@@ -23,9 +23,9 @@
     "prepare": "husky install"
   },
   "dependencies": {
-    "@new-hros/libs-apis": "^1.1.0",
-    "@new-hros/libs-core": "^1.1.0",
-    "@new-hros/libs-sql": "^1.1.0",
+    "@new-hros/libs-apis": "^1.1.1",
+    "@new-hros/libs-core": "^1.1.1",
+    "@new-hros/libs-sql": "^1.1.1",
     "@nestjs/common": "^10.3.0",
     "@nestjs/config": "^3.1.1",
     "@nestjs/core": "^10.3.0",

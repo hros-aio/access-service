@@ -6,8 +6,14 @@ import { ApisModule } from '@new-hros/libs-apis';
 import { ConfigurationModule, ConfigurationService, CoreModule } from '@new-hros/libs-core';
 import { SqlModule } from '@new-hros/libs-sql';
 
+import { AuthModule } from './modules/auth/auth.module';
+import { EmployeeModule } from './modules/employee/employee.module';
 import { HealthModule } from './modules/health/health.module';
+import { InviteModule } from './modules/invite/invite.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
+import { MfaModule } from './modules/mfa/mfa.module';
+import { TenantModule } from './modules/tenant/tenant.module';
+import { UserModule } from './modules/user/user.module';
 
 // Load local .env file if available
 const envPath = path.resolve(process.cwd(), '.env');
@@ -54,6 +60,12 @@ const config = new ConfigurationService({});
     }),
     HealthModule,
     MetricsModule,
+    TenantModule,
+    EmployeeModule,
+    UserModule,
+    InviteModule,
+    AuthModule,
+    MfaModule,
     SqlModule.forRootAsync({
       inject: [ConfigurationService],
       useFactory: (config: ConfigurationService) => ({
