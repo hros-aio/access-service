@@ -81,4 +81,13 @@ describe('MfaMethodRepository', () => {
       where: { userId: 'user-uuid', isPrimary: true, status: 'active' },
     });
   });
+
+  it('should save mfa method', async () => {
+    const method = new MfaMethod();
+    mockTypeormRepository.save.mockResolvedValue(method);
+
+    const result = await repository.save(method);
+    expect(result).toEqual(method);
+    expect(mockTypeormRepository.save).toHaveBeenCalledWith(method);
+  });
 });

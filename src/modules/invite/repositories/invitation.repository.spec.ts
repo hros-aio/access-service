@@ -84,4 +84,13 @@ describe('InvitationRepository', () => {
       ],
     });
   });
+
+  it('should save invitation', async () => {
+    const invite = new Invitation();
+    mockTypeormRepository.save.mockResolvedValue(invite);
+
+    const result = await repository.save(invite);
+    expect(result).toEqual(invite);
+    expect(mockTypeormRepository.save).toHaveBeenCalledWith(invite);
+  });
 });

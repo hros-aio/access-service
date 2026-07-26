@@ -64,4 +64,27 @@ describe('EmployeeReferenceRepository', () => {
     expect(result).toEqual(emp);
     expect(mockTypeormRepository.save).toHaveBeenCalledWith(emp);
   });
+
+  it('should find employee reference by code', async () => {
+    const emp = new EmployeeReference();
+    emp.tenantCode = 'TENANT_A';
+    emp.employeeCode = 'EMP001';
+    mockTypeormRepository.findOne.mockResolvedValue(emp);
+
+    const result = await repository.findByCode('TENANT_A', 'EMP001');
+    expect(result).toEqual(emp);
+    expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
+      where: { tenantCode: 'TENANT_A', employeeCode: 'EMP001' },
+    });
+  });
+
+  it('should check if employee reference exists', async () => {
+    mockTypeormRepository.count = jest.fn().mockResolvedValue(1);
+
+    const result = await repository.exists('emp-uuid');
+    expect(result).toBe(true);
+    expect(mockTypeormRepository.count).toHaveBeenCalledWith({
+      where: { employeeId: 'emp-uuid' },
+    });
+  });
 });

@@ -63,4 +63,14 @@ describe('TenantRepository', () => {
     expect(result).toEqual(tenant);
     expect(mockTypeormRepository.save).toHaveBeenCalledWith(tenant);
   });
+
+  it('should check if tenant exists', async () => {
+    mockTypeormRepository.count = jest.fn().mockResolvedValue(1);
+
+    const result = await repository.exists('TENANT_A');
+    expect(result).toBe(true);
+    expect(mockTypeormRepository.count).toHaveBeenCalledWith({
+      where: { tenantCode: 'TENANT_A' },
+    });
+  });
 });

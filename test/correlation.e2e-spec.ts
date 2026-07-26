@@ -1,10 +1,7 @@
 process.env.JWT_PRIVATE_KEY = process.env.JWT_PRIVATE_KEY || 'mock-private-key';
-if (!process.env.CI) {
-  process.env.DATABASE_PORT = process.env.DATABASE_PORT || '5433';
-  process.env.REDIS_PORT = process.env.REDIS_PORT || '6380';
-} else {
-  process.env.DATABASE_NAME = process.env.DATABASE_NAME || 'hrms_access_db_test';
-}
+process.env.DATABASE_PORT = process.env.DATABASE_PORT || '5432';
+process.env.REDIS_PORT = process.env.REDIS_PORT || '6379';
+process.env.DATABASE_NAME = process.env.DATABASE_NAME || 'hrms_access_db_test';
 import { Controller, Get, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Public } from '@new-hros/libs-apis';

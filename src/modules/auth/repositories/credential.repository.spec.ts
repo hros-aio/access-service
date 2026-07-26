@@ -80,4 +80,13 @@ describe('CredentialRepository', () => {
       where: { userId: 'user-uuid' },
     });
   });
+
+  it('should save credential', async () => {
+    const cred = new Credential();
+    mockTypeormRepository.save.mockResolvedValue(cred);
+
+    const result = await repository.save(cred);
+    expect(result).toEqual(cred);
+    expect(mockTypeormRepository.save).toHaveBeenCalledWith(cred);
+  });
 });
