@@ -1,9 +1,10 @@
 import { BaseEntity } from '@new-hros/libs-sql';
-import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, OneToOne, Unique } from 'typeorm';
 
 import { EmployeeReference } from '../../employee/entities/employee-reference.entity';
 
 @Entity('users')
+@Unique('uq_users_tenant_normalized_email', ['tenantCode', 'normalizedEmail'])
 export class User extends BaseEntity {
   @Column({ name: 'employee_ref_id', type: 'uuid', nullable: true })
   employeeRefId?: string;

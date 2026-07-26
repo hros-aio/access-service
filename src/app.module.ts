@@ -41,7 +41,7 @@ const config = new ConfigurationService({});
 
 @Module({
   imports: [
-    ConfigurationModule.register({ configDir: 'config' }),
+    ConfigurationModule.register({ configDir: 'config', envPath: '.env' }),
     CoreModule.forRoot({
       cache: {
         store: 'redis',
@@ -75,7 +75,7 @@ const config = new ConfigurationService({});
         username: config.get<string>('database.username'),
         password: config.get<string>('database.password'),
         database: config.get<string>('database.name'),
-        synchronize: false,
+        synchronize: true,
         autoLoadEntities: true,
       }),
     }),

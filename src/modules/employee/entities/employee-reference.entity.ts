@@ -1,8 +1,10 @@
-import { Column, Entity, ManyToOne, PrimaryColumn, JoinColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, PrimaryColumn, JoinColumn, Unique } from 'typeorm';
 
 import { Tenant } from '../../tenant/entities/tenant.entity';
 
 @Entity('employee_references')
+@Unique('uq_employee_references_tenant_employee_code', ['tenantCode', 'employeeCode'])
+@Unique('uq_employee_references_tenant_employee_id', ['tenantCode', 'employeeId'])
 export class EmployeeReference {
   @PrimaryColumn({ name: 'employee_id', type: 'uuid' })
   employeeId: string;

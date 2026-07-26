@@ -1,9 +1,11 @@
 import { BaseEntity } from '@new-hros/libs-sql';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 
 import { User } from '../../user/entities/user.entity';
 
 @Entity('external_identities')
+@Unique('uq_external_identity_subject', ['tenantCode', 'provider', 'providerSubject'])
+@Unique('uq_external_identity_user_provider', ['userId', 'provider'])
 export class ExternalIdentity extends BaseEntity {
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
