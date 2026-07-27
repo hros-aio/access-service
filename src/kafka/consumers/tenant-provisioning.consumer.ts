@@ -1,7 +1,8 @@
 import { Controller } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
-import { EventEnvelope } from '@new-hros/libs-events';
 import { RequestContextService, RequestContext } from '@new-hros/libs-core';
+import { EventEnvelope } from '@new-hros/libs-events';
+
 import { ProvisioningApplicationService } from '../../modules/provisioning/services/provisioning.application.service';
 
 interface TenantCreatedPayload {
@@ -11,21 +12,25 @@ interface TenantCreatedPayload {
 
 @Controller()
 export class TenantProvisioningConsumer {
-  constructor(
-    private readonly provisioningService: ProvisioningApplicationService,
-  ) {}
+  constructor(private readonly provisioningService: ProvisioningApplicationService) {}
 
   @EventPattern('tenant.lifecycle-events')
   async handleTenantLifecycleEvent(
     @Payload() envelope: EventEnvelope<TenantCreatedPayload> & { eventType?: string },
-  ): Promise<any> {
-    const eventType = envelope.eventType || (envelope as any).payload?.eventType || 'tenant.created';
-    
+  ): Promise<unknown> {
+    const eventType =
+      envelope.eventType ||
+      (envelope as unknown as { payload?: { eventType?: string } }).payload?.eventType ||
+      'tenant.created';
+
     if (eventType !== 'tenant.created') {
       return;
     }
 
-    const payload = envelope.payload?.tenantCode ? envelope.payload : (envelope as any).payload?.payload || envelope.payload;
+    const payload = envelope.payload?.tenantCode
+      ? envelope.payload
+      : (envelope as unknown as { payload?: { payload?: TenantCreatedPayload } }).payload
+          ?.payload || envelope.payload;
 
     const context: RequestContext = {
       traceId: envelope.correlationId || envelope.id,
@@ -39,11 +44,7 @@ export class TenantProvisioningConsumer {
     };
 
     return RequestContextService.run(context, async () => {
-      return this.provisioningService.bootstrapRootAdmin(
-        envelope.id,
-        envelope.topic,
-        payload,
-      );
+      return this.provisioningService.bootstrapRootAdmin(envelope.id, envelope.topic, payload);
     });
   }
 }

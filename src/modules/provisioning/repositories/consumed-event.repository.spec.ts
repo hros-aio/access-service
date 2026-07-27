@@ -1,13 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionService } from '@new-hros/libs-sql';
+
 import { ConsumedEventRepository } from './consumed-event.repository';
 import { ConsumedEvent } from '../entities/consumed-event.entity';
 
 describe('ConsumedEventRepository', () => {
   let repository: ConsumedEventRepository;
-  let mockTransactionService: any;
-  let mockEntityManager: any;
-  let mockTypeormRepository: any;
+  let mockTransactionService: { getManager: jest.Mock };
+  let mockEntityManager: { getRepository: jest.Mock };
+  let mockTypeormRepository: { count: jest.Mock; save: jest.Mock };
 
   beforeEach(async () => {
     mockTypeormRepository = {

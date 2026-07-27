@@ -1,11 +1,12 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
-import { UserRepository } from '../../user/repositories/user.repository';
-import { ConsumedEventRepository } from '../repositories/consumed-event.repository';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
-import { ConsumedEvent } from '../entities/consumed-event.entity';
-import { User } from '../../user/entities/user.entity';
+
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
+import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { User } from '../../user/entities/user.entity';
+import { UserRepository } from '../../user/repositories/user.repository';
+import { ConsumedEvent } from '../entities/consumed-event.entity';
+import { ConsumedEventRepository } from '../repositories/consumed-event.repository';
 
 @Injectable()
 export class ProvisioningApplicationService {
@@ -64,7 +65,7 @@ export class ProvisioningApplicationService {
       newUser.credentialStatus = 'pending';
       newUser.protectedRootAdmin = true;
       newUser.securityVersion = 1;
-      
+
       const savedUser = await usersRepo.save(newUser);
 
       // 5. Append security outbox event
@@ -81,7 +82,9 @@ export class ProvisioningApplicationService {
       };
       outbox.publishStatus = 'pending';
 
-      const outboxRepo = this.transactionService.getManager().getRepository(AuthSecurityEventOutbox);
+      const outboxRepo = this.transactionService
+        .getManager()
+        .getRepository(AuthSecurityEventOutbox);
       await outboxRepo.save(outbox);
 
       // 6. Record consumed event

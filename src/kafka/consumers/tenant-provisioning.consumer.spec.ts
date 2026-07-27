@@ -1,11 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RequestContextService } from '@new-hros/libs-core';
-import { ProvisioningApplicationService } from '../../modules/provisioning/services/provisioning.application.service';
+
 import { TenantProvisioningConsumer } from './tenant-provisioning.consumer';
+import { ProvisioningApplicationService } from '../../modules/provisioning/services/provisioning.application.service';
 
 describe('TenantProvisioningConsumer', () => {
   let consumer: TenantProvisioningConsumer;
-  let mockProvisioningService: any;
+  let mockProvisioningService: { bootstrapRootAdmin: jest.Mock };
 
   beforeEach(async () => {
     mockProvisioningService = {
@@ -14,9 +15,7 @@ describe('TenantProvisioningConsumer', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [TenantProvisioningConsumer],
-      providers: [
-        { provide: ProvisioningApplicationService, useValue: mockProvisioningService },
-      ],
+      providers: [{ provide: ProvisioningApplicationService, useValue: mockProvisioningService }],
     }).compile();
 
     consumer = module.get<TenantProvisioningConsumer>(TenantProvisioningConsumer);
@@ -74,7 +73,9 @@ describe('TenantProvisioningConsumer', () => {
       },
     };
 
-    await consumer.handleTenantLifecycleEvent(envelope as any);
+    await consumer.handleTenantLifecycleEvent(
+      envelope as unknown as Parameters<typeof consumer.handleTenantLifecycleEvent>[0],
+    );
 
     expect(mockProvisioningService.bootstrapRootAdmin).toHaveBeenCalledWith(
       'evt-123',
@@ -97,7 +98,9 @@ describe('TenantProvisioningConsumer', () => {
       },
     };
 
-    await consumer.handleTenantLifecycleEvent(envelope as any);
+    await consumer.handleTenantLifecycleEvent(
+      envelope as unknown as Parameters<typeof consumer.handleTenantLifecycleEvent>[0],
+    );
 
     expect(mockProvisioningService.bootstrapRootAdmin).toHaveBeenCalledWith(
       'evt-123',

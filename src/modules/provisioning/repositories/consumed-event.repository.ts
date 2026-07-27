@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
 import { Repository } from 'typeorm';
+
 import { ConsumedEvent } from '../entities/consumed-event.entity';
 
 @Injectable()

@@ -1,22 +1,22 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionService } from '@new-hros/libs-sql';
-import { RequestContextService } from '@new-hros/libs-core';
+
+import { ProvisioningApplicationService } from './provisioning.application.service';
+import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { User } from '../../user/entities/user.entity';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { ConsumedEventRepository } from '../repositories/consumed-event.repository';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
-import { ProvisioningApplicationService } from './provisioning.application.service';
-import { User } from '../../user/entities/user.entity';
 
 describe('ProvisioningApplicationService', () => {
   let service: ProvisioningApplicationService;
-  let mockTransactionService: any;
-  let mockUserRepository: any;
-  let mockConsumedEventRepository: any;
-  let mockOutboxRepository: any;
-  let mockEntityManager: any;
-  let mockTypeormUserRepository: any;
-  let mockTypeormOutboxRepository: any;
+  let mockTransactionService: { runInTransaction: jest.Mock; getManager: jest.Mock };
+  let mockUserRepository: Record<string, unknown>;
+  let mockConsumedEventRepository: { exists: jest.Mock; save: jest.Mock };
+  let mockOutboxRepository: Record<string, unknown>;
+  let mockEntityManager: { getRepository: jest.Mock };
+  let mockTypeormUserRepository: { findOne: jest.Mock; save: jest.Mock };
+  let mockTypeormOutboxRepository: { save: jest.Mock };
 
   beforeEach(async () => {
     mockTypeormUserRepository = {
