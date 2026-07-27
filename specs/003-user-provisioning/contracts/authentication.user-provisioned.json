@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UserProvisionedEvent",
+  "type": "object",
+  "required": ["userId", "tenantCode", "email", "accountType", "status"],
+  "properties": {
+    "userId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier of the created root admin user"
+    },
+    "tenantCode": {
+      "type": "string",
+      "description": "Tenant code context"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Normalized email address of the root admin"
+    },
+    "accountType": {
+      "type": "string",
+      "enum": ["BUILT_IN_ADMIN"],
+      "description": "Determines the account tier"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ACTIVE"],
+      "description": "Account status immediately after bootstrap"
+    }
+  }
+}
