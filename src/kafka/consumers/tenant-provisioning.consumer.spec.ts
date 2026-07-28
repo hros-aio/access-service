@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RequestContextService } from '@new-hros/libs-core';
 
-import { EventType } from '../../enums';
 import { TenantProvisioningConsumer } from './tenant-provisioning.consumer';
+import { EventType } from '../../enums';
 import { ProvisioningApplicationService } from '../../modules/provisioning/services/provisioning.application.service';
 
 describe('TenantProvisioningConsumer', () => {

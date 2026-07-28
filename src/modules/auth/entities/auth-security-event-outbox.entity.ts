@@ -1,7 +1,7 @@
 import { BaseEntity } from '@new-hros/libs-sql';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { TableName } from '../../../enums';
 
+import { TableName } from '../../../enums';
 import { User } from '../../user/entities/user.entity';
 
 @Entity(TableName.AUTH_SECURITY_EVENTS_OUTBOX)
