@@ -1,6 +1,7 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
 
+import { EventType } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { User } from '../../user/entities/user.entity';
@@ -72,7 +73,7 @@ export class ProvisioningApplicationService {
       const outbox = new AuthSecurityEventOutbox();
       outbox.tenantCode = tenantCode;
       outbox.userId = savedUser.id;
-      outbox.eventType = 'authentication.user-provisioned';
+      outbox.eventType = EventType.AUTHENTICATION_USER_PROVISIONED;
       outbox.sanitizedPayload = {
         userId: savedUser.id,
         tenantCode,

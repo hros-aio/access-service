@@ -1,6 +1,8 @@
-import { Column, Entity, PrimaryColumn, CreateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryColumn } from 'typeorm';
 
-@Entity('kafka_consumed_events')
+import { TableName } from '../../../enums';
+
+@Entity(TableName.KAFKA_CONSUMED_EVENTS)
 export class ConsumedEvent {
   @PrimaryColumn({ type: 'uuid' })
   id: string;

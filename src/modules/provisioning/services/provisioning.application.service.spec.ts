@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { ProvisioningApplicationService } from './provisioning.application.service';
+import { EventType } from '../../../enums';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { User } from '../../user/entities/user.entity';
 import { UserRepository } from '../../user/repositories/user.repository';
@@ -137,7 +138,7 @@ describe('ProvisioningApplicationService', () => {
     );
     expect(mockTypeormOutboxRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({
-        eventType: 'authentication.user-provisioned',
+        eventType: EventType.AUTHENTICATION_USER_PROVISIONED,
         publishStatus: 'pending',
       }),
     );

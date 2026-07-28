@@ -1,9 +1,10 @@
 import { BaseEntity } from '@new-hros/libs-sql';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { TableName } from '../../../enums';
 
 import { User } from '../../user/entities/user.entity';
 
-@Entity('auth_security_events_outbox')
+@Entity(TableName.AUTH_SECURITY_EVENTS_OUTBOX)
 export class AuthSecurityEventOutbox extends BaseEntity {
   @Column({ name: 'user_id', type: 'uuid', nullable: true })
   userId?: string;

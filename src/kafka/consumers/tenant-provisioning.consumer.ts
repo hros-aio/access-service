@@ -3,6 +3,7 @@ import { EventPattern, Payload } from '@nestjs/microservices';
 import { RequestContextService, RequestContext } from '@new-hros/libs-core';
 import { EventEnvelope } from '@new-hros/libs-events';
 
+import { EventType } from '../../enums';
 import { ProvisioningApplicationService } from '../../modules/provisioning/services/provisioning.application.service';
 
 interface TenantCreatedPayload {
@@ -21,9 +22,9 @@ export class TenantProvisioningConsumer {
     const eventType =
       envelope.eventType ||
       (envelope as unknown as { payload?: { eventType?: string } }).payload?.eventType ||
-      'tenant.created';
+      EventType.TENANT_CREATED;
 
-    if (eventType !== 'tenant.created') {
+    if (eventType !== EventType.TENANT_CREATED) {
       return;
     }
 
