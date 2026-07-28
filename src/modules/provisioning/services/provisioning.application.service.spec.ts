@@ -128,6 +128,15 @@ describe('ProvisioningApplicationService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('should throw BadRequestException if rootAdminEmail format is invalid', async () => {
+      await expect(
+        service.bootstrapRootAdmin('evt-123', 'topic-name', {
+          tenantCode: 'TENANT_A',
+          rootAdminEmail: 'invalid-email',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should return ALREADY_EXISTS if root admin user exists', async () => {
       mockTypeormUserRepository.findOne.mockResolvedValue(new User());
 
@@ -380,4 +389,82 @@ describe('ProvisioningApplicationService', () => {
       );
     });
   });
+
+  describe('synchronizeEmployeeStatus - Missing User Reference', () => {
+    it('should update employee reference to suspended if user is missing', async () => {
+      const existingRef = new EmployeeReference();
+      existingRef.employeeId = 'emp-123';
+      existingRef.tenantCode = 'TENANT_A';
+      existingRef.sourceVersion = '9';
+
+      mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
+      mockTypeormUserRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.synchronizeEmployeeStatus(
+        'evt-123',
+        EventType.EMPLOYEE_SUSPENDED,
+        {
+          employeeId: 'emp-123',
+          tenantCode: 'TENANT_A',
+          sourceVersion: 10,
+        },
+      );
+
+      expect(result).toEqual({ success: true });
+      expect(existingRef.status).toBe('suspended');
+      expect(existingRef.sourceVersion).toBe('10');
+      expect(mockTypeormConsumedEventRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'evt-123' }),
+      );
+    });
+
+    it('should update employee reference to terminated if user is missing', async () => {
+      const existingRef = new EmployeeReference();
+      existingRef.employeeId = 'emp-123';
+      existingRef.tenantCode = 'TENANT_A';
+      existingRef.sourceVersion = '9';
+
+      mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
+      mockTypeormUserRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.synchronizeEmployeeStatus(
+        'evt-123',
+        EventType.EMPLOYEE_TERMINATED,
+        {
+          employeeId: 'emp-123',
+          tenantCode: 'TENANT_A',
+          sourceVersion: 10,
+        },
+      );
+
+      expect(result).toEqual({ success: true });
+      expect(existingRef.status).toBe('terminated');
+      expect(existingRef.sourceVersion).toBe('10');
+    });
+
+    it('should update employee reference to reactivated if user is missing', async () => {
+      const existingRef = new EmployeeReference();
+      existingRef.employeeId = 'emp-123';
+      existingRef.tenantCode = 'TENANT_A';
+      existingRef.sourceVersion = '9';
+
+      mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
+      mockTypeormUserRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.synchronizeEmployeeStatus(
+        'evt-123',
+        EventType.EMPLOYEE_REACTIVATED,
+        {
+          employeeId: 'emp-123',
+          tenantCode: 'TENANT_A',
+          sourceVersion: 10,
+        },
+      );
+
+      expect(result).toEqual({ success: true });
+      expect(existingRef.status).toBe('reactivated');
+      expect(existingRef.sourceVersion).toBe('10');
+    });
+  });
 });
+

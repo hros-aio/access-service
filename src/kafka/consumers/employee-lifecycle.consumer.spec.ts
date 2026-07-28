@@ -154,5 +154,111 @@ describe('EmployeeLifecycleConsumer', () => {
         envelope.payload,
       );
     });
+
+    it('should fall back to envelope.payload.eventType if eventType is missing', async () => {
+      const envelope = {
+        id: 'event-id-4',
+        topic: 'employee.lifecycle-events',
+        timestamp: new Date(),
+        payload: {
+          eventType: EventType.EMPLOYEE_SUSPENDED,
+          employeeId: 'emp-id',
+          tenantCode: 'T1',
+          sourceVersion: 10,
+        },
+      };
+
+      await consumer.handleEmployeeLifecycleEvent(
+        envelope as unknown as Parameters<
+          EmployeeLifecycleConsumer['handleEmployeeLifecycleEvent']
+        >[0],
+      );
+
+      expect(mockProvisioningService.synchronizeEmployeeStatus).toHaveBeenCalledWith(
+        'event-id-4',
+        EventType.EMPLOYEE_SUSPENDED,
+        envelope.payload,
+      );
+    });
+
+    it('should handle nested payload structure when employeeId is missing in flat payload', async () => {
+      const envelope = {
+        id: 'event-id-5',
+        topic: 'employee.lifecycle-events',
+        timestamp: new Date(),
+        eventType: EventType.EMPLOYEE_SUSPENDED,
+        payload: {
+          payload: {
+            employeeId: 'emp-id-nested',
+            tenantCode: 'T1',
+            sourceVersion: 10,
+          },
+        },
+      };
+
+      await consumer.handleEmployeeLifecycleEvent(
+        envelope as unknown as Parameters<
+          EmployeeLifecycleConsumer['handleEmployeeLifecycleEvent']
+        >[0],
+      );
+
+      expect(mockProvisioningService.synchronizeEmployeeStatus).toHaveBeenCalledWith(
+        'event-id-5',
+        EventType.EMPLOYEE_SUSPENDED,
+        envelope.payload.payload,
+      );
+    });
+
+    it('should fall back to envelope.payload if employeeId and nested payload are both missing', async () => {
+      const envelope = {
+        id: 'event-id-6',
+        topic: 'employee.lifecycle-events',
+        timestamp: new Date(),
+        eventType: EventType.EMPLOYEE_SUSPENDED,
+        payload: {
+          tenantCode: 'T1',
+          sourceVersion: 10,
+        },
+      };
+
+      await consumer.handleEmployeeLifecycleEvent(
+        envelope as unknown as Parameters<
+          EmployeeLifecycleConsumer['handleEmployeeLifecycleEvent']
+        >[0],
+      );
+
+      expect(mockProvisioningService.synchronizeEmployeeStatus).toHaveBeenCalledWith(
+        'event-id-6',
+        EventType.EMPLOYEE_SUSPENDED,
+        envelope.payload,
+      );
+    });
+
+    it('should fall back to envelope.id if correlationId is missing', async () => {
+      const envelope = {
+        id: 'event-id-7',
+        topic: 'employee.lifecycle-events',
+        timestamp: new Date(),
+        eventType: EventType.EMPLOYEE_SUSPENDED,
+        payload: {
+          employeeId: 'emp-id',
+          tenantCode: 'T1',
+          sourceVersion: 10,
+        },
+      };
+
+      const runSpy = jest.spyOn(RequestContextService, 'run');
+
+      await consumer.handleEmployeeLifecycleEvent(
+        envelope as unknown as Parameters<
+          EmployeeLifecycleConsumer['handleEmployeeLifecycleEvent']
+        >[0],
+      );
+
+      expect(runSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ traceId: 'event-id-7' }),
+        expect.any(Function),
+      );
+    });
   });
 });
