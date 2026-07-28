@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { CACHE_PROVIDER_TOKEN, RedisCacheProvider } from '@new-hros/libs-core';
+import { CACHE_PROVIDER_TOKEN, CacheService, RedisCacheProvider } from '@new-hros/libs-core';
 
 import { AuthSecurityEventOutbox } from './entities/auth-security-event-outbox.entity';
 import { Credential } from './entities/credential.entity';
@@ -19,7 +19,7 @@ import { SessionApplicationService } from './services/session.application.servic
     SessionApplicationService,
     {
       provide: RedisCacheProvider,
-      useFactory: (cacheService: any) => cacheService.l2,
+      useFactory: (cacheService: CacheService): RedisCacheProvider => cacheService['l2'],
       inject: [CACHE_PROVIDER_TOKEN],
     },
   ],

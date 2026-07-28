@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RequestContextService } from '@new-hros/libs-core';
+import { EventEnvelope } from '@new-hros/libs-events';
 
 import { TenantProvisioningConsumer } from './tenant-provisioning.consumer';
 import { EventType } from '../../enums';
@@ -171,7 +172,9 @@ describe('TenantProvisioningConsumer', () => {
 
     const runSpy = jest.spyOn(RequestContextService, 'run');
 
-    await consumer.handleTenantLifecycleEvent(envelope as any);
+    await consumer.handleTenantLifecycleEvent(
+      envelope as unknown as EventEnvelope<{ tenantCode: string; rootAdminEmail: string }>,
+    );
 
     expect(runSpy).toHaveBeenCalledWith(
       expect.objectContaining({ traceId: 'evt-123' }),
