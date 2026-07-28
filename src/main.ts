@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { createCorsOptions, setupSwagger, setupVersioning } from '@new-hros/libs-apis';
 import { ConfigurationService } from '@new-hros/libs-core';
+import { setupKafkaMicroservice } from '@new-hros/libs-events';
 
 import { AppModule } from './app.module';
 
@@ -33,6 +34,20 @@ async function bootstrap(): Promise<void> {
 
   // Enable Graceful Shutdown hooks
   app.enableShutdownHooks();
+
+  // Configure Kafka Microservice
+  const brokers = configService.get<string[]>('kafka.brokers') ?? ['localhost:9092'];
+  await setupKafkaMicroservice(app, {
+    client: {
+      brokers,
+      clientId: 'hrms-access-service-client',
+    },
+    consumer: {
+      groupId: 'hrms-access-service-group',
+    },
+    failedCount: 3,
+    retryDelayMs: 1000,
+  });
 
   await app.listen(port);
   logger.log(`Application is running on: http://localhost:${port}/docs`);

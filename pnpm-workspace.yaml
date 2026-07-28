@@ -6,4 +6,5 @@ allowBuilds:
 overrides:
   '@new-hros/libs-apis': link:../../api-factory/libs/libs-apis
   '@new-hros/libs-core': link:../../api-factory/libs/libs-core
+  '@new-hros/libs-events': link:../../api-factory/libs/libs-events
   '@new-hros/libs-sql': link:../../api-factory/libs/libs-sql
