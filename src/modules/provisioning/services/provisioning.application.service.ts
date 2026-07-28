@@ -1,9 +1,14 @@
+import crypto from 'crypto';
+
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { EventType } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { SessionApplicationService } from '../../auth/services/session.application.service';
+import { EmployeeReference } from '../../employee/entities/employee-reference.entity';
+import { Invitation } from '../../invite/entities/invitation.entity';
 import { User } from '../../user/entities/user.entity';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { ConsumedEvent } from '../entities/consumed-event.entity';
@@ -16,6 +21,7 @@ export class ProvisioningApplicationService {
     private readonly userRepository: UserRepository,
     private readonly consumedEventRepository: ConsumedEventRepository,
     private readonly outboxRepository: AuthSecurityEventOutboxRepository,
+    private readonly sessionService: SessionApplicationService,
   ) {}
 
   async bootstrapRootAdmin(
@@ -96,5 +102,204 @@ export class ProvisioningApplicationService {
 
       return { success: true };
     });
+  }
+
+  async synchronizeEmployeeStatus(
+    eventId: string,
+    eventType: string,
+    payload: { employeeId: string; tenantCode: string; sourceVersion: number },
+  ): Promise<{ success: boolean; reason?: string }> {
+    // 1. Idempotency Check
+    const alreadyProcessed = await this.consumedEventRepository.exists(eventId);
+    if (alreadyProcessed) {
+      return { success: true, reason: 'DUPLICATE' };
+    }
+
+    const { employeeId, tenantCode, sourceVersion } = payload;
+    let userIdToRevoke: string | null = null;
+
+    const result = await this.transactionService.runInTransaction(async () => {
+      const manager = this.transactionService.getManager();
+      const employeeRefRepo = manager.getRepository(EmployeeReference);
+      const userRepo = manager.getRepository(User);
+      const consumedRepo = manager.getRepository(ConsumedEvent);
+      const outboxRepo = manager.getRepository(AuthSecurityEventOutbox);
+      const invitationRepo = manager.getRepository(Invitation);
+
+      // 2. Lock & Retrieve EmployeeReference
+      const employeeRef = await employeeRefRepo.findOne({
+        where: { employeeId, tenantCode },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!employeeRef) {
+        return { success: true, reason: 'UNKNOWN_EMPLOYEE_REFERENCE' };
+      }
+
+      // 3. Event Ordering/Idempotency validation
+      const currentStoredVersion = employeeRef.sourceVersion
+        ? parseInt(employeeRef.sourceVersion, 10)
+        : 0;
+      if (sourceVersion <= currentStoredVersion) {
+        return { success: true, reason: 'STALE_VERSION' };
+      }
+
+      // 4. Retrieve User associated with this employee
+      const user = await userRepo.findOne({
+        where: { tenantCode, employeeRefId: employeeId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!user) {
+        // Just update employeeRef version/status and return
+        employeeRef.sourceVersion = sourceVersion.toString();
+        if (eventType === EventType.EMPLOYEE_SUSPENDED) {
+          employeeRef.status = 'suspended';
+        } else if (eventType === EventType.EMPLOYEE_TERMINATED) {
+          employeeRef.status = 'terminated';
+        } else if (eventType === EventType.EMPLOYEE_REACTIVATED) {
+          employeeRef.status = 'reactivated';
+        }
+        await employeeRefRepo.save(employeeRef);
+
+        const consumed = new ConsumedEvent();
+        consumed.id = eventId;
+        consumed.topic = 'employee.lifecycle-events';
+        await consumedRepo.save(consumed);
+
+        return { success: true };
+      }
+
+      userIdToRevoke = user.id;
+
+      // 5. Update state for US1 Suspension
+      if (eventType === EventType.EMPLOYEE_SUSPENDED) {
+        user.status = 'disabled';
+        user.securityVersion += 1;
+        employeeRef.status = 'suspended';
+
+        await userRepo.save(user);
+        employeeRef.sourceVersion = sourceVersion.toString();
+        await employeeRefRepo.save(employeeRef);
+
+        // Write outbox security event
+        const outbox = new AuthSecurityEventOutbox();
+        outbox.tenantCode = tenantCode;
+        outbox.userId = user.id;
+        outbox.eventType = EventType.AUTHENTICATION_SESSIONS_REVOKED;
+        outbox.sanitizedPayload = {
+          userId: user.id,
+          tenantCode,
+          reason: 'EMPLOYMENT_STATUS_CHANGED',
+          newStatus: 'DISABLED',
+        };
+        outbox.publishStatus = 'pending';
+        await outboxRepo.save(outbox);
+      }
+
+      // 5. Update state for US2 Termination
+      if (eventType === EventType.EMPLOYEE_TERMINATED) {
+        user.status = 'archived';
+        user.securityVersion += 1;
+        employeeRef.status = 'terminated';
+
+        await userRepo.save(user);
+        employeeRef.sourceVersion = sourceVersion.toString();
+        await employeeRefRepo.save(employeeRef);
+
+        // Revoke active/pending invitations
+        const invitations = await invitationRepo.find({
+          where: { userId: user.id, status: 'pending' },
+        });
+        if (invitations.length > 0) {
+          for (const invite of invitations) {
+            invite.status = 'revoked';
+            invite.revokedAt = new Date();
+          }
+          await invitationRepo.save(invitations);
+        }
+
+        // Write outbox security event
+        const outbox = new AuthSecurityEventOutbox();
+        outbox.tenantCode = tenantCode;
+        outbox.userId = user.id;
+        outbox.eventType = EventType.AUTHENTICATION_SESSIONS_REVOKED;
+        outbox.sanitizedPayload = {
+          userId: user.id,
+          tenantCode,
+          reason: 'EMPLOYMENT_STATUS_CHANGED',
+          newStatus: 'ARCHIVED',
+        };
+        outbox.publishStatus = 'pending';
+        await outboxRepo.save(outbox);
+      }
+
+      // 5. Update state for US3 Reactivation
+      if (eventType === EventType.EMPLOYEE_REACTIVATED) {
+        user.status = 'invited';
+        user.securityVersion += 1;
+        employeeRef.status = 'reactivated';
+
+        await userRepo.save(user);
+        employeeRef.sourceVersion = sourceVersion.toString();
+        await employeeRefRepo.save(employeeRef);
+
+        // Revoke old active/pending invitations
+        const invitations = await invitationRepo.find({
+          where: { userId: user.id, status: 'pending' },
+        });
+        if (invitations.length > 0) {
+          for (const invite of invitations) {
+            invite.status = 'revoked';
+            invite.revokedAt = new Date();
+          }
+          await invitationRepo.save(invitations);
+        }
+
+        // Create new pending invitation
+        const newInvite = new Invitation();
+        newInvite.userId = user.id;
+        newInvite.status = 'pending';
+        const randomToken = crypto.randomBytes(32).toString('hex');
+        newInvite.tokenHash = crypto.createHash('sha256').update(randomToken).digest('hex');
+        newInvite.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        newInvite.version = 1;
+        const savedInvite = await invitationRepo.save(newInvite);
+
+        // Write outbox security event (user-invited)
+        const outbox = new AuthSecurityEventOutbox();
+        outbox.tenantCode = tenantCode;
+        outbox.userId = user.id;
+        outbox.eventType = EventType.AUTHENTICATION_USER_INVITED;
+        outbox.sanitizedPayload = {
+          userId: user.id,
+          tenantCode,
+          invitationId: savedInvite.id,
+          email: user.displayEmail,
+        };
+        outbox.publishStatus = 'pending';
+        await outboxRepo.save(outbox);
+      }
+
+      // 6. Record consumed event
+      const consumed = new ConsumedEvent();
+      consumed.id = eventId;
+      consumed.topic = 'employee.lifecycle-events';
+      await consumedRepo.save(consumed);
+
+      return { success: true };
+    });
+
+    // 7. Revoke active sessions in Redis post-commit
+    if (result.success && !result.reason && userIdToRevoke) {
+      if (
+        eventType === EventType.EMPLOYEE_SUSPENDED ||
+        eventType === EventType.EMPLOYEE_TERMINATED
+      ) {
+        await this.sessionService.revokeAllSessions(tenantCode, userIdToRevoke);
+      }
+    }
+
+    return result;
   }
 }
