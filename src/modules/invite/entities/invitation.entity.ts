@@ -7,6 +7,7 @@ import {
   VersionColumn,
 } from 'typeorm';
 
+import { InvitationStatus } from '../../../enums';
 import { User } from '../../user/entities/user.entity';
 
 @Entity('invitations')
@@ -21,7 +22,7 @@ export class Invitation {
   tokenHash: string;
 
   @Column({ name: 'status', type: 'varchar', length: 30 })
-  status: string;
+  status: InvitationStatus;
 
   @VersionColumn({ default: 1 })
   version: number;
