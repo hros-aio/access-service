@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ConsumedEmployeeLifecycleEvent",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique event identifier for idempotency check."
+    },
+    "eventType": {
+      "type": "string",
+      "enum": ["employee.suspended", "employee.terminated", "employee.reactivated"],
+      "description": "The type of the lifecycle transition event."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event occurrence time."
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Tracing identifier across boundaries."
+    },
+    "tenantCode": {
+      "type": "string",
+      "description": "Tenant the employee belongs to."
+    },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tenantCode": {
+          "type": "string"
+        },
+        "sourceVersion": {
+          "type": "integer",
+          "description": "Monotonically increasing version from source domain used for event ordering."
+        }
+      },
+      "required": ["employeeId", "tenantCode", "sourceVersion"]
+    }
+  },
+  "required": ["id", "eventType", "timestamp", "tenantCode", "payload"]
+}

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RequestContextService } from '@new-hros/libs-core';
+import { EventEnvelope } from '@new-hros/libs-events';
 
 import { TenantProvisioningConsumer } from './tenant-provisioning.consumer';
 import { EventType } from '../../enums';
@@ -128,5 +129,56 @@ describe('TenantProvisioningConsumer', () => {
     await consumer.handleTenantLifecycleEvent(envelope);
 
     expect(mockProvisioningService.bootstrapRootAdmin).not.toHaveBeenCalled();
+  });
+
+  it('should fall back to envelope.payload if tenantCode and nested payload are both missing', async () => {
+    const envelope = {
+      id: 'evt-123',
+      topic: 'tenant.lifecycle-events',
+      producer: 'tenant-service',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      correlationId: 'corr-123',
+      eventType: EventType.TENANT_CREATED,
+      payload: {
+        rootAdminEmail: 'admin@tenant-a.com',
+      },
+    };
+
+    await consumer.handleTenantLifecycleEvent(
+      envelope as unknown as Parameters<typeof consumer.handleTenantLifecycleEvent>[0],
+    );
+
+    expect(mockProvisioningService.bootstrapRootAdmin).toHaveBeenCalledWith(
+      'evt-123',
+      'tenant.lifecycle-events',
+      envelope.payload,
+    );
+  });
+
+  it('should fall back to envelope.id if correlationId is missing', async () => {
+    const envelope = {
+      id: 'evt-123',
+      topic: 'tenant.lifecycle-events',
+      producer: 'tenant-service',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      eventType: EventType.TENANT_CREATED,
+      payload: {
+        tenantCode: 'TENANT_A',
+        rootAdminEmail: 'admin@tenant-a.com',
+      },
+    };
+
+    const runSpy = jest.spyOn(RequestContextService, 'run');
+
+    await consumer.handleTenantLifecycleEvent(
+      envelope as unknown as EventEnvelope<{ tenantCode: string; rootAdminEmail: string }>,
+    );
+
+    expect(runSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ traceId: 'evt-123' }),
+      expect.any(Function),
+    );
   });
 });

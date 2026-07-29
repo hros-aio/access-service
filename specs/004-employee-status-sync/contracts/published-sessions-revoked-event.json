@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PublishedSessionsRevokedEvent",
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "The user whose sessions were revoked."
+    },
+    "tenantCode": {
+      "type": "string",
+      "description": "The tenant code of the user."
+    },
+    "reason": {
+      "type": "string",
+      "const": "EMPLOYMENT_STATUS_CHANGED",
+      "description": "Static reason why sessions were invalidated."
+    },
+    "newStatus": {
+      "type": "string",
+      "enum": ["DISABLED", "ARCHIVED"],
+      "description": "The new access status of the user."
+    }
+  },
+  "required": ["userId", "tenantCode", "reason", "newStatus"]
+}
