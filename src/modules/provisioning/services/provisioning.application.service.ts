@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
 
-import { EventType } from '../../../enums';
+import { EventType, UserStatus, CredentialStatus, InvitationStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { SessionApplicationService } from '../../auth/services/session.application.service';
@@ -67,9 +67,9 @@ export class ProvisioningApplicationService {
       newUser.tenantCode = tenantCode;
       newUser.displayEmail = rootAdminEmail;
       newUser.normalizedEmail = rootAdminEmail.toLowerCase().trim();
-      newUser.status = 'active';
+      newUser.status = UserStatus.ACTIVE;
       newUser.userType = 'admin';
-      newUser.credentialStatus = 'pending';
+      newUser.credentialStatus = CredentialStatus.PENDING;
       newUser.protectedRootAdmin = true;
       newUser.securityVersion = 1;
 
@@ -174,7 +174,7 @@ export class ProvisioningApplicationService {
 
       // 5. Update state for US1 Suspension
       if (eventType === EventType.EMPLOYEE_SUSPENDED) {
-        user.status = 'disabled';
+        user.status = UserStatus.DISABLED;
         user.securityVersion += 1;
         employeeRef.status = 'suspended';
 
@@ -199,7 +199,7 @@ export class ProvisioningApplicationService {
 
       // 5. Update state for US2 Termination
       if (eventType === EventType.EMPLOYEE_TERMINATED) {
-        user.status = 'archived';
+        user.status = UserStatus.ARCHIVED;
         user.securityVersion += 1;
         employeeRef.status = 'terminated';
 
@@ -209,11 +209,11 @@ export class ProvisioningApplicationService {
 
         // Revoke active/pending invitations
         const invitations = await invitationRepo.find({
-          where: { userId: user.id, status: 'pending' },
+          where: { userId: user.id, status: InvitationStatus.PENDING },
         });
         if (invitations.length > 0) {
           for (const invite of invitations) {
-            invite.status = 'revoked';
+            invite.status = InvitationStatus.REVOKED;
             invite.revokedAt = new Date();
           }
           await invitationRepo.save(invitations);
@@ -236,7 +236,7 @@ export class ProvisioningApplicationService {
 
       // 5. Update state for US3 Reactivation
       if (eventType === EventType.EMPLOYEE_REACTIVATED) {
-        user.status = 'invited';
+        user.status = UserStatus.INVITED;
         user.securityVersion += 1;
         employeeRef.status = 'reactivated';
 
@@ -246,11 +246,11 @@ export class ProvisioningApplicationService {
 
         // Revoke old active/pending invitations
         const invitations = await invitationRepo.find({
-          where: { userId: user.id, status: 'pending' },
+          where: { userId: user.id, status: InvitationStatus.PENDING },
         });
         if (invitations.length > 0) {
           for (const invite of invitations) {
-            invite.status = 'revoked';
+            invite.status = InvitationStatus.REVOKED;
             invite.revokedAt = new Date();
           }
           await invitationRepo.save(invitations);
@@ -259,7 +259,7 @@ export class ProvisioningApplicationService {
         // Create new pending invitation
         const newInvite = new Invitation();
         newInvite.userId = user.id;
-        newInvite.status = 'pending';
+        newInvite.status = InvitationStatus.PENDING;
         const randomToken = crypto.randomBytes(32).toString('hex');
         newInvite.tokenHash = crypto.createHash('sha256').update(randomToken).digest('hex');
         newInvite.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);

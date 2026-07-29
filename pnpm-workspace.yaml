@@ -2,6 +2,7 @@ packages: []
 
 allowBuilds:
   '@nestjs/core': false
+  argon2: true
 
 overrides:
   '@new-hros/libs-apis': link:../../api-factory/libs/libs-apis

@@ -1,6 +1,7 @@
 import { BaseEntity } from '@new-hros/libs-sql';
 import { Column, Entity, JoinColumn, OneToOne, Unique } from 'typeorm';
 
+import { UserStatus, CredentialStatus } from '../../../enums';
 import { EmployeeReference } from '../../employee/entities/employee-reference.entity';
 
 @Entity('users')
@@ -19,10 +20,10 @@ export class User extends BaseEntity {
   userType: string;
 
   @Column({ name: 'status', type: 'varchar', length: 30 })
-  status: string;
+  status: UserStatus;
 
   @Column({ name: 'credential_status', type: 'varchar', length: 30 })
-  credentialStatus: string;
+  credentialStatus: CredentialStatus;
 
   @Column({ name: 'security_version', type: 'integer', default: 1 })
   securityVersion: number;

@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { ProvisioningApplicationService } from './provisioning.application.service';
-import { EventType } from '../../../enums';
+import { EventType, UserStatus, InvitationStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { SessionApplicationService } from '../../auth/services/session.application.service';
@@ -225,7 +225,7 @@ describe('ProvisioningApplicationService', () => {
       const existingUser = new User();
       existingUser.id = 'user-123';
       existingUser.tenantCode = 'TENANT_A';
-      existingUser.status = 'active';
+      existingUser.status = UserStatus.ACTIVE;
       existingUser.securityVersion = 1;
 
       mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
@@ -242,7 +242,7 @@ describe('ProvisioningApplicationService', () => {
       );
 
       expect(result).toEqual({ success: true });
-      expect(existingUser.status).toBe('disabled');
+      expect(existingUser.status).toBe(UserStatus.DISABLED);
       expect(existingUser.securityVersion).toBe(2);
       expect(existingRef.status).toBe('suspended');
       expect(existingRef.sourceVersion).toBe('10');
@@ -265,12 +265,12 @@ describe('ProvisioningApplicationService', () => {
       const existingUser = new User();
       existingUser.id = 'user-123';
       existingUser.tenantCode = 'TENANT_A';
-      existingUser.status = 'active';
+      existingUser.status = UserStatus.ACTIVE;
       existingUser.securityVersion = 2;
 
       const mockInvitation = new Invitation();
       mockInvitation.userId = 'user-123';
-      mockInvitation.status = 'pending';
+      mockInvitation.status = InvitationStatus.PENDING;
 
       mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
       mockTypeormUserRepository.findOne.mockResolvedValue(existingUser);
@@ -324,14 +324,14 @@ describe('ProvisioningApplicationService', () => {
       const existingUser = new User();
       existingUser.id = 'user-123';
       existingUser.tenantCode = 'TENANT_A';
-      existingUser.status = 'archived';
+      existingUser.status = UserStatus.ARCHIVED;
       existingUser.securityVersion = 3;
       existingUser.displayEmail = 'rehire@tenant.com';
       existingUser.normalizedEmail = 'rehire@tenant.com';
 
       const mockInvitation = new Invitation();
       mockInvitation.userId = 'user-123';
-      mockInvitation.status = 'pending';
+      mockInvitation.status = InvitationStatus.PENDING;
 
       mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
       mockTypeormUserRepository.findOne.mockResolvedValue(existingUser);
@@ -348,19 +348,19 @@ describe('ProvisioningApplicationService', () => {
       );
 
       expect(result).toEqual({ success: true });
-      expect(existingUser.status).toBe('invited');
+      expect(existingUser.status).toBe(UserStatus.INVITED);
       expect(existingUser.securityVersion).toBe(4);
       expect(existingRef.status).toBe('reactivated');
       expect(existingRef.sourceVersion).toBe('10');
 
       expect(mockTypeormInvitationRepository.find).toHaveBeenCalledWith({
-        where: { userId: 'user-123', status: 'pending' },
+        where: { userId: 'user-123', status: InvitationStatus.PENDING },
       });
       // Verify revoke old invitations
       expect(mockTypeormInvitationRepository.save).toHaveBeenCalledWith([
         expect.objectContaining({
           userId: 'user-123',
-          status: 'revoked',
+          status: InvitationStatus.REVOKED,
           revokedAt: expect.any(Date),
         }),
       ]);
@@ -369,7 +369,7 @@ describe('ProvisioningApplicationService', () => {
       expect(mockTypeormInvitationRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'user-123',
-          status: 'pending',
+          status: InvitationStatus.PENDING,
           tokenHash: expect.any(String),
           expiresAt: expect.any(Date),
         }),

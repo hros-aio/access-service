@@ -6,4 +6,6 @@ export enum EventType {
   EMPLOYEE_REACTIVATED = 'employee.reactivated',
   AUTHENTICATION_SESSIONS_REVOKED = 'authentication.sessions-revoked',
   AUTHENTICATION_USER_INVITED = 'authentication.user-invited',
+  AUTHENTICATION_INVITATION_ACCEPTED = 'authentication.invitation-accepted',
+  AUTHENTICATION_INVITATION_RESENT = 'authentication.invitation-resent',
 }

@@ -8,6 +8,7 @@ import { ExternalIdentity } from './entities/external-identity.entity';
 import { AuthSecurityEventOutboxRepository } from './repositories/auth-security-event-outbox.repository';
 import { CredentialRepository } from './repositories/credential.repository';
 import { ExternalIdentityRepository } from './repositories/external-identity.repository';
+import { CredentialDomainService } from './services/credential.domain.service';
 import { SessionApplicationService } from './services/session.application.service';
 
 @Module({
@@ -17,6 +18,7 @@ import { SessionApplicationService } from './services/session.application.servic
     ExternalIdentityRepository,
     AuthSecurityEventOutboxRepository,
     SessionApplicationService,
+    CredentialDomainService,
     {
       provide: RedisCacheProvider,
       useFactory: (cacheService: CacheService): RedisCacheProvider => cacheService['l2'],
@@ -28,6 +30,7 @@ import { SessionApplicationService } from './services/session.application.servic
     ExternalIdentityRepository,
     AuthSecurityEventOutboxRepository,
     SessionApplicationService,
+    CredentialDomainService,
     RedisCacheProvider,
   ],
 })
