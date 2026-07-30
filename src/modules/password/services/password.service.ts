@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BusinessException, RedisCacheProvider } from '@new-hros/libs-core';
+import { RedisCacheProvider } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 import { In } from 'typeorm';
 
@@ -66,7 +66,7 @@ export class PasswordService {
 
       // 4. Invariant Verification: Check if an active credential already exists
       const existingCredential = await credentialsRepo.findOne({
-        where: { userId: user.id, status: 'active' },
+        where: { userId: user.id, status: CredentialStatus.ACTIVE },
       });
 
       if (existingCredential) {
@@ -74,14 +74,16 @@ export class PasswordService {
       }
 
       // 5. Hash password
-      const passwordHash = await this.credentialDomainService.hashPassword(dto.password);
+      const { hash: passwordHash, algorithm } = await this.credentialDomainService.hashPassword(
+        dto.password,
+      );
 
       // 6. Insert new active credential
       const credential = new Credential();
       credential.userId = user.id;
       credential.passwordHash = passwordHash;
-      credential.algorithm = 'argon2id';
-      credential.status = 'active';
+      credential.algorithm = algorithm;
+      credential.status = CredentialStatus.ACTIVE;
       credential.passwordChangedAt = new Date();
       await credentialsRepo.save(credential);
 
@@ -128,38 +130,34 @@ export class PasswordService {
         invitationAcceptedEvent.publishStatus = 'pending';
         await outboxRepo.save(invitationAcceptedEvent);
       }
-
-      // 10. Clear old sessions in Redis
-      try {
-        await this.sessionApplicationService.revokeAllSessions(tenantCode, user.id);
-      } catch (err) {
-        throw new AuthStoreUnavailableError();
-      }
     });
 
-    // 11. Clear Redis temporary restricted setup key
+    // 10. Clear old sessions in Redis (executed after transaction commit)
+    try {
+      await this.sessionApplicationService.revokeAllSessions(tenantCode, userId);
+    } catch (err) {
+      throw new AuthStoreUnavailableError();
+    }
+
+    // 11. Clear Redis temporary restricted setup key (best effort)
     const redisKey = `auth:sso-setup:${flowId}`;
     try {
       const provider = this.redisCacheProvider as unknown as {
         client?: { del(key: string): Promise<number> };
       };
       const client = provider.client;
-      if (!client) {
-        throw new AuthStoreUnavailableError();
+      if (client) {
+        await client.del(redisKey);
       }
-      await client.del(redisKey);
     } catch (err) {
-      if (err instanceof BusinessException) {
-        throw err;
-      }
-      throw new AuthStoreUnavailableError();
+      // eslint-disable-next-line no-console
+      console.error('Failed to clean up temporary SSO setup key from Redis:', err);
+      // best-effort: do not rethrow or fail the request
     }
 
-    // 12. Session transition
+    // 12. Session transition (require a fresh login)
     return {
       mfaRequired: false,
-      accessToken: 'mock-access-token-jwt',
-      refreshToken: 'mock-refresh-token',
     };
   }
 }

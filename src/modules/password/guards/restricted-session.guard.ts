@@ -2,17 +2,26 @@ import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { RedisCacheProvider } from '@new-hros/libs-core';
 import { Request } from 'express';
 
+import { SessionState } from '../../../enums';
 import {
   AuthSessionExpiredError,
   AuthStoreUnavailableError,
 } from '../exceptions/password.exception';
+
+export interface RestrictedSessionRequest extends Request {
+  session?: {
+    userId: string;
+    tenantCode: string;
+    flowId: string;
+  };
+}
 
 @Injectable()
 export class RestrictedSessionGuard implements CanActivate {
   constructor(private readonly redisCacheProvider: RedisCacheProvider) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<RestrictedSessionRequest>();
     const authHeader = request.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new AuthSessionExpiredError('Missing or invalid authorization header');
@@ -34,6 +43,8 @@ export class RestrictedSessionGuard implements CanActivate {
       if (err instanceof AuthSessionExpiredError || err instanceof AuthStoreUnavailableError) {
         throw err;
       }
+      // eslint-disable-next-line no-console
+      console.error('Redis lookup failure in RestrictedSessionGuard:', err);
       throw new AuthStoreUnavailableError();
     }
 
@@ -41,15 +52,13 @@ export class RestrictedSessionGuard implements CanActivate {
       !sessionData ||
       !sessionData.userId ||
       !sessionData.tenantCode ||
-      sessionData.authState !== 'sso-setup-pending'
+      sessionData.authState !== SessionState.SSO_SETUP_PENDING
     ) {
       throw new AuthSessionExpiredError();
     }
 
     // Attach session details to the request object for use in the controller/service
-    (
-      request as Request & { session?: { userId: string; tenantCode: string; flowId: string } }
-    ).session = {
+    request.session = {
       userId: sessionData.userId,
       tenantCode: sessionData.tenantCode,
       flowId: token,

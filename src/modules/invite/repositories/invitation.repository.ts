@@ -72,6 +72,10 @@ export class InvitationRepository {
       .set({ status: InvitationStatus.CANCELLED, revokedAt: new Date() })
       .where('userId = :userId', { userId })
       .andWhere("status IN ('pending', 'sent')")
+      .andWhere(
+        'user_id IN (SELECT id FROM users WHERE id = :userId AND tenant_code = :tenantCode)',
+        { tenantCode, userId },
+      )
       .execute();
   }
 }

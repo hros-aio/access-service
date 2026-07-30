@@ -44,7 +44,7 @@ As the system, I want to automatically cancel any outstanding email invitations 
 - **Session Expiry**: What happens when the temporary restricted setup session/token in Redis expires before the user completes password setup? The system returns a `401 Unauthorized` error (`AUTH_SESSION_EXPIRED`) and requires the user to log in via SSO again.
 - **Already Setup**: How does the system handle password setup if the user already has an active password configured? The system rejects the request with a `409 Conflict` error (`CREDENTIAL_ALREADY_EXISTS`) and logs a security audit event.
 - **Complexity Violation**: What happens if the password provided does not meet the complexity requirements of the password policy? The system rejects the request with a `400 Bad Request` error (`INVALID_PASSWORD_POLICY`).
-- **Concurrent Setup**: What happens if two concurrent password setup requests are sent for the same user? The database blocks the concurrent request via row locking, and the second request fails with a `409 Conflict`/`Credential already exists` (`CONCURRENT_MODIFICATION`).
+- **Concurrent Setup**: What happens if two concurrent password setup requests are sent for the same user? The database blocks the concurrent request via row locking, and the second request fails with a `409 Conflict`/`Credential already exists` (`CREDENTIAL_ALREADY_EXISTS`).
 
 ## Requirements *(mandatory)*
 
@@ -116,11 +116,12 @@ As the system, I want to automatically cancel any outstanding email invitations 
 
 | Current Account State | Pending Invitation Exists | Incoming Request | Password Valid | Mandatory MFA Enabled | Expected Result State | Published Event(s) | HTTP Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Active User, No Password | Yes (`pending`/`sent`) | Valid Password | Yes | No | User `ACTIVE`, Credential `ACTIVE`, Invitation `cancelled` | `authentication.password-changed`, `authentication.invitation-accepted` | `200 OK` |
-| Active User, No Password | Yes (`pending`/`sent`) | Valid Password | Yes | Yes | Restricted MFA Session Created, User `ACTIVE`, Invitation `cancelled` | `authentication.password-changed`, `authentication.mfa-enrolled` (pending) | `200 OK` (`MFA_REQUIRED`) |
-| Active User, No Password | No | Invalid Password | No | N/A | No state change | None (Audit failure logged) | `400 Bad Request` |
+| User status: `invited` (or `active`), Credential status: `pending` | Yes (`pending`/`sent`) | Valid Password | Yes | No | User status: `active`, Credential status: `active`, Invitation status: `cancelled` | `authentication.password-changed`, `authentication.invitation-accepted` | `200 OK` |
+| User status: `invited` (or `active`), Credential status: `pending` | Yes (`pending`/`sent`) | Valid Password | Yes | Yes | Restricted MFA Session Created, User status: `active`, Invitation status: `cancelled` | `authentication.password-changed`, `authentication.mfa-enrolled` (pending) | `200 OK` (`MFA_REQUIRED`) |
+| User status: `invited` (or `active`), Credential status: `pending` | No | Invalid Password | No | N/A | No state change | None (Audit failure logged) | `400 Bad Request` |
 | Restricted Token Expired | Yes | Valid Password | Yes | N/A | No state change | None | `401 Unauthorized` |
-| User Already Has Password | N/A | Valid Password | Yes | N/A | No state change | Security audit denial | `409 Conflict` |
+| Credential status: `active` | N/A | Valid Password | Yes | N/A | No state change | Security audit denial | `409 Conflict` |
+
 
 ### Owning Backend Components
 
@@ -180,7 +181,8 @@ PasswordController.setupPasswordViaSso()
 8. **Cancel Pending Invitations**: Execute `UPDATE invitations SET status = 'cancelled', updated_at = NOW() WHERE tenant_code = $1 AND user_id = $2 AND status IN ('pending', 'sent')`.
 9. **Append Outbox Audit Records**: Call `SecurityEventService.append()` twice within the active transaction manager:
    - `authentication.password-changed`
-   - `authentication.invitation-accepted` (or `authentication.invitation-cancelled`)
+   - `authentication.invitation-accepted` (this acts as the canonical accepted/superseded event when a pending invitation exists)
+
 10. **Commit PostgreSQL Transaction**: Commit both domain state changes and outbox rows atomically.
 11. **Clear Redis Temporary State**: Delete `auth:sso-setup:{flowId}` in Redis.
 12. **Session Transition**: If tenant requires mandatory MFA and user has no active MFA method, issue an MFA enrollment challenge session; otherwise, issue standard JWT tokens.
@@ -189,7 +191,8 @@ PasswordController.setupPasswordViaSso()
 
 | Invariant | Primary Enforcement | Database / Infrastructure Backstop |
 | --- | --- | --- |
-| Single Active Password per User | Domain `CredentialPolicy` check | Partial unique index `uq_credentials_one_active_per_user` on `(tenant_code, user_id)` WHERE `status = 'active'` |
+| Single Active Password per User | Domain `CredentialPolicy` check | Partial unique index `uq_credentials_one_active_per_user` on `(user_id)` WHERE `type = 'password' AND status = 'active'` |
+
 | Strict Tenant Isolation | Application query filter via `RequestContext` | Composite FK `(tenant_code, user_id)` on `credentials` and `invitations` |
 | No Outstanding Invitations After SSO Setup | Application transaction update | `invitations.status` predicate check |
 | Restricted State Enclosure | `RestrictedSessionGuard` middleware | Redis key TTL expiration (`15 min`) |
@@ -286,7 +289,7 @@ INSERT INTO auth_security_events_outbox (
 | Invalid password strength | `InvalidPasswordPolicyError` | `400` | `INVALID_PASSWORD_POLICY` | "Password does not meet tenant security requirements." | `PASSWORD_POLICY_VIOLATION` |
 | Active credential already exists | `CredentialAlreadyExistsError` | `409` | `CREDENTIAL_ALREADY_EXISTS` | "User already has an active password configured." | `CREDENTIAL_ALREADY_CONFIGURED` |
 | Redis unreachable | `AuthStoreUnavailableError` | `503` | `AUTH_SESSION_STORE_UNAVAILABLE` | "Service temporarily unavailable. Please try again later." | `REDIS_UNAVAILABLE` |
-| Concurrent update race | `ConcurrentModificationError` | `409` | `CONCURRENT_MODIFICATION` | "Request conflicts with a concurrent update. Please retry." | `OPTIMISTIC_LOCK_CONFLICT` |
+| Concurrent update race | `CredentialAlreadyExistsError` | `409` | `CREDENTIAL_ALREADY_EXISTS` | "User already has an active password configured." | `CREDENTIAL_ALREADY_CONFIGURED` |
 
 ### Idempotency and Concurrency
 - **Concurrent Setup Requests**: Handled via `SELECT ... FOR UPDATE` on the target `users` row. The second request blocks until the first completes, then reads the updated state and fails with `409 Conflict` (`CREDENTIAL_ALREADY_EXISTS`).
@@ -300,21 +303,26 @@ INSERT INTO auth_security_events_outbox (
 
 ### File-Level Implementation Plan
 ```text
-src/modules/password/
-├── presentation/
-│   ├── password.controller.ts                   (Modify: add POST /auth/password/setup/firebase)
-│   └── dto/setup-password-via-sso.dto.ts        (Create: request validation DTO)
-├── application/
-│   ├── password.service.ts                      (Modify: add setupPasswordViaSsoFallback method)
-│   └── guards/restricted-session.guard.ts       (Create/Modify: enforce restricted auth state)
-├── domain/
-│   └── credential.policy.ts                     (Modify: add password complexity rules)
-└── infrastructure/
-    ├── adapters/argon2-crypto.adapter.ts        (Modify: add password hashing method)
-    └── persistence/
-        ├── credential.repository.ts             (Modify: add insert/upsert methods)
-        └── invitation.repository.ts             (Modify: add cancelPendingInvitations method)
+src/
+├── modules/
+│   ├── password/
+│   │   ├── controllers/
+│   │   │   └── password.controller.ts           (Modify: add POST /auth/password/setup/firebase)
+│   │   ├── dto/
+│   │   │   └── setup-password-via-sso.dto.ts    (Create: request validation DTO)
+│   │   ├── guards/
+│   │   │   └── restricted-session.guard.ts      (Create/Modify: enforce restricted auth state)
+│   │   └── services/
+│   │       ├── password.service.ts              (Modify: add setupPasswordViaSsoFallback method)
+│   │       └── credential.policy.ts             (Modify: add password complexity rules)
+│   ├── auth/
+│   │   └── services/
+│   │       └── credential.domain.service.ts     (Modify: add algorithm metadata returns)
+│   └── invite/
+│       └── repositories/
+│           └── invitation.repository.ts         (Modify: add cancelPendingInvitations method)
 ```
+
 
 ### Testing Matrix
 

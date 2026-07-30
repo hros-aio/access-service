@@ -51,14 +51,25 @@ curl -X POST http://localhost:3000/api/v1/auth/password/setup/firebase \
 
 ### Expected HTTP Outcome
 
-You should receive a `200 OK` response:
+You should receive a `200 OK` response.
+
+**Scenario A: MFA Not Required (Requires fresh login to obtain tokens)**
 ```json
 {
   "status": "success",
   "data": {
-    "mfaRequired": false,
-    "accessToken": "eyJhbGciOiJSUzI1Ni...",
-    "refreshToken": "rft_..."
+    "mfaRequired": false
+  }
+}
+```
+
+**Scenario B: MFA Required (MFA enrollment session is returned)**
+```json
+{
+  "status": "success",
+  "data": {
+    "mfaRequired": true,
+    "mfaSetupToken": "mfa_setup_flow_abc123..."
   }
 }
 ```
@@ -69,13 +80,14 @@ You should receive a `200 OK` response:
 
 Verify the database transitions and Redis cache invalidation:
 
-1. **Verify User transitions to `ACTIVE`**:
+1. **Verify User transitions to `active`**:
    ```sql
    SELECT status, credential_status, security_version 
    FROM users 
    WHERE id = 'usr_test123' AND tenant_code = 'TENANT_ACME';
-   -- Expected: status = 'ACTIVE', credential_status = 'CONFIGURED', security_version = 2
+   -- Expected: status = 'active', credential_status = 'active', and security_version has incremented by 1 (e.g. from baseline 1 to 2)
    ```
+
 
 2. **Verify Credential creation**:
    ```sql

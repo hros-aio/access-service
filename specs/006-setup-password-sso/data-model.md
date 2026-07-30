@@ -12,8 +12,8 @@ Represents the core employee identity within a specific tenant context.
 | --- | --- | --- | --- | --- |
 | `id` | `uuid` | No | Primary Key | Unique user identifier. |
 | `tenant_code` | `varchar(30)` | No | Composite Unique Key | Tenant partition key. |
-| `status` | `varchar(30)` | No | `UserStatus` Enum | Account state: transitions `PENDING` -> `ACTIVE`. |
-| `credential_status` | `varchar(30)` | No | `CredentialStatus` Enum | Credential state: transitions `EMPTY`/`PENDING` -> `CONFIGURED`. |
+| `status` | `varchar(30)` | No | `UserStatus` Enum | Account state: transitions `invited` -> `active`. |
+| `credential_status` | `varchar(30)` | No | `CredentialStatus` Enum | Credential state: transitions `pending` -> `active`. |
 | `security_version` | `integer` | No | Default: `1` | Incremented during security credential modifications. |
 | `mfa_enrollment_required` | `boolean` | No | Default: `false` | Indicates if mandatory MFA setup applies. |
 
@@ -31,7 +31,8 @@ Holds secure credential verification data associated with users.
 | `algorithm` | `varchar(30)` | No | Default: `'argon2id'` | Cryptographic algorithm format. |
 | `status` | `varchar(30)` | No | Default: `'active'` | Active/inactive state flag. |
 
-- *Database Constraint*: Partial composite unique index `uq_credentials_one_active_per_user` on `(tenant_code, user_id)` where `status = 'active'` prevents dual active password rows.
+- *Database Constraint*: Partial unique index `uq_credentials_one_active_per_user` on `(user_id)` where `type = 'password' AND status = 'active'` prevents dual active password rows.
+
 
 ### Entity: Invitation (`invitations` table)
 

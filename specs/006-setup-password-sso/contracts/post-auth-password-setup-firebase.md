@@ -34,18 +34,17 @@ Defines the contract for creating a password using an active SSO setup session.
 
 ### Response 1: 200 OK (Password Setup Success - MFA Not Required)
 
-Returned when the password is successfully set up and the user does not have mandatory MFA configured.
+Returned when the password is successfully set up and the user does not have mandatory MFA configured. The user must perform a fresh login using their new credentials to obtain access tokens.
 
 ```json
 {
   "status": "success",
   "data": {
-    "mfaRequired": false,
-    "accessToken": "eyJhbGciOiJSUzI1Ni...",
-    "refreshToken": "rft_987654321..."
+    "mfaRequired": false
   }
 }
 ```
+
 
 ### Response 2: 200 OK (Password Setup Success - MFA Required)
 
@@ -99,3 +98,19 @@ Returned when the user account already has an active password credential configu
   "message": "User already has an active password configured."
 }
 ```
+
+### Response 6: 503 Service Unavailable (Redis/Session-Store Failure)
+
+Returned when the Redis cache or session store is unreachable or encounters an internal failure.
+
+```json
+{
+  "statusCode": 503,
+  "error": "Service Unavailable",
+  "errorCode": "AUTH_SESSION_STORE_UNAVAILABLE",
+  "message": "Service temporarily unavailable. Please try again later."
+}
+```
+
+**Client Retry Expectation**: Clients should implement transient fault handling and retry the request after a short, exponentially backed-off delay.
+

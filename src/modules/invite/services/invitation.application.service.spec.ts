@@ -83,7 +83,7 @@ describe('InvitationApplicationService', () => {
     };
 
     mockCredentialDomainService = {
-      hashPassword: jest.fn().mockResolvedValue('hashed-password'),
+      hashPassword: jest.fn().mockResolvedValue({ hash: 'hashed-password', algorithm: 'argon2id' }),
       verifyPassword: jest.fn(),
     };
 

@@ -1,9 +1,12 @@
 import { Body, Controller, Post, Req, UseGuards, ValidationPipe } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
 
 import { SetupPasswordViaSsoDto } from '../dto/setup-password-via-sso.dto';
-import { RestrictedSessionGuard } from '../guards/restricted-session.guard';
+import { AuthSessionExpiredError } from '../exceptions/password.exception';
+import {
+  RestrictedSessionGuard,
+  RestrictedSessionRequest,
+} from '../guards/restricted-session.guard';
 import { PasswordService } from '../services/password.service';
 
 @ApiTags('Password')
@@ -19,8 +22,9 @@ export class PasswordController {
   @ApiResponse({ status: 401, description: 'Restricted session expired or invalid' })
   @ApiResponse({ status: 409, description: 'Credential already exists' })
   async setupPassword(
-    @Req() req: Request & { session?: { userId: string; tenantCode: string; flowId: string } },
-    @Body(new ValidationPipe()) dto: SetupPasswordViaSsoDto,
+    @Req() req: RestrictedSessionRequest,
+    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
+    dto: SetupPasswordViaSsoDto,
   ): Promise<{
     status: string;
     data: {
@@ -32,7 +36,7 @@ export class PasswordController {
   }> {
     const session = req.session;
     if (!session) {
-      throw new Error('Session metadata not set by guard');
+      throw new AuthSessionExpiredError('Session metadata not set by guard');
     }
 
     const result = await this.passwordService.setupPasswordViaSsoFallback(

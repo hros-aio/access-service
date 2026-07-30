@@ -134,8 +134,6 @@ describe('PasswordService', () => {
 
       expect(result).toEqual({
         mfaRequired: false,
-        accessToken: 'mock-access-token-jwt',
-        refreshToken: 'mock-refresh-token',
       });
 
       // Verify db changes saved
@@ -200,7 +198,25 @@ describe('PasswordService', () => {
       ).rejects.toThrow(CredentialAlreadyExistsError);
     });
 
-    it('should throw AuthStoreUnavailableError if Redis client is missing or fails', async () => {
+    it('should throw AuthStoreUnavailableError if revokeAllSessions fails', async () => {
+      const user = new User();
+      user.id = 'user-uuid';
+      user.tenantCode = 'tenant-abc';
+
+      mockTypeormUserRepository.findOne.mockResolvedValue(user);
+      mockTypeormCredentialRepository.findOne.mockResolvedValue(null);
+
+      // Force revokeAllSessions to reject
+      mockSessionApplicationService.revokeAllSessions.mockRejectedValue(new Error('Redis issue'));
+
+      await expect(
+        service.setupPasswordViaSsoFallback('flow-123', 'tenant-abc', 'user-uuid', {
+          password: 'Password123!',
+        }),
+      ).rejects.toThrow(AuthStoreUnavailableError);
+    });
+
+    it('should not throw AuthStoreUnavailableError if Redis client is missing or fails (best-effort)', async () => {
       const user = new User();
       user.id = 'user-uuid';
       user.tenantCode = 'tenant-abc';
@@ -211,11 +227,17 @@ describe('PasswordService', () => {
       // Force delete to reject
       mockRedisClient.del.mockRejectedValue(new Error('Redis issue'));
 
-      await expect(
-        service.setupPasswordViaSsoFallback('flow-123', 'tenant-abc', 'user-uuid', {
+      const result = await service.setupPasswordViaSsoFallback(
+        'flow-123',
+        'tenant-abc',
+        'user-uuid',
+        {
           password: 'Password123!',
-        }),
-      ).rejects.toThrow(AuthStoreUnavailableError);
+        },
+      );
+      expect(result).toEqual({
+        mfaRequired: false,
+      });
     });
   });
 });

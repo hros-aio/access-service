@@ -1,13 +1,13 @@
 # Implementation Plan: Password Setup via Company Single Sign-On (Fallback Path)
 
-**Branch**: `006-setup-password-sso` | **Date**: 2026-07-30 | **Spec**: [spec.md](file:///home/ren0503/new-hros/admin-module/auth-svc/specs/006-setup-password-sso/spec.md)
+**Branch**: `006-setup-password-sso` | **Date**: 2026-07-30 | **Spec**: [spec.md](specs/006-setup-password-sso/spec.md)
 
-**Input**: Feature specification from `/specs/006-setup-password-sso/spec.md`
+**Input**: Feature specification from `specs/006-setup-password-sso/spec.md`
 
 ## Summary
 
 - **Primary Requirement**: Provide a secure fallback mechanism for employees logging in via company SSO who do not have an active password credential or completed invitation.
-- **Technical Approach**: Establish a restricted session state (verified using a `sso-setup-pending` token in Redis), validate password strength, hash password via Argon2id, and execute a database transaction that upserts the active credential, transitions the user to ACTIVE, cancels pending invitations, and writes event audit records into the transactional outbox.
+- **Technical Approach**: Establish a restricted session state (verified using a `sso-setup-pending` token in Redis), validate password strength, hash password via Argon2id, and execute a database transaction that inserts-if-absent the active credential (throwing a 409 CREDENTIAL_ALREADY_EXISTS error if it already exists), transitions the user to ACTIVE, cancels pending invitations, and writes event audit records into the transactional outbox.
 
 ## Technical Context
 
@@ -18,7 +18,8 @@
 - **Target Platform**: Linux container (Node.js runtime environment)
 - **Project Type**: Web service (REST API backend)
 - **Performance Goals**: Argon2id password hashing under 300ms, overall database transaction commit under 200ms
-- **Constraints**: Strict multi-tenant isolation (tenant_code required on all filters), zero plain text password exposure in logs/payloads
+- **Constraints**: Strict multi-tenant isolation (tenant_code required on all filters); the password may be sent in the HTTPS request body but must never be logged, persisted unencrypted, returned, or included in errors or audit payloads.
+
 - **Scale/Scope**: Fallback authentication API endpoint, concurrent safety handling simultaneous updates via row-level locking
 
 ## Constitution Check

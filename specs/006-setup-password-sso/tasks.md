@@ -82,7 +82,8 @@
 **Purpose**: Insert transactional outbox records for Kafka event dispatches.
 
 - [X] T016 [P] Add outbox event creation and password sanitization checks to integration test suite in `src/modules/password/services/password.service.spec.ts`
-- [X] T017 Append audit events (`authentication.password-changed` and `authentication.invitation-accepted`) to `auth_security_events_outbox` inside the PostgreSQL transaction in `src/modules/password/services/password.service.ts`
+- [X] T017 Append audit events (`authentication.password-changed` and the intentional canonical `authentication.invitation-accepted` supersession event) to `auth_security_events_outbox` inside the PostgreSQL transaction in `src/modules/password/services/password.service.ts`
+
 
 ---
 

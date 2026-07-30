@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-07-30
-**Feature**: [spec.md](file:///home/ren0503/new-hros/admin-module/auth-svc/specs/006-setup-password-sso/spec.md)
+**Feature**: [spec.md](specs/006-setup-password-sso/spec.md)
 
 ## Content Quality
 
