@@ -8,4 +8,5 @@ export enum EventType {
   AUTHENTICATION_USER_INVITED = 'authentication.user-invited',
   AUTHENTICATION_INVITATION_ACCEPTED = 'authentication.invitation-accepted',
   AUTHENTICATION_INVITATION_RESENT = 'authentication.invitation-resent',
+  AUTHENTICATION_PASSWORD_CHANGED = 'authentication.password-changed',
 }
