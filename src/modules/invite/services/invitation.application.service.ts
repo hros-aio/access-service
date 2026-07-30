@@ -113,17 +113,20 @@ export class InvitationApplicationService {
         where: { userId: user.id, status: 'active' },
       });
 
-      const passwordHash = await this.credentialDomainService.hashPassword(dto.password);
+      const { hash: passwordHash, algorithm } = await this.credentialDomainService.hashPassword(
+        dto.password,
+      );
 
       if (existingCredential) {
         existingCredential.passwordHash = passwordHash;
+        existingCredential.algorithm = algorithm;
         existingCredential.passwordChangedAt = new Date();
         await credentialsRepo.save(existingCredential);
       } else {
         const newCredential = new Credential();
         newCredential.userId = user.id;
         newCredential.passwordHash = passwordHash;
-        newCredential.algorithm = 'argon2id';
+        newCredential.algorithm = algorithm;
         newCredential.status = 'active';
         newCredential.passwordChangedAt = new Date();
         await credentialsRepo.save(newCredential);

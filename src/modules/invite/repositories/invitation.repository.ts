@@ -64,4 +64,18 @@ export class InvitationRepository {
       .andWhere('invitation.tokenHash = :tokenHash', { tokenHash })
       .getOne();
   }
+
+  async cancelPendingInvitations(tenantCode: string, userId: string): Promise<void> {
+    await this.repository
+      .createQueryBuilder('invitation')
+      .update(Invitation)
+      .set({ status: InvitationStatus.CANCELLED, revokedAt: new Date() })
+      .where('userId = :userId', { userId })
+      .andWhere("status IN ('pending', 'sent')")
+      .andWhere(
+        'user_id IN (SELECT id FROM users WHERE id = :userId AND tenant_code = :tenantCode)',
+        { tenantCode, userId },
+      )
+      .execute();
+  }
 }

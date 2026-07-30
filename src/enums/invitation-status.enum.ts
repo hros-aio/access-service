@@ -3,4 +3,5 @@ export enum InvitationStatus {
   SENT = 'sent',
   ACCEPTED = 'accepted',
   REVOKED = 'revoked',
+  CANCELLED = 'cancelled',
 }

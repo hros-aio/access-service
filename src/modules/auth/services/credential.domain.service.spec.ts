@@ -20,17 +20,18 @@ describe('CredentialDomainService', () => {
   describe('hashPassword', () => {
     it('should generate a hashed password and contain argon2id signature', async () => {
       const password = 'MySecurePassword123!';
-      const hash = await service.hashPassword(password);
-      expect(hash).toBeDefined();
-      expect(hash).not.toBe(password);
-      expect(hash).toContain('$argon2id$');
+      const result = await service.hashPassword(password);
+      expect(result.hash).toBeDefined();
+      expect(result.hash).not.toBe(password);
+      expect(result.hash).toContain('$argon2id$');
+      expect(result.algorithm).toBe('argon2id');
     });
   });
 
   describe('verifyPassword', () => {
     it('should return true for a matching password', async () => {
       const password = 'MySecurePassword123!';
-      const hash = await service.hashPassword(password);
+      const { hash } = await service.hashPassword(password);
       const isMatch = await service.verifyPassword(hash, password);
       expect(isMatch).toBe(true);
     });
@@ -38,7 +39,7 @@ describe('CredentialDomainService', () => {
     it('should return false for a non-matching password', async () => {
       const password = 'MySecurePassword123!';
       const wrongPassword = 'WrongPassword123!';
-      const hash = await service.hashPassword(password);
+      const { hash } = await service.hashPassword(password);
       const isMatch = await service.verifyPassword(hash, wrongPassword);
       expect(isMatch).toBe(false);
     });

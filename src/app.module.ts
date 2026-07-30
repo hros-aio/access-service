@@ -12,6 +12,7 @@ import { HealthModule } from './modules/health/health.module';
 import { InviteModule } from './modules/invite/invite.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { MfaModule } from './modules/mfa/mfa.module';
+import { PasswordModule } from './modules/password/password.module';
 import { ProvisioningModule } from './modules/provisioning/provisioning.module';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { UserModule } from './modules/user/user.module';
@@ -67,6 +68,7 @@ const config = new ConfigurationService({});
     InviteModule,
     AuthModule,
     MfaModule,
+    PasswordModule,
     ProvisioningModule,
     SqlModule.forRootAsync({
       inject: [ConfigurationService],
