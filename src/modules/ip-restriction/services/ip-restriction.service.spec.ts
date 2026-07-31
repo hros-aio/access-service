@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { IpRestrictionService } from './ip-restriction.service';
-import { InvalidCredentialsError } from '../../auth/exceptions/auth.exception';
+import { IpRestrictedError } from '../../auth/exceptions/auth.exception';
 import { AuthenticationSettings } from '../../tenant/entities/authentication-settings.entity';
 
 describe('IpRestrictionService', () => {
@@ -60,12 +60,20 @@ describe('IpRestrictionService', () => {
       expect(() => service.evaluate('192.168.1.50', settings)).not.toThrow();
     });
 
-    it('should throw InvalidCredentialsError if IP is not in allowed list', () => {
+    it('should throw IpRestrictedError if IP is not in allowed list', () => {
       const settings = {
         ipRestrictionEnabled: true,
         allowedIpCidrs: ['192.168.1.0/24'],
       } as unknown as AuthenticationSettings;
-      expect(() => service.evaluate('8.8.8.8', settings)).toThrow(InvalidCredentialsError);
+      expect(() => service.evaluate('8.8.8.8', settings)).toThrow(IpRestrictedError);
+    });
+
+    it('should throw IpRestrictedError if allow-list is empty and restrictions enabled', () => {
+      const settings = {
+        ipRestrictionEnabled: true,
+        allowedIpCidrs: [],
+      } as unknown as AuthenticationSettings;
+      expect(() => service.evaluate('192.168.1.50', settings)).toThrow(IpRestrictedError);
     });
   });
 });

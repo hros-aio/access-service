@@ -5,7 +5,9 @@
 ### 1. `users` (Existing)
 Represents the user identity and account status.
 - `id`: `UUID` (Primary Key)
-- `tenant_code`: `VARCHAR(50)` (Composite unique constraint with id, multi-tenant scope)
+- `tenant_code`: `VARCHAR(16)` (Composite unique constraint with normalized_email, multi-tenant scope)
+- `normalized_email`: `VARCHAR(255)` (The lower-cased email address used for login identity)
+- `display_email`: `VARCHAR(255)` (The display email address)
 - `status`: `VARCHAR(20)` (Enum: `'ACTIVE'`, `'SUSPENDED'`, `'LOCKED'`, `'PENDING'`)
 - `security_version`: `INT` (Incremented on password change, lockout, or security state reset to invalidate old JWTs)
 - `updated_at`: `TIMESTAMP`
@@ -26,7 +28,7 @@ Stores credentials linked to a user.
 Holds security policies for each tenant.
 - `tenant_code`: `VARCHAR(50)` (Primary Key)
 - `lockout_enabled`: `BOOLEAN`
-- `lockout_threshold`: `INT` (Max consecutive failed logins allowed)
+- `lockout_threshold`: `INT` (Account locks when consecutive failures count >= this value)
 - `ip_restriction_enabled`: `BOOLEAN`
 - `allowed_ip_ranges`: `VARCHAR[]` (Array of CIDR formatted IP subnets)
 - `mandatory_mfa_enabled`: `BOOLEAN`
@@ -46,7 +48,7 @@ Transactional outbox containing security and auditing events to publish.
 
 ## NoSQL / Cache Keys (Redis)
 
-### 1. User Session Store
+## User Session Store
 - **Key Pattern**: `auth:session:{sessionId}`
 - **Type**: `Hash`
 - **Fields**:
@@ -57,11 +59,12 @@ Transactional outbox containing security and auditing events to publish.
   - `authState`: `'AUTHENTICATED'`
 - **TTL**: 15 minutes sliding window, or 30 days absolute cap if `rememberMe` is true.
 
-### 2. User Active Sessions Tracker
+## User Active Sessions Tracker
 - **Key Pattern**: `auth:user-sessions:{tenantCode}:{userId}`
-- **Type**: `Set`
-- **Value**: Set of `sessionId` values.
-- **TTL**: Matching session TTL.
+- **Type**: `Sorted Set (ZSET)`
+- **Score**: Expiration timestamp (epoch milliseconds) of the session.
+- **Value**: `sessionId`.
+- **TTL**: Expiry matching maximum session TTL (30 days). Old/expired members are explicitly removed using ZREMRANGEBYSCORE before querying or adding members to track active sessions independently.
 
 ### 3. MFA Challenge Store
 - **Key Pattern**: `auth:mfa-challenge:{challengeId}`

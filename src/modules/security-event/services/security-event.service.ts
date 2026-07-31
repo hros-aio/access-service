@@ -23,13 +23,14 @@ export class SecurityEventService {
     sessionId: string,
     ipAddress: string,
     userAgent?: string,
+    rememberMe = false,
   ): Promise<void> {
     const payload = {
       tenantCode,
       userId,
       sessionId,
       authenticationMethod: 'PASSWORD',
-      rememberMe: false,
+      rememberMe,
       ipAddress,
       userAgent: userAgent || 'unknown',
     };

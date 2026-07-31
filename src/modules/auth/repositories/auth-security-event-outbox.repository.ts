@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 import { Repository, DeepPartial, FindOptionsWhere } from 'typeorm';
 
@@ -26,7 +27,11 @@ export class AuthSecurityEventOutboxRepository {
   }
 
   async findByUserId(userId: string): Promise<AuthSecurityEventOutbox[]> {
-    return this.find({ userId });
+    const tenantCode = RequestContextService.getTenantCode();
+    if (!tenantCode) {
+      throw new Error('Tenant code is missing from active RequestContext');
+    }
+    return this.find({ tenantCode, userId });
   }
 
   async clear(): Promise<void> {

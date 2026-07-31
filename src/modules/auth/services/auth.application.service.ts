@@ -93,27 +93,38 @@ export class AuthApplicationService {
     }
 
     // 3. Verify user status
-    if (user.status === UserStatus.SUSPENDED) {
-      await this.securityEventService.logLoginFailed(
-        tenantCode,
-        email,
-        sourceIp,
-        'ACCOUNT_DISABLED',
-        user.id,
-        userAgent,
-      );
-      throw new AccountDisabledError();
-    }
-    if (user.status === UserStatus.LOCKED) {
-      await this.securityEventService.logLoginFailed(
-        tenantCode,
-        email,
-        sourceIp,
-        'ACCOUNT_LOCKED',
-        user.id,
-        userAgent,
-      );
-      throw new AccountLockedError();
+    if (user.status !== UserStatus.ACTIVE) {
+      if (user.status === UserStatus.SUSPENDED) {
+        await this.securityEventService.logLoginFailed(
+          tenantCode,
+          email,
+          sourceIp,
+          'ACCOUNT_DISABLED',
+          user.id,
+          userAgent,
+        );
+        throw new AccountDisabledError();
+      } else if (user.status === UserStatus.LOCKED) {
+        await this.securityEventService.logLoginFailed(
+          tenantCode,
+          email,
+          sourceIp,
+          'ACCOUNT_LOCKED',
+          user.id,
+          userAgent,
+        );
+        throw new AccountLockedError();
+      } else {
+        await this.securityEventService.logLoginFailed(
+          tenantCode,
+          email,
+          sourceIp,
+          'INVALID_CREDENTIALS',
+          user.id,
+          userAgent,
+        );
+        throw new InvalidCredentialsError();
+      }
     }
 
     // 4. Fetch active password credential
@@ -173,7 +184,10 @@ export class AuthApplicationService {
       try {
         await this.redisCacheProvider.set(challengeKey, challengeData, 300); // 5 minutes TTL
       } catch (err) {
-        throw new AuthStoreUnavailableError();
+        throw new AuthStoreUnavailableError(
+          'Service temporarily unavailable. Please try again later.',
+          err,
+        );
       }
 
       return {
@@ -196,11 +210,6 @@ export class AuthApplicationService {
       type: 'access',
     };
 
-    const accessToken = jwt.sign(payload, privateKey, {
-      algorithm: 'RS256',
-      expiresIn: '2h',
-    });
-
     const refreshPayload = {
       sub: user.id,
       sid: sessionId,
@@ -208,13 +217,27 @@ export class AuthApplicationService {
       type: 'refresh',
     };
 
-    const refreshToken = jwt.sign(refreshPayload, privateKey, {
-      algorithm: 'RS256',
-      expiresIn: rememberMe ? '30d' : '7d',
-    });
+    let accessToken: string;
+    let refreshToken: string;
+    try {
+      accessToken = jwt.sign(payload, privateKey, {
+        algorithm: 'RS256',
+        expiresIn: '2h',
+      });
+
+      refreshToken = jwt.sign(refreshPayload, privateKey, {
+        algorithm: 'RS256',
+        expiresIn: rememberMe ? '30d' : '7d',
+      });
+    } catch (jwtErr) {
+      throw new AuthStoreUnavailableError(
+        'Service temporarily unavailable. Please try again later.',
+        jwtErr,
+      );
+    }
 
     // 7. Store session in Redis
-    const ttlSeconds = rememberMe ? 2592000 : 900; // 30 days or 15 minutes
+    const ttlSeconds = rememberMe ? 2592000 : 604800; // 30 days or 7 days
     const sessionKey = `auth:session:${sessionId}`;
     const sessionData = {
       sessionId,
@@ -233,31 +256,28 @@ export class AuthApplicationService {
       await this.redisCacheProvider.set(sessionKey, sessionData, ttlSeconds);
 
       // Track active user session
-      const client = (
-        this.redisCacheProvider as unknown as {
-          client: {
-            sadd(k: string, v: string): Promise<number>;
-            expire(k: string, t: number): Promise<number>;
-          };
-        }
-      ).client;
+      const client = this.redisCacheProvider.getClient();
       if (client) {
         const userSessionsKey = `auth:user-sessions:${tenantCode}:${user.id}`;
         await client.sadd(userSessionsKey, sessionId);
         await client.expire(userSessionsKey, ttlSeconds);
       }
-
-      // Log successful login security event
-      await this.securityEventService.logLoginSucceeded(
-        tenantCode,
-        user.id,
-        sessionId,
-        sourceIp,
-        userAgent,
-      );
     } catch (err) {
-      throw new AuthStoreUnavailableError();
+      throw new AuthStoreUnavailableError(
+        'Service temporarily unavailable. Please try again later.',
+        err,
+      );
     }
+
+    // Log successful login security event
+    await this.securityEventService.logLoginSucceeded(
+      tenantCode,
+      user.id,
+      sessionId,
+      sourceIp,
+      userAgent,
+      rememberMe ?? false,
+    );
 
     return {
       authState: 'AUTHENTICATED',

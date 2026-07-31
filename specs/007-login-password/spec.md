@@ -49,8 +49,9 @@ As the system, I want to block invalid login attempts, lock accounts after too m
 **Acceptance Scenarios**:
 
 1. **Given** a user is active, **When** they attempt to login with incorrect credentials, **Then** the system returns a generic 401 error, increments the failure counter in Redis, and records a failed login security event.
-2. **Given** a user has a failure count at $N-1$ lockout threshold, **When** they attempt to login with incorrect credentials, **Then** the account is locked in PostgreSQL, the request returns a generic 401 error, and an account-locked security event is recorded.
+2. **Given** a user has a failure count at $N-1$ of the lockout threshold, **When** they attempt to login with incorrect credentials, **Then** the consecutive failures count reaches $N$ (failures >= lockout_threshold), the account is locked in PostgreSQL, the request returns a generic 401 error, and an account-locked security event is recorded.
 3. **Given** a user requests login from a restricted IP range, **When** they submit credentials, **Then** access is denied with a generic error before checking passwords, and a security event is recorded.
+4. **Given** a user is locked or suspended, **When** they attempt to login with valid credentials, **Then** the request returns a generic 401 error and access is denied.
 
 ---
 
@@ -69,7 +70,7 @@ As the system, I want to block invalid login attempts, lock accounts after too m
 
 - **FR-001**: System MUST authenticate users by validating email and password credentials scoped by tenant.
 - **FR-002**: System MUST check IP restrictions against the tenant settings before evaluating user credentials.
-- **FR-003**: System MUST enforce account lockout by transitioning `users.status` to `'LOCKED'` when consecutive login failures exceed the tenant threshold.
+- **FR-003**: System MUST enforce account lockout by transitioning `users.status` to `'LOCKED'` when consecutive login failures count >= lockout_threshold.
 - **FR-004**: System MUST check if multi-factor authentication (MFA) is required or enrolled, branching to MFA challenge session if true.
 - **FR-005**: System MUST prevent account enumeration by returning a generic `401 Unauthorized` response with a unified error message for all credential, status, IP, or lockout-related authentication failures.
 - **FR-006**: System MUST record successful logins, failed logins, and lockout events to `auth_security_events_outbox` inside the database transaction, strictly sanitizing sensitive details (such as raw passwords/hashes).
@@ -175,12 +176,21 @@ PasswordController (POST /auth/login/password)
 
 - **Transaction Boundary**:
   - Authentication reads occur in `READ COMMITTED` isolation.
-  - If login succeeds or fails with an audit requirement, a PostgreSQL transaction opens exclusively to insert into `auth_security_events_outbox` (and update user lockout status if triggered).
-  - Redis updates execute *after* or *alongside* standard flow; Redis failure throws `503 AuthStoreUnavailableError` (fails closed).
-
-- **Idempotency & Concurrency Control**:
-  - Redis login failure counter increments use atomic Lua script `INCR` + conditional `EXPIRE`.
-  - Lockout state transition uses `SELECT ... FOR UPDATE` on target `users` row to avoid concurrent login race conditions locking/unlocking simultaneously.
+  - **Deterministic PostgreSQL/Redis Operation Order**:
+    1. Verify credentials and evaluate policies (read-only).
+    2. Start a database transaction.
+    3. Update user status to `LOCKED` (under pessimistic write lock `SELECT ... FOR UPDATE` if consecutive failure count meets threshold).
+    4. Write security event (`authentication.login-succeeded`, `authentication.login-failed`, or `authentication.account-locked`) to `auth_security_events_outbox`.
+    5. Commit the database transaction.
+    6. **Only after PostgreSQL commits**, perform Redis operations (creating session, updating active session tracker, incrementing or resetting failure counter).
+  - **Failure Handling & Compensation**:
+    - If PostgreSQL transaction fails/rolls back: No changes commit, outbox event is not saved, and Redis is not modified. Client receives `401 Unauthorized` or `500/503` depending on cause.
+    - If Redis fails *before* PostgreSQL commits (e.g., during lockout counter increment prior to Postgres transaction): The PostgreSQL transaction rolls back, and client receives `503 Service Unavailable (AuthStoreUnavailableError)`.
+    - If Redis fails *after* PostgreSQL transaction commits: PostgreSQL changes (user lockout, outbox event) remain committed. The session state is not created in Redis, and client receives `503 Service Unavailable (AuthStoreUnavailableError)`. A background outbox reconciliation worker or a retry will identify the disparity and either allow session re-establishment or log compensation events.
+  - **Idempotency & Concurrency Control**:
+    - Redis login failure counter increments use atomic `INCR` + conditional `EXPIRE` (on first increment) to ensure correct counting under concurrency.
+    - Lockout state transition uses pessimistic row-level write locks (`pessimistic_write` via `SELECT ... FOR UPDATE`) on target `users` row. This ensures concurrent requests serialize, preventing multiple lockout transitions or duplicate audit events for the same lockout transition.
+    - Client retries use idempotent request correlation. Duplicate audit events are prevented by verifying if user status is already `LOCKED` or if the session ID has already been recorded in the outbox prior to inserting.
 
 ---
 

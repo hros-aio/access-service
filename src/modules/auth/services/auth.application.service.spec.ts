@@ -88,10 +88,10 @@ describe('AuthApplicationService', () => {
     };
     mockRedisCacheProvider = {
       set: jest.fn().mockResolvedValue(undefined),
-      client: {
+      getClient: jest.fn().mockReturnValue({
         sadd: jest.fn().mockResolvedValue(1),
         expire: jest.fn().mockResolvedValue(1),
-      },
+      }),
     };
     mockConfigService = {
       get: jest.fn().mockImplementation((key: string) => {
@@ -121,6 +121,9 @@ describe('AuthApplicationService', () => {
     }).compile();
 
     service = module.get<AuthApplicationService>(AuthApplicationService);
+
+    // Reset the module-level jwt mock before each test
+    (jwt.sign as jest.Mock).mockReset();
   });
 
   it('should be defined', () => {
@@ -145,7 +148,7 @@ describe('AuthApplicationService', () => {
       expect(result.accessToken).toBe('mock-jwt-token');
       expect(result.refreshToken).toBe('mock-jwt-token');
       expect(mockRedisCacheProvider.set).toHaveBeenCalled();
-      expect(mockRedisCacheProvider.client.sadd).toHaveBeenCalled();
+      expect(mockRedisCacheProvider.getClient().sadd).toHaveBeenCalled();
     });
 
     it('should throw InvalidCredentialsError for non-existent tenant', async () => {

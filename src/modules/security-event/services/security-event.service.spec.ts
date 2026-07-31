@@ -46,6 +46,7 @@ describe('SecurityEventService', () => {
         'session-123',
         '192.168.1.50',
         'Mozilla/5.0',
+        true,
       );
       expect(mockOutboxRepository.create).toHaveBeenCalledWith({
         tenantCode: 'TENANT_123',
@@ -57,7 +58,7 @@ describe('SecurityEventService', () => {
           userId: 'user-123',
           sessionId: 'session-123',
           authenticationMethod: 'PASSWORD',
-          rememberMe: false,
+          rememberMe: true,
           ipAddress: '192.168.1.50',
           userAgent: 'Mozilla/5.0',
         },

@@ -19,12 +19,12 @@ describe('LockoutService', () => {
 
   beforeEach(async () => {
     mockRedisCacheProvider = {
-      client: {
+      getClient: jest.fn().mockReturnValue({
         get: jest.fn(),
         incr: jest.fn(),
         expire: jest.fn(),
         del: jest.fn(),
-      },
+      }),
     };
 
     mockUserRepository = {
@@ -63,16 +63,16 @@ describe('LockoutService', () => {
 
   describe('getFailureCount', () => {
     it('should return parsed count from Redis if exists', async () => {
-      mockRedisCacheProvider.client.get.mockResolvedValue('3');
+      mockRedisCacheProvider.getClient().get.mockResolvedValue('3');
       const count = await service.getFailureCount('TENANT_123', 'user-123');
       expect(count).toBe(3);
-      expect(mockRedisCacheProvider.client.get).toHaveBeenCalledWith(
+      expect(mockRedisCacheProvider.getClient().get).toHaveBeenCalledWith(
         'auth:login-failure:TENANT_123:user-123',
       );
     });
 
     it('should return 0 if no count in Redis', async () => {
-      mockRedisCacheProvider.client.get.mockResolvedValue(null);
+      mockRedisCacheProvider.getClient().get.mockResolvedValue(null);
       const count = await service.getFailureCount('TENANT_123', 'user-123');
       expect(count).toBe(0);
     });
@@ -80,29 +80,29 @@ describe('LockoutService', () => {
 
   describe('incrementFailureCount', () => {
     it('should increment and set TTL on first attempt', async () => {
-      mockRedisCacheProvider.client.incr.mockResolvedValue(1);
+      mockRedisCacheProvider.getClient().incr.mockResolvedValue(1);
       const count = await service.incrementFailureCount('TENANT_123', 'user-123');
       expect(count).toBe(1);
-      expect(mockRedisCacheProvider.client.incr).toHaveBeenCalled();
-      expect(mockRedisCacheProvider.client.expire).toHaveBeenCalledWith(
+      expect(mockRedisCacheProvider.getClient().incr).toHaveBeenCalled();
+      expect(mockRedisCacheProvider.getClient().expire).toHaveBeenCalledWith(
         'auth:login-failure:TENANT_123:user-123',
         900,
       );
     });
 
     it('should increment without setting TTL on subsequent attempts', async () => {
-      mockRedisCacheProvider.client.incr.mockResolvedValue(2);
+      mockRedisCacheProvider.getClient().incr.mockResolvedValue(2);
       const count = await service.incrementFailureCount('TENANT_123', 'user-123');
       expect(count).toBe(2);
-      expect(mockRedisCacheProvider.client.incr).toHaveBeenCalled();
-      expect(mockRedisCacheProvider.client.expire).not.toHaveBeenCalled();
+      expect(mockRedisCacheProvider.getClient().incr).toHaveBeenCalled();
+      expect(mockRedisCacheProvider.getClient().expire).not.toHaveBeenCalled();
     });
   });
 
   describe('resetFailureCount', () => {
     it('should delete the failure key from Redis', async () => {
       await service.resetFailureCount('TENANT_123', 'user-123');
-      expect(mockRedisCacheProvider.client.del).toHaveBeenCalledWith(
+      expect(mockRedisCacheProvider.getClient().del).toHaveBeenCalledWith(
         'auth:login-failure:TENANT_123:user-123',
       );
     });
@@ -118,18 +118,18 @@ describe('LockoutService', () => {
       const disabledSettings = { accountLockoutEnabled: false } as AuthenticationSettings;
       const result = await service.handleFailure('TENANT_123', 'user-123', disabledSettings);
       expect(result).toBe(false);
-      expect(mockRedisCacheProvider.client.incr).not.toHaveBeenCalled();
+      expect(mockRedisCacheProvider.getClient().incr).not.toHaveBeenCalled();
     });
 
     it('should increment counter but not lock if under threshold', async () => {
-      mockRedisCacheProvider.client.incr.mockResolvedValue(3);
+      mockRedisCacheProvider.getClient().incr.mockResolvedValue(3);
       const result = await service.handleFailure('TENANT_123', 'user-123', settings);
       expect(result).toBe(false);
       expect(mockTypeormRepository.save).not.toHaveBeenCalled();
     });
 
     it('should lock user in database if threshold reached', async () => {
-      mockRedisCacheProvider.client.incr.mockResolvedValue(5);
+      mockRedisCacheProvider.getClient().incr.mockResolvedValue(5);
       const mockUser = { id: 'user-123', status: UserStatus.ACTIVE } as User;
       mockTypeormRepository.findOne.mockResolvedValue(mockUser);
 
@@ -141,6 +141,7 @@ describe('LockoutService', () => {
       });
       expect(mockUser.status).toBe(UserStatus.LOCKED);
       expect(mockTypeormRepository.save).toHaveBeenCalledWith(mockUser);
+      expect(mockTransactionService.runInTransaction).toHaveBeenCalled();
     });
   });
 });

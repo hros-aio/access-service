@@ -1,20 +1,6 @@
-import crypto from 'crypto';
-
-// Always generate a valid key pair for test signing/verification to override mock environment settings
-const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
-  modulusLength: 2048,
-  publicKeyEncoding: { type: 'spki', format: 'pem' },
-  privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-});
-process.env.JWT_PRIVATE_KEY = privateKey;
-process.env.JWT_PUBLIC_KEY = publicKey;
-
-process.env.DATABASE_PORT = process.env.DATABASE_PORT || '5432';
-process.env.REDIS_PORT = process.env.REDIS_PORT || '6379';
-process.env.DATABASE_NAME = process.env.DATABASE_NAME || 'hrms_access_db_test';
-
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { RedisCacheProvider } from '@new-hros/libs-core';
 import request, { Response } from 'supertest';
 import { DataSource } from 'typeorm';
 
@@ -34,6 +20,7 @@ describe('Authentication (e2e)', () => {
   let dataSource: DataSource;
   let dbHelper: TestDatabaseHelper;
   let credentialService: CredentialDomainService;
+  let redisCacheProvider: RedisCacheProvider;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -46,6 +33,7 @@ describe('Authentication (e2e)', () => {
     dataSource = app.get(DataSource);
     dbHelper = new TestDatabaseHelper(dataSource);
     credentialService = app.get(CredentialDomainService);
+    redisCacheProvider = app.get(RedisCacheProvider);
   });
 
   afterAll(async () => {
@@ -54,6 +42,13 @@ describe('Authentication (e2e)', () => {
 
   beforeEach(async () => {
     await dbHelper.cleanDatabase();
+
+    // Clear Redis login-failure counters for seeded users
+    const redisClient = redisCacheProvider.getClient();
+    if (redisClient) {
+      await redisClient.del('auth:login-failure:TENANT_TEST:a32e12e8-d101-4475-b6d1-419bd1e967a1');
+      await redisClient.del('auth:login-failure:TENANT_TEST:b43f23f8-e202-5586-c7e2-520ce2e078b2');
+    }
 
     // 1. Seed Tenant
     const tenant = new Tenant();
@@ -239,7 +234,7 @@ describe('Authentication (e2e)', () => {
 
   it('/auth/login/password (POST) - Security events are logged to outbox, sanitizing passwords', async () => {
     const outboxRepo = dataSource.getRepository(AuthSecurityEventOutbox);
-    await outboxRepo.clear();
+    await outboxRepo.createQueryBuilder().delete().from(AuthSecurityEventOutbox).execute();
 
     const sensitivePassword = 'MySecretRawPassword!';
 
@@ -258,11 +253,16 @@ describe('Authentication (e2e)', () => {
     const events = await outboxRepo.find();
     expect(events.length).toBeGreaterThan(0);
 
-    // Check that the payload does not contain the password
+    // Check that the payload does not contain the raw password
     const failedEvent = events.find((e) => e.eventType === 'authentication.login-failed');
     expect(failedEvent).toBeDefined();
 
     const payloadStr = JSON.stringify(failedEvent?.sanitizedPayload);
     expect(payloadStr).not.toContain(sensitivePassword);
+    // Verify the plaintext email is not leaked in the sanitized payload
+    expect(payloadStr).not.toContain('employee@tenant.com');
+    // Verify the sanitized payload has the expected shape
+    expect(failedEvent?.sanitizedPayload).toHaveProperty('ipAddress');
+    expect(failedEvent?.sanitizedPayload).toHaveProperty('failureReason');
   });
 });

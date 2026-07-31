@@ -60,7 +60,7 @@ describe('AuthSecurityEventOutboxRepository', () => {
     });
   });
 
-  it('should find events by user ID without tenant scope', async () => {
+  it('should find events by user ID with tenant scope', async () => {
     const events = [new AuthSecurityEventOutbox()];
     mockTypeormRepository.find.mockResolvedValue(events);
 
@@ -68,6 +68,7 @@ describe('AuthSecurityEventOutboxRepository', () => {
     expect(result).toEqual(events);
     expect(mockTypeormRepository.find).toHaveBeenCalledWith({
       where: {
+        tenantCode: 'TENANT_A',
         userId: 'user-uuid',
       },
     });

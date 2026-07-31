@@ -25,7 +25,12 @@ export class IpRestrictedError extends BusinessException {
 }
 
 export class AuthStoreUnavailableError extends BusinessException {
-  constructor(message = 'Service temporarily unavailable. Please try again later.') {
+  public readonly cause?: unknown;
+  constructor(
+    message = 'Service temporarily unavailable. Please try again later.',
+    cause?: unknown,
+  ) {
     super(message, 'AUTH_SESSION_STORE_UNAVAILABLE', 503);
+    this.cause = cause;
   }
 }

@@ -1,6 +1,6 @@
 # Implementation Plan: Log In With Email and Password
 
-**Branch**: `007-login-password` | **Date**: 2026-07-31 | **Spec**: [spec.md](specs/007-login-password/spec.md)
+**Branch**: `007-login-password` | **Date**: 2026-07-31 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `/specs/007-login-password/spec.md`
 
@@ -60,31 +60,32 @@ specs/007-login-password/
 ```text
 src/
 └── modules/
-    ├── authentication/
+    ├── auth/
     │   ├── controllers/
-    │   │   └── authentication.controller.ts            # Mapped to POST /auth/login/password
+    │   │   └── auth.controller.ts                       # Mapped to POST /auth/login/password
     │   ├── dto/
-    │   │   └── login-with-password.dto.ts              # Payload validation DTO
+    │   │   └── login-with-password.dto.ts               # Payload validation DTO
+    │   ├── entities/
+    │   │   ├── credential.entity.ts                     # Credential entity
+    │   │   └── auth-security-event-outbox.entity.ts     # Outbox entity
+    │   ├── repositories/
+    │   │   ├── credential.repository.ts                 # Credential data access
+    │   │   └── auth-security-event-outbox.repository.ts # Outbox data access
     │   └── services/
-    │       └── authentication-application.service.ts   # Core orchestrator
-    ├── credential/
-    │   ├── domain/
-    │   │   └── credential-policy.domain.ts             # Password strength validations
-    │   └── infrastructure/
-    │       └── adapters/
-    │           └── argon2-crypto.adapter.ts            # Argon2id hashing & verification
+    │       ├── auth.application.service.ts              # Core login orchestrator
+    │       └── credential.domain.service.ts             # Argon2id hashing & verification
     ├── lockout/
     │   └── services/
-    │       └── lockout.service.ts                      # Failure tracking & lockout evaluations
+    │       └── lockout.service.ts                       # Failure tracking & lockout evaluations
     ├── ip-restriction/
     │   └── services/
-    │       └── ip-restriction.service.ts               # CIDR validation policy
+    │       └── ip-restriction.service.ts                # CIDR validation policy (ipaddr.js)
     └── security-event/
         └── services/
-            └── security-event.service.ts               # Transactional event outbox publisher
+            └── security-event.service.ts                # Transactional event outbox publisher
 ```
 
-**Structure Decision**: Single project NestJS layout. Business login logic resides inside the modular `authentication` domain, while specialized subsystems like `lockout`, `ip-restriction`, `credential`, and `security-event` handle their respective policies.
+**Structure Decision**: Single project NestJS layout. Business login logic resides inside the modular `auth` domain, while specialized subsystems like `lockout`, `ip-restriction`, and `security-event` handle their respective policies.
 
 ## Complexity Tracking
 

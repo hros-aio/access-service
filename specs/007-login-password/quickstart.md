@@ -79,11 +79,11 @@ This document details the manual and automated validation scenarios to verify th
   - Event `authentication.login-failed` is recorded in `auth_security_events_outbox`.
 
 ### Scenario 4: Account Lockout Trigger
-- **Goal**: Verify that exceeding the lockout threshold transitions user status to `LOCKED` in PostgreSQL.
+- **Goal**: Verify that meeting the lockout threshold transitions user status to `LOCKED` in PostgreSQL.
 - **Verification Command**:
-  Perform 5 consecutive failed login attempts for `employee@tenant.com`.
+  Perform 5 consecutive failed login attempts for `employee@tenant.com` (where threshold is 5).
 - **Expected Outcome**:
-  - On the 5th failed request: HTTP `401 Unauthorized` with generic message.
+  - On the 5th failed request (where consecutive failures count reaches 5, thus failures >= lockout_threshold): HTTP `401 Unauthorized` with generic message.
   - Querying PostgreSQL table `users` shows `status = 'LOCKED'` for the user.
   - Subsequent login attempts (even with correct password) return HTTP `401` immediately.
   - Security event `authentication.account-locked` is recorded in the outbox.
