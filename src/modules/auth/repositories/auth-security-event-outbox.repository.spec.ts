@@ -47,7 +47,7 @@ describe('AuthSecurityEventOutboxRepository', () => {
     expect(repository).toBeDefined();
   });
 
-  it('should find pending events with tenant scope', async () => {
+  it('should find pending events without tenant scope', async () => {
     const events = [new AuthSecurityEventOutbox()];
     mockTypeormRepository.find.mockResolvedValue(events);
 
@@ -56,12 +56,11 @@ describe('AuthSecurityEventOutboxRepository', () => {
     expect(mockTypeormRepository.find).toHaveBeenCalledWith({
       where: {
         publishStatus: 'pending',
-        tenantCode: 'TENANT_A',
       },
     });
   });
 
-  it('should find events by user ID with tenant scope', async () => {
+  it('should find events by user ID without tenant scope', async () => {
     const events = [new AuthSecurityEventOutbox()];
     mockTypeormRepository.find.mockResolvedValue(events);
 
@@ -70,7 +69,6 @@ describe('AuthSecurityEventOutboxRepository', () => {
     expect(mockTypeormRepository.find).toHaveBeenCalledWith({
       where: {
         userId: 'user-uuid',
-        tenantCode: 'TENANT_A',
       },
     });
   });
