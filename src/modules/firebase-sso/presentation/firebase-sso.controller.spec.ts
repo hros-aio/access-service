@@ -1,8 +1,9 @@
 import {
-  UnauthorizedException,
   ConflictException,
   ServiceUnavailableException,
+  UnauthorizedException,
 } from '@nestjs/common';
+
 import { FirebaseSsoController } from './firebase-sso.controller';
 import { FirebaseSsoApplicationService } from '../application/firebase-sso-application.service';
 import {

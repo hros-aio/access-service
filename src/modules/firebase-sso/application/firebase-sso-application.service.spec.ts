@@ -1,11 +1,12 @@
 import { FirebaseSsoApplicationService } from './firebase-sso-application.service';
+import { ExternalIdentity } from '../../auth/entities/external-identity.entity';
 import { ExternalIdentityRepository } from '../../auth/repositories/external-identity.repository';
 import { SecurityEventService } from '../../security-event/services/security-event.service';
-import { FirebaseVerifierPort } from '../domain/ports/firebase-verifier.port';
 import {
   AmbiguousIdentityMappingException,
   ExternalIdentityNotMappedException,
 } from '../domain/exceptions/firebase-sso.exceptions';
+import { FirebaseVerifierPort } from '../domain/ports/firebase-verifier.port';
 
 describe('FirebaseSsoApplicationService', () => {
   let firebaseVerifier: jest.Mocked<FirebaseVerifierPort>;
@@ -54,8 +55,8 @@ describe('FirebaseSsoApplicationService', () => {
   it('should throw AmbiguousIdentityMappingException when multiple mappings exist', async () => {
     firebaseVerifier.verifyIdToken.mockResolvedValue({ uid: 'fb_uid_dup' });
     externalIdentityRepository.findMapping.mockResolvedValue([
-      { userId: 'u1' } as any,
-      { userId: 'u2' } as any,
+      { userId: 'u1' } as ExternalIdentity,
+      { userId: 'u2' } as ExternalIdentity,
     ]);
 
     await expect(
@@ -74,9 +75,14 @@ describe('FirebaseSsoApplicationService', () => {
 
   it('should return ACTIVE result and log success event when single mapping exists', async () => {
     firebaseVerifier.verifyIdToken.mockResolvedValue({ uid: 'fb_uid_ok' });
-    externalIdentityRepository.findMapping.mockResolvedValue([{ userId: 'u_active' } as any]);
+    externalIdentityRepository.findMapping.mockResolvedValue([
+      { userId: 'u_active' } as ExternalIdentity,
+    ]);
 
-    const result = await service.authenticateSso({ tenantCode: 'TENANT_01', idToken: 'valid_token' });
+    const result = await service.authenticateSso({
+      tenantCode: 'TENANT_01',
+      idToken: 'valid_token',
+    });
 
     expect(result).toEqual({
       authState: 'ACTIVE',

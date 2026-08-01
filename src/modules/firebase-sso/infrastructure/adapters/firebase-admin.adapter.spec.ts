@@ -4,12 +4,20 @@ import {
   InvalidFirebaseTokenException,
 } from '../../domain/exceptions/firebase-sso.exceptions';
 
+interface GlobalWithAdmin {
+  admin?: {
+    auth?: () => {
+      verifyIdToken: (token: string) => Promise<Record<string, unknown>>;
+    };
+  };
+}
+
 describe('FirebaseAdminAdapter', () => {
   let adapter: FirebaseAdminAdapter;
 
   beforeEach(() => {
     adapter = new FirebaseAdminAdapter();
-    delete (global as any).admin;
+    delete (global as unknown as GlobalWithAdmin).admin;
   });
 
   it('should verify valid token in fallback mock mode', async () => {
@@ -31,8 +39,8 @@ describe('FirebaseAdminAdapter', () => {
   });
 
   it('should verify token when global.admin.auth is available', async () => {
-    (global as any).admin = {
-      auth: () => ({
+    (global as unknown as GlobalWithAdmin).admin = {
+      auth: (): { verifyIdToken: (token: string) => Promise<Record<string, unknown>> } => ({
         verifyIdToken: jest.fn().mockResolvedValue({
           uid: 'global_fb_uid',
           email: 'global@company.com',
@@ -51,20 +59,18 @@ describe('FirebaseAdminAdapter', () => {
     const customError = new FirebaseVerificationError('Token verification failed');
     customError.code = 'auth/invalid-id-token';
 
-    (global as any).admin = {
-      auth: () => ({
+    (global as unknown as GlobalWithAdmin).admin = {
+      auth: (): { verifyIdToken: (token: string) => Promise<Record<string, unknown>> } => ({
         verifyIdToken: jest.fn().mockRejectedValue(customError),
       }),
     };
 
-    await expect(adapter.verifyIdToken('ANY_TOKEN')).rejects.toThrow(
-      InvalidFirebaseTokenException,
-    );
+    await expect(adapter.verifyIdToken('ANY_TOKEN')).rejects.toThrow(InvalidFirebaseTokenException);
   });
 
   it('should handle generic error and rethrow FirebaseProviderUnavailableException', async () => {
-    (global as any).admin = {
-      auth: () => ({
+    (global as unknown as GlobalWithAdmin).admin = {
+      auth: (): { verifyIdToken: (token: string) => Promise<Record<string, unknown>> } => ({
         verifyIdToken: jest.fn().mockRejectedValue(new Error('Network error')),
       }),
     };
