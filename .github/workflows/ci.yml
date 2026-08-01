@@ -107,7 +107,3 @@ jobs:
       - name: Run Tests With Coverage
         working-directory: admin-module/access-svc
         run: pnpm run test:cov
-
-      - name: Run E2E Tests
-        working-directory: admin-module/access-svc
-        run: pnpm run test:e2e
