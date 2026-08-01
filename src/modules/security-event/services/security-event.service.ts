@@ -92,4 +92,59 @@ export class SecurityEventService {
       publishStatus: 'pending',
     });
   }
+
+  async logSsoLoginSucceeded(
+    tenantCode: string,
+    userId: string,
+    providerSubject: string,
+    authState: string,
+    ipAddress: string,
+    userAgent?: string,
+  ): Promise<void> {
+    const payload = {
+      tenantCode,
+      userId,
+      provider: 'firebase',
+      providerSubject,
+      authMethod: 'sso_firebase',
+      authState,
+      ipAddress,
+      userAgent: userAgent || 'unknown',
+    };
+
+    await this.outboxRepository.create({
+      tenantCode,
+      userId,
+      eventType: 'authentication.sso-login-succeeded',
+      sanitizedPayload: payload,
+      publishStatus: 'pending',
+    });
+  }
+
+  async logSsoLoginFailed(
+    tenantCode: string,
+    providerSubject: string,
+    failureReason: string,
+    ipAddress: string,
+    userId?: string,
+    userAgent?: string,
+  ): Promise<void> {
+    const payload = {
+      tenantCode,
+      userId: userId || null,
+      provider: 'firebase',
+      providerSubject,
+      failureReason,
+      ipAddress,
+      userAgent: userAgent || 'unknown',
+    };
+
+    await this.outboxRepository.create({
+      tenantCode,
+      userId: userId || undefined,
+      eventType: 'authentication.sso-login-failed',
+      sanitizedPayload: payload,
+      publishStatus: 'pending',
+    });
+  }
 }

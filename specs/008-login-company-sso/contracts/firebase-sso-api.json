@@ -1,0 +1,122 @@
+# API Contract: Firebase SSO Login (`POST /auth/login/firebase`)
+
+## Endpoint Summary
+
+- **URL**: `/api/v1/auth/login/firebase`
+- **Method**: `POST`
+- **Auth**: None (Public Endpoint)
+- **Headers**:
+  - `Content-Type: application/json`
+  - `X-Tenant-Code: <tenant_code>` (Optional if provided in body)
+
+---
+
+## Request Body Schema
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "tenantCode": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tenant identifier code"
+    },
+    "idToken": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Valid RS256 Firebase ID Token issued by Firebase Client SDK"
+    }
+  },
+  "required": ["tenantCode", "idToken"],
+  "additionalProperties": false
+}
+```
+
+### Example Request
+
+```json
+{
+  "tenantCode": "TENANT_CORP_01",
+  "idToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6..."
+}
+```
+
+---
+
+## Response Schemas
+
+### 1. Active HRMS Access Issued (`200 OK`)
+
+```json
+{
+  "status": "SUCCESS",
+  "data": {
+    "authState": "ACTIVE",
+    "accessToken": "eyJhbGciOiJSUzI1Ni...",
+    "refreshToken": "d9b28a4c-...",
+    "expiresIn": 900
+  }
+}
+```
+
+### 2. Password Setup Required (`200 OK`)
+
+```json
+{
+  "status": "SUCCESS",
+  "data": {
+    "authState": "PASSWORD_SETUP_REQUIRED",
+    "flowId": "sso_setup_88f7a9c1",
+    "expiresIn": 900
+  }
+}
+```
+
+### 3. MFA Challenge Required (`200 OK`)
+
+```json
+{
+  "status": "SUCCESS",
+  "data": {
+    "authState": "MFA_REQUIRED",
+    "challengeId": "mfa_chal_44e12c99",
+    "allowedMethods": ["TOTP", "EMAIL_OTP"],
+    "expiresIn": 300
+  }
+}
+```
+
+### 4. Authentication Failed / Unmapped / Locked (`401 Unauthorized`)
+
+```json
+{
+  "statusCode": 401,
+  "errorCode": "AUTH_UNAUTHORIZED",
+  "message": "Authentication failed via Single Sign-On. Please try again or contact your administrator.",
+  "timestamp": "2026-08-01T12:00:00.000Z"
+}
+```
+
+### 5. Identity Conflict (`409 Conflict`)
+
+```json
+{
+  "statusCode": 409,
+  "errorCode": "AUTH_FIREBASE_IDENTITY_CONFLICT",
+  "message": "Authentication failed due to ambiguous identity mappings. Please contact your administrator.",
+  "timestamp": "2026-08-01T12:00:00.000Z"
+}
+```
+
+### 6. Provider or Infrastructure Failure (`503 Service Unavailable`)
+
+```json
+{
+  "statusCode": 503,
+  "errorCode": "AUTH_SSO_PROVIDER_UNAVAILABLE",
+  "message": "Single Sign-On service is temporarily unavailable. Please try logging in with your password.",
+  "timestamp": "2026-08-01T12:00:00.000Z"
+}
+```

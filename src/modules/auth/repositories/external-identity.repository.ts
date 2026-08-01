@@ -19,4 +19,12 @@ export class ExternalIdentityRepository extends BaseRepository<ExternalIdentity>
   async findByUserId(userId: string): Promise<ExternalIdentity[]> {
     return this.find({ userId });
   }
+
+  async findMapping(
+    tenantCode: string,
+    provider: string,
+    providerSubject: string,
+  ): Promise<ExternalIdentity[]> {
+    return this.find({ tenantCode, provider, providerSubject });
+  }
 }
