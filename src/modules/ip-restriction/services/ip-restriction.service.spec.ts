@@ -44,6 +44,42 @@ describe('IpRestrictionService', () => {
       expect(service.ipInCidr('192.168.1.1', '192.168.1.1')).toBe(true);
       expect(service.ipInCidr('192.168.1.2', '192.168.1.1')).toBe(false);
     });
+
+    it('should return false if IPv4 prefix is out of bounds', () => {
+      expect(service.ipInCidr('192.168.1.50', '192.168.1.0/33')).toBe(false);
+      expect(service.ipInCidr('192.168.1.50', '192.168.1.0/-1')).toBe(false);
+    });
+
+    it('should return false if IPv6 prefix is out of bounds', () => {
+      expect(service.ipInCidr('2001:db8::1', '2001:db8::/129')).toBe(false);
+      expect(service.ipInCidr('2001:db8::1', '2001:db8::/-1')).toBe(false);
+    });
+
+    it('should return true if IPv6 IP falls within CIDR range', () => {
+      expect(service.ipInCidr('2001:db8::1', '2001:db8::/32')).toBe(true);
+    });
+
+    it('should return false if IPv6 IP falls outside CIDR range', () => {
+      expect(service.ipInCidr('2001:db9::1', '2001:db8::/32')).toBe(false);
+    });
+
+    it('should support full 128-bit single IPv6 IP match if no bits specified', () => {
+      expect(service.ipInCidr('2001:db8::1', '2001:db8::1')).toBe(true);
+      expect(service.ipInCidr('2001:db8::2', '2001:db8::1')).toBe(false);
+    });
+
+    it('should return false on kind mismatch (IPv4 IP vs IPv6 CIDR)', () => {
+      expect(service.ipInCidr('192.168.1.1', '2001:db8::/32')).toBe(false);
+    });
+
+    it('should return false on kind mismatch (IPv6 IP vs IPv4 CIDR)', () => {
+      expect(service.ipInCidr('2001:db8::1', '192.168.1.0/24')).toBe(false);
+    });
+
+    it('should return true for IPv4-mapped IPv6 address vs IPv4 CIDR', () => {
+      // 192.168.1.50 in mapped format without standard ::ffff: prefix so it bypasses normalizeIp
+      expect(service.ipInCidr('0:0:0:0:0:ffff:192.168.1.50', '192.168.1.0/24')).toBe(true);
+    });
   });
 
   describe('evaluate', () => {
@@ -72,6 +108,18 @@ describe('IpRestrictionService', () => {
       const settings = {
         ipRestrictionEnabled: true,
         allowedIpCidrs: [],
+      } as unknown as AuthenticationSettings;
+      expect(() => service.evaluate('192.168.1.50', settings)).toThrow(IpRestrictedError);
+    });
+
+    it('should succeed silently if settings are not provided', () => {
+      expect(() => service.evaluate('192.168.1.50')).not.toThrow();
+    });
+
+    it('should throw IpRestrictedError if allowedIpCidrs is null/undefined', () => {
+      const settings = {
+        ipRestrictionEnabled: true,
+        allowedIpCidrs: null,
       } as unknown as AuthenticationSettings;
       expect(() => service.evaluate('192.168.1.50', settings)).toThrow(IpRestrictedError);
     });

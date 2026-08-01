@@ -18,7 +18,10 @@ export class LockoutService {
   ) {}
 
   private getRedisClient(): Redis | null {
-    return this.redisCacheProvider.getClient();
+    const provider = this.redisCacheProvider as unknown as {
+      getClient?(): Redis | null;
+    };
+    return provider.getClient?.() ?? null;
   }
 
   async getFailureCount(tenantCode: string, userId: string): Promise<number> {

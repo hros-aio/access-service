@@ -44,7 +44,10 @@ describe('Authentication (e2e)', () => {
     await dbHelper.cleanDatabase();
 
     // Clear Redis login-failure counters for seeded users
-    const redisClient = redisCacheProvider.getClient();
+    const provider = redisCacheProvider as unknown as {
+      getClient?(): { del(key: string): Promise<number> } | null;
+    };
+    const redisClient = provider.getClient?.();
     if (redisClient) {
       await redisClient.del('auth:login-failure:TENANT_TEST:a32e12e8-d101-4475-b6d1-419bd1e967a1');
       await redisClient.del('auth:login-failure:TENANT_TEST:b43f23f8-e202-5586-c7e2-520ce2e078b2');

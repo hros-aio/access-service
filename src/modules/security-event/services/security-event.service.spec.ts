@@ -64,6 +64,18 @@ describe('SecurityEventService', () => {
         },
       });
     });
+
+    it('should use default userAgent and rememberMe when not provided', async () => {
+      await service.logLoginSucceeded('TENANT_123', 'user-123', 'session-123', '192.168.1.50');
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sanitizedPayload: expect.objectContaining({
+            userAgent: 'unknown',
+            rememberMe: false,
+          }),
+        }),
+      );
+    });
   });
 
   describe('logLoginFailed', () => {
@@ -106,6 +118,24 @@ describe('SecurityEventService', () => {
       expect(payloadString).not.toContain(sensitivePassword);
       expect(payloadString).not.toContain('passwordHash');
     });
+
+    it('should handle missing userId and userAgent', async () => {
+      await service.logLoginFailed(
+        'TENANT_123',
+        'user@example.com',
+        '192.168.1.50',
+        'INVALID_CREDENTIALS',
+      );
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: undefined,
+          sanitizedPayload: expect.objectContaining({
+            userId: null,
+            userAgent: 'unknown',
+          }),
+        }),
+      );
+    });
   });
 
   describe('logAccountLocked', () => {
@@ -123,6 +153,17 @@ describe('SecurityEventService', () => {
           userAgent: 'Mozilla/5.0',
         },
       });
+    });
+
+    it('should use default userAgent when not provided', async () => {
+      await service.logAccountLocked('TENANT_123', 'user-123', '192.168.1.50');
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sanitizedPayload: expect.objectContaining({
+            userAgent: 'unknown',
+          }),
+        }),
+      );
     });
   });
 });

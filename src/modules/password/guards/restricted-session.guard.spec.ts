@@ -103,4 +103,11 @@ describe('RestrictedSessionGuard', () => {
 
     await expect(guard.canActivate(context)).rejects.toThrow(AuthStoreUnavailableError);
   });
+
+  it('should throw AuthStoreUnavailableError and re-throw when Redis client is null', async () => {
+    const context = createMockContext({ authorization: 'Bearer flow-null' });
+    mockRedisCacheProvider.client = null;
+
+    await expect(guard.canActivate(context)).rejects.toThrow(AuthStoreUnavailableError);
+  });
 });
