@@ -17,6 +17,7 @@ describe('AuthSecurityEventOutboxRepository', () => {
       save: jest.fn(),
       findOne: jest.fn(),
       find: jest.fn(),
+      clear: jest.fn(),
     };
 
     mockEntityManager = {
@@ -47,7 +48,7 @@ describe('AuthSecurityEventOutboxRepository', () => {
     expect(repository).toBeDefined();
   });
 
-  it('should find pending events with tenant scope', async () => {
+  it('should find pending events without tenant scope', async () => {
     const events = [new AuthSecurityEventOutbox()];
     mockTypeormRepository.find.mockResolvedValue(events);
 
@@ -56,7 +57,6 @@ describe('AuthSecurityEventOutboxRepository', () => {
     expect(mockTypeormRepository.find).toHaveBeenCalledWith({
       where: {
         publishStatus: 'pending',
-        tenantCode: 'TENANT_A',
       },
     });
   });
@@ -69,9 +69,31 @@ describe('AuthSecurityEventOutboxRepository', () => {
     expect(result).toEqual(events);
     expect(mockTypeormRepository.find).toHaveBeenCalledWith({
       where: {
-        userId: 'user-uuid',
         tenantCode: 'TENANT_A',
+        userId: 'user-uuid',
       },
     });
+  });
+
+  it('should throw an error in findByUserId when tenant code is missing', async () => {
+    jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue(null);
+    await expect(repository.findByUserId('user-uuid')).rejects.toThrow(
+      'Tenant code is missing from active RequestContext',
+    );
+  });
+
+  it('should create and save an entity', async () => {
+    const entityData = { userId: 'test' };
+    mockTypeormRepository.save.mockResolvedValue(entityData);
+
+    const result = await repository.create(entityData);
+    expect(mockTypeormRepository.create).toHaveBeenCalledWith(entityData);
+    expect(mockTypeormRepository.save).toHaveBeenCalledWith(entityData);
+    expect(result).toEqual(entityData);
+  });
+
+  it('should clear all records', async () => {
+    await repository.clear();
+    expect(mockTypeormRepository.clear).toHaveBeenCalled();
   });
 });

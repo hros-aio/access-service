@@ -57,5 +57,25 @@ describe('AdminInvitationController', () => {
         'target-user-uuid',
       );
     });
+
+    it('should default missing actor fields to empty string', async () => {
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const actor = {
+        type: 'access' as const,
+        sid: 'session-uuid',
+      } as any;
+      /* eslint-enable @typescript-eslint/no-explicit-any */
+      mockInvitationService.resendInvitation.mockResolvedValue({ success: true });
+
+      await controller.resend(actor, 'target-user-uuid');
+      expect(mockInvitationService.resendInvitation).toHaveBeenCalledWith(
+        {
+          userId: '',
+          tenantCode: '',
+          userType: 'admin',
+        },
+        'target-user-uuid',
+      );
+    });
   });
 });

@@ -5,4 +5,5 @@ export enum UserStatus {
   INVITED = 'invited',
   DISABLED = 'disabled',
   ARCHIVED = 'archived',
+  LOCKED = 'locked',
 }
