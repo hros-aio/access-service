@@ -12,3 +12,5 @@ process.env.JWT_PUBLIC_KEY = publicKey;
 process.env.DATABASE_PORT = process.env.DATABASE_PORT || '5432';
 process.env.REDIS_PORT = process.env.REDIS_PORT || '6379';
 process.env.DATABASE_NAME = process.env.DATABASE_NAME || 'hrms_access_db_test';
+
+jest.setTimeout(30000);

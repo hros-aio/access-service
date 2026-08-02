@@ -18,6 +18,12 @@ export class AuthSecurityEventOutbox extends BaseEntity {
   @Column({ name: 'publish_status', type: 'varchar', length: 30, default: 'pending' })
   publishStatus: string;
 
+  @Column({ name: 'attempt_count', type: 'int', default: 0 })
+  attemptCount: number;
+
+  @Column({ name: 'last_attempted_at', type: 'timestamptz', nullable: true })
+  lastAttemptedAt?: Date | null;
+
   @ManyToOne(() => User, { onDelete: 'SET NULL', onUpdate: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user?: User;

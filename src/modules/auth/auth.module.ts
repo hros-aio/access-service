@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CACHE_PROVIDER_TOKEN, CacheService, RedisCacheProvider } from '@new-hros/libs-core';
 
@@ -24,7 +24,7 @@ import { UserModule } from '../user/user.module';
     TypeOrmModule.forFeature([Credential, ExternalIdentity, AuthSecurityEventOutbox]),
     TenantModule,
     UserModule,
-    MfaModule,
+    forwardRef(() => MfaModule),
   ],
   controllers: [AuthController],
   providers: [
