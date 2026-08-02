@@ -5,20 +5,22 @@ import { TransactionService } from '@new-hros/libs-sql';
 
 import { CredentialPolicy } from './credential.policy';
 import { PasswordService } from './password.service';
-import { CredentialStatus, UserStatus } from '../../../enums';
+import { UserStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { Credential } from '../../auth/entities/credential.entity';
 import { CredentialDomainService } from '../../auth/services/credential.domain.service';
 import { SessionApplicationService } from '../../auth/services/session.application.service';
 import { Invitation } from '../../invite/entities/invitation.entity';
 import { InvitationRepository } from '../../invite/repositories/invitation.repository';
+import { AuthenticationSettings } from '../../tenant/entities/authentication-settings.entity';
 import { User } from '../../user/entities/user.entity';
+import { PasswordResetRedisAdapter } from '../adapters/password-reset-redis.adapter';
 import {
-  AuthSessionExpiredError,
-  AuthStoreUnavailableError,
-  CredentialAlreadyExistsError,
-  InvalidPasswordPolicyError,
-} from '../exceptions/password.exception';
+  InvalidResetChallengeException,
+  InvalidResetCodeException,
+  MaxAttemptsExceededException,
+  SelfServiceResetDisabledException,
+} from '../exceptions/password-reset.exception';
 
 describe('PasswordService', () => {
   let service: PasswordService;
@@ -28,11 +30,13 @@ describe('PasswordService', () => {
   let mockRedisClient: any;
   let mockSessionApplicationService: any;
   let mockInvitationRepository: any;
+  let mockPasswordResetRedisAdapter: any;
 
   let mockTypeormUserRepository: any;
   let mockTypeormCredentialRepository: any;
   let mockTypeormInvitationRepository: any;
   let mockTypeormOutboxRepository: any;
+  let mockTypeormSettingsRepository: any;
   let mockEntityManager: any;
 
   beforeEach(async () => {
@@ -55,12 +59,17 @@ describe('PasswordService', () => {
       save: jest.fn().mockImplementation((o) => o),
     };
 
+    mockTypeormSettingsRepository = {
+      findOne: jest.fn().mockResolvedValue(null),
+    };
+
     mockEntityManager = {
       getRepository: jest.fn().mockImplementation((entity) => {
         if (entity === User) return mockTypeormUserRepository;
         if (entity === Credential) return mockTypeormCredentialRepository;
         if (entity === Invitation) return mockTypeormInvitationRepository;
         if (entity === AuthSecurityEventOutbox) return mockTypeormOutboxRepository;
+        if (entity === AuthenticationSettings) return mockTypeormSettingsRepository;
         return null;
       }),
     };
@@ -90,6 +99,14 @@ describe('PasswordService', () => {
       cancelPendingInvitations: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockPasswordResetRedisAdapter = {
+      saveChallenge: jest.fn().mockResolvedValue(undefined),
+      getChallenge: jest.fn(),
+      incrementAttempts: jest.fn(),
+      markCodeVerified: jest.fn().mockResolvedValue(undefined),
+      deleteChallenge: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PasswordService,
@@ -99,6 +116,7 @@ describe('PasswordService', () => {
         { provide: RedisCacheProvider, useValue: mockRedisCacheProvider },
         { provide: SessionApplicationService, useValue: mockSessionApplicationService },
         { provide: InvitationRepository, useValue: mockInvitationRepository },
+        { provide: PasswordResetRedisAdapter, useValue: mockPasswordResetRedisAdapter },
       ],
     }).compile();
 
@@ -109,135 +127,109 @@ describe('PasswordService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('setupPasswordViaSsoFallback', () => {
-    it('should successfully set password, update state, cancel pending invitations, delete Redis token, and return tokens', async () => {
-      const user = new User();
-      user.id = 'user-uuid';
-      user.tenantCode = 'tenant-abc';
-      user.status = UserStatus.INVITED;
-      user.credentialStatus = CredentialStatus.PENDING;
-      user.securityVersion = 1;
+  describe('requestResetCode', () => {
+    it('should throw SelfServiceResetDisabledException if tenant settings forbid self-service reset', async () => {
+      mockTypeormSettingsRepository.findOne.mockResolvedValue({ needAdminResetPassword: true });
 
-      const pendingInvite = new Invitation();
-      pendingInvite.id = 'invite-uuid';
-
-      mockTypeormUserRepository.findOne.mockResolvedValue(user);
-      mockTypeormCredentialRepository.findOne.mockResolvedValue(null);
-      mockTypeormInvitationRepository.findOne.mockResolvedValue(pendingInvite);
-
-      const result = await service.setupPasswordViaSsoFallback(
-        'flow-123',
-        'tenant-abc',
-        'user-uuid',
-        { password: 'Password123!' },
-      );
-
-      expect(result).toEqual({
-        mfaRequired: false,
-      });
-
-      // Verify db changes saved
-      expect(mockTypeormUserRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 'user-uuid', tenantCode: 'tenant-abc' },
-        lock: { mode: 'pessimistic_write' },
-      });
-      expect(mockTypeormCredentialRepository.save).toHaveBeenCalled();
-      expect(mockTypeormUserRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          status: UserStatus.ACTIVE,
-          credentialStatus: CredentialStatus.ACTIVE,
-          securityVersion: 2,
-        }),
-      );
-      expect(mockInvitationRepository.cancelPendingInvitations).toHaveBeenCalledWith(
-        'tenant-abc',
-        'user-uuid',
-      );
-      expect(mockTypeormOutboxRepository.save).toHaveBeenCalledTimes(2); // US1 password event + US2 invitation accepted/superseded event
-      expect(mockSessionApplicationService.revokeAllSessions).toHaveBeenCalledWith(
-        'tenant-abc',
-        'user-uuid',
-      );
-      expect(mockRedisClient.del).toHaveBeenCalledWith('auth:sso-setup:flow-123');
-    });
-
-    it('should throw InvalidPasswordPolicyError if password is weak', async () => {
       await expect(
-        service.setupPasswordViaSsoFallback('flow-123', 'tenant-abc', 'user-uuid', {
-          password: '123',
-        }),
-      ).rejects.toThrow(InvalidPasswordPolicyError);
+        service.requestResetCode({ tenantCode: 'tenant-1', email: 'user@example.com' }),
+      ).rejects.toThrow(SelfServiceResetDisabledException);
     });
 
-    it('should throw AuthSessionExpiredError if user row cannot be locked or found', async () => {
+    it('should return generic success and skip redis/outbox if user is not found', async () => {
       mockTypeormUserRepository.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.setupPasswordViaSsoFallback('flow-123', 'tenant-abc', 'user-uuid', {
-          password: 'Password123!',
-        }),
-      ).rejects.toThrow(AuthSessionExpiredError);
-    });
-
-    it('should throw CredentialAlreadyExistsError if user already has an active password credential', async () => {
-      const user = new User();
-      user.id = 'user-uuid';
-      user.tenantCode = 'tenant-abc';
-
-      const existingCred = new Credential();
-      existingCred.userId = 'user-uuid';
-      existingCred.status = 'active';
-
-      mockTypeormUserRepository.findOne.mockResolvedValue(user);
-      mockTypeormCredentialRepository.findOne.mockResolvedValue(existingCred);
-
-      await expect(
-        service.setupPasswordViaSsoFallback('flow-123', 'tenant-abc', 'user-uuid', {
-          password: 'Password123!',
-        }),
-      ).rejects.toThrow(CredentialAlreadyExistsError);
-    });
-
-    it('should throw AuthStoreUnavailableError if revokeAllSessions fails', async () => {
-      const user = new User();
-      user.id = 'user-uuid';
-      user.tenantCode = 'tenant-abc';
-
-      mockTypeormUserRepository.findOne.mockResolvedValue(user);
-      mockTypeormCredentialRepository.findOne.mockResolvedValue(null);
-
-      // Force revokeAllSessions to reject
-      mockSessionApplicationService.revokeAllSessions.mockRejectedValue(new Error('Redis issue'));
-
-      await expect(
-        service.setupPasswordViaSsoFallback('flow-123', 'tenant-abc', 'user-uuid', {
-          password: 'Password123!',
-        }),
-      ).rejects.toThrow(AuthStoreUnavailableError);
-    });
-
-    it('should not throw AuthStoreUnavailableError if Redis client is missing or fails (best-effort)', async () => {
-      const user = new User();
-      user.id = 'user-uuid';
-      user.tenantCode = 'tenant-abc';
-
-      mockTypeormUserRepository.findOne.mockResolvedValue(user);
-      mockTypeormCredentialRepository.findOne.mockResolvedValue(null);
-
-      // Force delete to reject
-      mockRedisClient.del.mockRejectedValue(new Error('Redis issue'));
-
-      const result = await service.setupPasswordViaSsoFallback(
-        'flow-123',
-        'tenant-abc',
-        'user-uuid',
-        {
-          password: 'Password123!',
-        },
-      );
-      expect(result).toEqual({
-        mfaRequired: false,
+      const res = await service.requestResetCode({
+        tenantCode: 'tenant-1',
+        email: 'missing@example.com',
       });
+      expect(res.message).toContain('If an active account exists');
+      expect(mockPasswordResetRedisAdapter.saveChallenge).not.toHaveBeenCalled();
+    });
+
+    it('should create challenge and save outbox event if valid user exists', async () => {
+      const user = new User();
+      user.id = 'user-uuid';
+      user.displayEmail = 'user@example.com';
+      user.normalizedEmail = 'user@example.com';
+      user.tenantCode = 'tenant-1';
+      user.status = UserStatus.ACTIVE;
+
+      mockTypeormUserRepository.findOne.mockResolvedValue(user);
+
+      const res = await service.requestResetCode({
+        tenantCode: 'tenant-1',
+        email: 'user@example.com',
+      });
+      expect(res.message).toContain('If an active account exists');
+      expect(mockPasswordResetRedisAdapter.saveChallenge).toHaveBeenCalled();
+      expect(mockTypeormOutboxRepository.save).toHaveBeenCalled();
+    });
+  });
+
+  describe('verifyResetCode', () => {
+    it('should throw InvalidResetChallengeException if challenge is missing', async () => {
+      mockPasswordResetRedisAdapter.getChallenge.mockResolvedValue(null);
+
+      await expect(
+        service.verifyResetCode({
+          challengeId: 'ch-1',
+          tenantCode: 'tenant-1',
+          userId: 'u-1',
+          code: '123456',
+        }),
+      ).rejects.toThrow(InvalidResetChallengeException);
+    });
+
+    it('should throw MaxAttemptsExceededException if attempts >= 3', async () => {
+      mockPasswordResetRedisAdapter.getChallenge.mockResolvedValue({ attempts: 3 });
+
+      await expect(
+        service.verifyResetCode({
+          challengeId: 'ch-1',
+          tenantCode: 'tenant-1',
+          userId: 'u-1',
+          code: '123456',
+        }),
+      ).rejects.toThrow(MaxAttemptsExceededException);
+    });
+
+    it('should throw InvalidResetCodeException and increment attempts on code mismatch', async () => {
+      mockPasswordResetRedisAdapter.getChallenge.mockResolvedValue({
+        attempts: 0,
+        hashedCode: 'different-hash',
+      });
+      mockPasswordResetRedisAdapter.incrementAttempts.mockResolvedValue(1);
+
+      await expect(
+        service.verifyResetCode({
+          challengeId: 'ch-1',
+          tenantCode: 'tenant-1',
+          userId: 'u-1',
+          code: '123456',
+        }),
+      ).rejects.toThrow(InvalidResetCodeException);
+    });
+  });
+
+  describe('adminInitiateReset', () => {
+    it('should initiate reset workflow for target user', async () => {
+      const user = new User();
+      user.id = 'user-target';
+      user.displayEmail = 'target@example.com';
+      user.normalizedEmail = 'target@example.com';
+      user.tenantCode = 'tenant-1';
+      user.status = UserStatus.ACTIVE;
+
+      mockTypeormUserRepository.findOne.mockResolvedValue(user);
+
+      const res = await service.adminInitiateReset({
+        tenantCode: 'tenant-1',
+        userId: 'user-target',
+      });
+      expect(res.message).toContain('Password reset workflow initiated');
+      expect(mockPasswordResetRedisAdapter.saveChallenge).toHaveBeenCalled();
+      expect(mockTypeormOutboxRepository.save).toHaveBeenCalled();
     });
   });
 });

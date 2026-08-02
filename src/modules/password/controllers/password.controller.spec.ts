@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { AuthGuard, PermissionGuard } from '@new-hros/libs-apis';
 import { RedisCacheProvider } from '@new-hros/libs-core';
 import { Request } from 'express';
 
@@ -29,7 +30,14 @@ describe('PasswordController', () => {
         { provide: RedisCacheProvider, useValue: mockRedisCacheProvider },
         RestrictedSessionGuard,
       ],
-    }).compile();
+    })
+      .overrideGuard(RestrictedSessionGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(AuthGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(PermissionGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<PasswordController>(PasswordController);
   });
