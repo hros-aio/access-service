@@ -26,6 +26,27 @@ export class AuthSecurityEventOutboxRepository {
     return this.find({ publishStatus: 'pending' });
   }
 
+  async findPendingForRetry(maxAttempts = 5): Promise<AuthSecurityEventOutbox[]> {
+    return this.repository
+      .createQueryBuilder('outbox')
+      .where("outbox.publish_status = 'pending'")
+      .andWhere('outbox.attempt_count < :maxAttempts', { maxAttempts })
+      .orderBy('outbox.created_at', 'ASC')
+      .getMany();
+  }
+
+  async recordAttemptFailure(id: string): Promise<void> {
+    await this.repository
+      .createQueryBuilder()
+      .update(AuthSecurityEventOutbox)
+      .set({
+        attemptCount: () => 'attempt_count + 1',
+        lastAttemptedAt: new Date(),
+      })
+      .where('id = :id', { id })
+      .execute();
+  }
+
   async findByUserId(userId: string): Promise<AuthSecurityEventOutbox[]> {
     const tenantCode = RequestContextService.getTenantCode();
     if (!tenantCode) {
