@@ -1,0 +1,136 @@
+# API OpenAPI Contract: Password Reset Endpoints
+
+```yaml
+openapi: 3.0.3
+info:
+  title: Authentication Service - Password Reset API
+  version: 1.0.0
+paths:
+  /auth/password/reset/request:
+    post:
+      summary: Request self-service password reset code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantCode, email]
+              properties:
+                tenantCode:
+                  type: string
+                  example: "acme-corp"
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+      responses:
+        '200':
+          description: Generic success response to prevent enumeration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "If an active account exists, recovery instructions have been sent."
+        '403':
+          description: Self-service password reset disabled by tenant policy
+
+  /auth/password/reset/verify:
+    post:
+      summary: Verify 6-digit OTP code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, code]
+              properties:
+                challengeId:
+                  type: string
+                  format: uuid
+                code:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+                  example: "123456"
+      responses:
+        '200':
+          description: Code verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                    example: true
+                  resetToken:
+                    type: string
+                    format: uuid
+        '400':
+          description: Invalid code or expired challenge
+        '429':
+          description: Maximum verification attempts exceeded
+
+  /auth/password/reset/confirm:
+    post:
+      summary: Confirm new password using reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, resetToken, newPassword]
+              properties:
+                challengeId:
+                  type: string
+                  format: uuid
+                resetToken:
+                  type: string
+                  format: uuid
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '200':
+          description: Password reset completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+
+  /auth/admin/users/{userId}/password-reset:
+    post:
+      summary: Admin-initiated password reset
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Password reset initiated by admin
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Password reset workflow initiated for user."
+        '403':
+          description: Insufficient admin permissions
+```
