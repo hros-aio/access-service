@@ -60,12 +60,17 @@ export class AuthApplicationService {
     try {
       this.ipRestrictionService.evaluate(sourceIp, authSettings || undefined);
     } catch (err) {
+      const normalizedEmail = email.toLowerCase().trim();
+      const user = await this.userRepository.findOne({ tenantCode, normalizedEmail });
+      if (user) {
+        await this.lockoutService.recordIpFailure(tenantCode, user.id, sourceIp);
+      }
       await this.securityEventService.logLoginFailed(
         tenantCode,
         email,
         sourceIp,
         'IP_RESTRICTION_DENIED',
-        undefined,
+        user?.id,
         userAgent,
       );
       throw err;
@@ -81,6 +86,11 @@ export class AuthApplicationService {
     const normalizedEmail = email.toLowerCase().trim();
     const user = await this.userRepository.findOne({ tenantCode, normalizedEmail });
     if (!user) {
+      // Execute constant-time dummy password verification defense against timing enumeration
+      await this.credentialDomainService.verifyPassword(
+        '$2b$10$e8p.9p56x8P90Q2m7qX67eO0jU5vK.hZl4u/eZzN7cZ5.0J6.y7iW',
+        password,
+      );
       await this.securityEventService.logLoginFailed(
         tenantCode,
         email,
@@ -94,6 +104,11 @@ export class AuthApplicationService {
 
     // 3. Verify user status
     if (user.status !== UserStatus.ACTIVE) {
+      // Execute constant-time dummy verification for non-active status
+      await this.credentialDomainService.verifyPassword(
+        '$2b$10$e8p.9p56x8P90Q2m7qX67eO0jU5vK.hZl4u/eZzN7cZ5.0J6.y7iW',
+        password,
+      );
       if (user.status === UserStatus.SUSPENDED) {
         await this.securityEventService.logLoginFailed(
           tenantCode,
