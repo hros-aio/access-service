@@ -1,0 +1,91 @@
+# OpenAPI Specification: Session Management & Logout Endpoints
+
+```yaml
+openapi: 3.0.3
+info:
+  title: Session Management Service API
+  version: 1.0.0
+  description: Endpoints for single device logout and administrative force logout.
+paths:
+  /auth/logout:
+    post:
+      summary: Revoke current device session
+      operationId: logoutCurrentSession
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Session successfully revoked (idempotent)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+        '401':
+          description: Missing or invalid JWT token
+        '503':
+          description: Session store unavailable
+
+  /admin/users/{userId}/force-logout:
+    post:
+      summary: Admin force logout all sessions for target user
+      operationId: forceLogoutUser
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Target user UUID
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForceLogoutRequest'
+      responses:
+        '200':
+          description: All user sessions successfully revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: User not found within tenant scope
+        '503':
+          description: Session store unavailable
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LogoutResponse:
+      type: object
+      required:
+        - success
+        - revokedSessionsCount
+      properties:
+        success:
+          type: boolean
+          example: true
+        revokedSessionsCount:
+          type: integer
+          example: 1
+
+    ForceLogoutRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          example: "ADMIN_FORCE_LOGOUT"
+```
