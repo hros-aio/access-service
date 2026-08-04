@@ -1,13 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { RedisCacheProvider } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 import Redis from 'ioredis';
 
 import { UserStatus } from '../../../enums';
 import { AuthStoreUnavailableError } from '../../auth/exceptions/auth.exception';
+import { SecurityEventService } from '../../security-event/services/security-event.service';
 import { AuthenticationSettings } from '../../tenant/entities/authentication-settings.entity';
 import { User } from '../../user/entities/user.entity';
 import { UserRepository } from '../../user/repositories/user.repository';
+import { RedisLockoutAdapter } from '../adapters/redis-lockout.adapter';
 
 @Injectable()
 export class LockoutService {
@@ -15,6 +17,7 @@ export class LockoutService {
     private readonly redisCacheProvider: RedisCacheProvider,
     private readonly userRepository: UserRepository,
     private readonly transactionService: TransactionService,
+    @Optional() private readonly securityEventService?: SecurityEventService,
   ) {}
 
   private getRedisClient(): Redis | null {
@@ -24,46 +27,58 @@ export class LockoutService {
     return provider.getClient?.() ?? null;
   }
 
-  async getFailureCount(tenantCode: string, userId: string): Promise<number> {
+  private getAdapter(): RedisLockoutAdapter {
     const client = this.getRedisClient();
     if (!client) {
       throw new AuthStoreUnavailableError('Redis client is unavailable');
     }
-    const key = `auth:login-failure:${tenantCode}:${userId}`;
+    return new RedisLockoutAdapter(client);
+  }
+
+  async getFailureCount(tenantCode: string, userId: string): Promise<number> {
     try {
-      const val = await client.get(key);
-      return val ? parseInt(val, 10) : 0;
+      return await this.getAdapter().getCredentialFailureCount(tenantCode, userId);
     } catch (err) {
+      if (err instanceof AuthStoreUnavailableError) throw err;
       throw new AuthStoreUnavailableError('Redis lookup failure', err);
     }
   }
 
   async incrementFailureCount(tenantCode: string, userId: string): Promise<number> {
-    const client = this.getRedisClient();
-    if (!client) {
-      throw new AuthStoreUnavailableError('Redis client is unavailable');
-    }
-    const key = `auth:login-failure:${tenantCode}:${userId}`;
     try {
-      const count = await client.incr(key);
-      if (count === 1) {
-        await client.expire(key, 900); // 15 mins rolling window
-      }
-      return count;
+      return await this.getAdapter().incrementCredentialFailure(tenantCode, userId, 900);
     } catch (err) {
+      if (err instanceof AuthStoreUnavailableError) throw err;
       throw new AuthStoreUnavailableError('Redis increment failure', err);
     }
   }
 
-  async resetFailureCount(tenantCode: string, userId: string): Promise<void> {
-    const client = this.getRedisClient();
-    if (!client) {
-      throw new AuthStoreUnavailableError('Redis client is unavailable');
-    }
-    const key = `auth:login-failure:${tenantCode}:${userId}`;
+  async recordIpFailure(tenantCode: string, userId: string, sourceIp: string): Promise<number> {
     try {
-      await client.del(key);
+      const adapter = this.getAdapter();
+      const count = await adapter.incrementIpFailure(tenantCode, userId, 900);
+      if (count >= 10 && this.securityEventService) {
+        await this.securityEventService.logLoginFailed(
+          tenantCode,
+          'ip-restriction-alert',
+          sourceIp,
+          'UNAPPROVED_IP_SPIKE',
+          userId,
+          'system',
+        );
+      }
+      return count;
     } catch (err) {
+      if (err instanceof AuthStoreUnavailableError) throw err;
+      throw new AuthStoreUnavailableError('Redis IP failure increment error', err);
+    }
+  }
+
+  async resetFailureCount(tenantCode: string, userId: string): Promise<void> {
+    try {
+      await this.getAdapter().resetCredentialFailure(tenantCode, userId);
+    } catch (err) {
+      if (err instanceof AuthStoreUnavailableError) throw err;
       throw new AuthStoreUnavailableError('Redis delete failure', err);
     }
   }
@@ -81,7 +96,6 @@ export class LockoutService {
     const threshold = settings.maxFailedRetries || 5;
 
     if (count >= threshold) {
-      // Lock user account under pessimistic write lock inside a transaction
       return this.transactionService.runInTransaction(async () => {
         const lockedUser = await this.transactionService
           .getManager()
@@ -93,9 +107,10 @@ export class LockoutService {
 
         if (lockedUser && lockedUser.status !== UserStatus.LOCKED) {
           lockedUser.status = UserStatus.LOCKED;
+          lockedUser.securityVersion = (lockedUser.securityVersion || 1) + 1;
           await this.transactionService.getManager().getRepository(User).save(lockedUser);
           await this.resetFailureCount(tenantCode, userId);
-          return true; // indicates account was locked in this call
+          return true;
         }
         return false;
       });
