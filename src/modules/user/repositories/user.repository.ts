@@ -17,4 +17,24 @@ export class UserRepository extends BaseRepository<User> {
   async findByEmployeeId(employeeRefId: string): Promise<User | null> {
     return this.findOne({ employeeRefId });
   }
+
+  /**
+   * Atomically increments security_version for target user in tenant context.
+   */
+  async bumpSecurityVersion(tenantCode: string, userId: string): Promise<boolean> {
+    const result = await this.repository
+      .createQueryBuilder()
+      .update(User)
+      .set({
+        securityVersion: () => '"security_version" + 1',
+      })
+      .where('tenant_code = :tenantCode AND id = :userId AND status = :status', {
+        tenantCode,
+        userId,
+        status: 'active',
+      })
+      .execute();
+
+    return (result.affected || 0) > 0;
+  }
 }
