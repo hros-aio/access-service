@@ -1,24 +1,22 @@
-import { RedisCacheProvider } from '@new-hros/libs-core';
-import Redis from 'ioredis';
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { IpLockoutRedisAdapter } from './ip-lockout-redis.adapter';
 
 describe('IpLockoutRedisAdapter', () => {
   let adapter: IpLockoutRedisAdapter;
-  let redisClientMock: jest.Mocked<Partial<Redis>>;
-  let redisCacheProviderMock: Partial<RedisCacheProvider>;
+  let redisClientMock: any;
+  let redisCacheProviderMock: any;
 
   beforeEach(() => {
     redisClientMock = {
-      incr: jest.fn() as unknown as Redis['incr'],
-      expire: jest.fn() as unknown as Redis['expire'],
-      get: jest.fn() as unknown as Redis['get'],
-      del: jest.fn() as unknown as Redis['del'],
+      incr: jest.fn(),
+      expire: jest.fn(),
+      get: jest.fn(),
+      del: jest.fn(),
     };
     redisCacheProviderMock = {
-      getClient: jest.fn().mockReturnValue(redisClientMock) as unknown as () => Redis,
+      getClient: jest.fn().mockReturnValue(redisClientMock),
     };
-    adapter = new IpLockoutRedisAdapter(redisCacheProviderMock as RedisCacheProvider);
+    adapter = new IpLockoutRedisAdapter(redisCacheProviderMock);
   });
 
   it('should generate correct Redis key format', () => {
@@ -26,7 +24,7 @@ describe('IpLockoutRedisAdapter', () => {
   });
 
   it('should increment counter and set TTL on first failure', async () => {
-    (redisClientMock.incr as jest.Mock).mockResolvedValue(1);
+    redisClientMock.incr.mockResolvedValue(1);
     const count = await adapter.incrementIpFailureCounter('TENANT1', 'USR1');
     expect(count).toBe(1);
     expect(redisClientMock.incr).toHaveBeenCalledWith('auth:ip-failure:TENANT1:USR1');
@@ -34,7 +32,7 @@ describe('IpLockoutRedisAdapter', () => {
   });
 
   it('should increment counter without resetting TTL on subsequent failures', async () => {
-    (redisClientMock.incr as jest.Mock).mockResolvedValue(2);
+    redisClientMock.incr.mockResolvedValue(2);
     const count = await adapter.incrementIpFailureCounter('TENANT1', 'USR1');
     expect(count).toBe(2);
     expect(redisClientMock.expire).not.toHaveBeenCalled();
