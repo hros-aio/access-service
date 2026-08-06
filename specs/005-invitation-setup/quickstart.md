@@ -41,14 +41,14 @@ redis-cli ping
 ### Scenario A: Validate Onboarding Invitation Link
 Given a user was provisioned and has a `PENDING` invitation with token `a1b2c3d4e5f6` (token hash matches database):
 ```bash
-curl -i -X GET "http://localhost:3000/api/v1/invitations/validate?token=a1b2c3d4e5f6"
+curl -i -X GET "http://localhost:3000/invitations/validate?token=a1b2c3d4e5f6"
 ```
 * **Expected Outcome**: HTTP `200 OK` with JSON indicating validity and corresponding user context.
 
 ### Scenario B: Accept Invitation & Initialize Password
 Complete the onboarding flow by setting a password:
 ```bash
-curl -i -X POST "http://localhost:3000/api/v1/invitations/accept" \
+curl -i -X POST "http://localhost:3000/invitations/accept" \
   -H "Content-Type: application/json" \
   -d '{
     "token": "a1b2c3d4e5f6",
@@ -65,7 +65,7 @@ curl -i -X POST "http://localhost:3000/api/v1/invitations/accept" \
 ### Scenario C: Admin Resends Invitation Link
 As a tenant administrator, trigger a resend for a user who hasn't accepted yet:
 ```bash
-curl -i -X POST "http://localhost:3000/api/v1/admin/users/550e8400-e29b-41d4-a716-446655440000/invitation/resend" \
+curl -i -X POST "http://localhost:3000/admin/users/550e8400-e29b-41d4-a716-446655440000/invitation/resend" \
   -H "Authorization: Bearer <Admin_JWT_Token>" \
   -H "X-Tenant-Code: tenant123"
 ```

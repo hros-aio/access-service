@@ -49,7 +49,7 @@ description: "Task list for Multi-Factor Authentication (MFA) implementation"
 
 - [x] T006 [P] [US1] Create DTOs for MFA enrollment in `src/modules/mfa/dto/enroll_mfa.dto.ts` and `src/modules/mfa/dto/verify_enrollment.dto.ts`
 - [x] T007 [US1] Implement `verifyAndActivateFactor` method in `src/modules/mfa/services/mfa_application.service.ts`
-- [x] T008 [US1] Implement enrollment HTTP handlers in `src/modules/mfa/controllers/mfa.controller.ts` (`POST /api/v1/auth/mfa/enroll`, `POST /api/v1/auth/mfa/enroll/verify`)
+- [x] T008 [US1] Implement enrollment HTTP handlers in `src/modules/mfa/controllers/mfa.controller.ts` (`POST /auth/mfa/enroll`, `POST /auth/mfa/enroll/verify`)
 - [x] T009 [P] [US1] Add unit tests for factor enrollment in `src/modules/mfa/services/mfa_application.service.spec.ts`
 
 **Checkpoint**: User Story 1 complete and independently testable
@@ -67,7 +67,7 @@ description: "Task list for Multi-Factor Authentication (MFA) implementation"
 - [x] T010 [P] [US2] Implement Redis MFA challenge adapter in `src/modules/mfa/adapters/redis_mfa_challenge.adapter.ts`
 - [x] T011 [P] [US2] Create challenge verification DTO in `src/modules/mfa/dto/verify_challenge.dto.ts`
 - [x] T012 [US2] Implement `verifyLoginChallenge` method in `src/modules/mfa/services/mfa_application.service.ts`
-- [x] T013 [US2] Expose challenge verification endpoint `POST /api/v1/auth/mfa/challenge/verify` in `src/modules/mfa/controllers/mfa.controller.ts`
+- [x] T013 [US2] Expose challenge verification endpoint `POST /auth/mfa/challenge/verify` in `src/modules/mfa/controllers/mfa.controller.ts`
 - [x] T014 [P] [US2] Add unit tests for login challenge adapter and verification logic in `src/modules/mfa/adapters/redis_mfa_challenge.adapter.spec.ts`
 
 **Checkpoint**: User Story 2 complete and independently testable
@@ -99,7 +99,7 @@ description: "Task list for Multi-Factor Authentication (MFA) implementation"
 
 - [x] T017 [P] [US4] Create Admin Reset DTO in `src/modules/mfa/dto/admin_reset_mfa.dto.ts`
 - [x] T018 [US4] Implement `resetUserMfa` in `src/modules/mfa/services/mfa_admin_application.service.ts` (handles DB soft-delete, `security_version` bump, Redis session deletion, and outbox write)
-- [x] T019 [US4] Expose admin reset endpoint `POST /api/v1/admin/users/:userId/mfa/reset` in `src/modules/mfa/controllers/mfa_admin.controller.ts`
+- [x] T019 [US4] Expose admin reset endpoint `POST /admin/users/:userId/mfa/reset` in `src/modules/mfa/controllers/mfa_admin.controller.ts`
 - [x] T020 [P] [US4] Add unit tests for Admin MFA reset service in `src/modules/mfa/services/mfa_admin_application.service.spec.ts`
 
 **Checkpoint**: User Story 4 complete and independently testable

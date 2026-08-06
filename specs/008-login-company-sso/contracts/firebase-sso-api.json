@@ -2,7 +2,7 @@
 
 ## Endpoint Summary
 
-- **URL**: `/api/v1/auth/login/firebase`
+- **URL**: `/auth/login/firebase`
 - **Method**: `POST`
 - **Auth**: None (Public Endpoint)
 - **Headers**:

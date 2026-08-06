@@ -121,9 +121,9 @@ Repositories are organized as single, deployable standalone services (Polyrepo l
 - **Imports**: Grouped and alphabetized: (1) Node modules, (2) `@hrms/libs-*` packages, (3) local relative imports.
 
 ### 6. API Standards
-- **Restful Naming**: URI paths MUST use plural, kebab-case nouns (e.g., `/api/v1/leave-requests`).
+- **Restful Naming**: URI paths MUST use plural, kebab-case nouns (e.g., `/leave-requests`).
 - **HTTP Mapping**: Map HTTP status codes strictly (200 for successful queries, 201 for creations, 400 for input validation errors, 401 for missing auth, 403 for insufficient permissions, 404 for missing entities, 409 for conflicts, 422 for business validations, 5xx for infrastructure failures).
-- **Versioning**: URI-based versioning is mandatory (`/api/v1/...`). Additive changes stay within the same major version; breaking changes require a new version.
+- **Versioning**: Versioning is configured in `libs-apis`. Additive changes stay within the same major version; breaking changes require a new version.
 - **Pagination**: All list endpoints MUST implement offset/cursor pagination using the `libs-sql` paginate utility. Unbounded `findAll()` is forbidden.
 - **Validation**: Incoming requests MUST use class-validator DTOs.
 - **Errors**: Domain code throws typed exceptions extending `BaseException`. Global exception filter handles formatting.

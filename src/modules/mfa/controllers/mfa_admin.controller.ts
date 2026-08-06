@@ -7,6 +7,7 @@ import {
   Post,
   Request,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Public } from '@new-hros/libs-apis';
 import { Request as ExpressRequest } from 'express';
 
@@ -21,7 +22,8 @@ interface AuthenticatedRequest extends ExpressRequest {
 }
 
 @Public()
-@Controller('api/v1/admin/users')
+@ApiTags('MFA')
+@Controller({ path: 'admin/users', version: '1' })
 export class MfaAdminController {
   constructor(private readonly mfaAdminApplicationService: MfaAdminApplicationService) {}
 

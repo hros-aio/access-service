@@ -2,7 +2,7 @@
 
 This document details the HTTP endpoints exposed by `hrms-access-service` for invitation and first-time access setup.
 
-All endpoints are prefixed with `/api/v1`.
+All endpoints are prefixed with `/`.
 
 ---
 

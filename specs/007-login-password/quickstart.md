@@ -26,7 +26,7 @@ This document details the manual and automated validation scenarios to verify th
 - **Goal**: Verify that an active user with correct password and no MFA from an allowed IP is issued a full session.
 - **Verification Command**:
   ```bash
-  curl -i -X POST http://localhost:3000/api/v1/auth/login/password \
+  curl -i -X POST http://localhost:3000/auth/login/password \
     -H "Content-Type: application/json" \
     -H "X-Forwarded-For: 192.168.1.50" \
     -d '{
@@ -45,7 +45,7 @@ This document details the manual and automated validation scenarios to verify th
 - **Goal**: Verify that an active user with correct password and enrolled MFA gets status `MFA_REQUIRED` and a challenge ID.
 - **Verification Command**:
   ```bash
-  curl -i -X POST http://localhost:3000/api/v1/auth/login/password \
+  curl -i -X POST http://localhost:3000/auth/login/password \
     -H "Content-Type: application/json" \
     -H "X-Forwarded-For: 192.168.1.50" \
     -d '{
@@ -63,7 +63,7 @@ This document details the manual and automated validation scenarios to verify th
 - **Goal**: Verify invalid credentials are rejected with a generic message and increment Redis failure counter.
 - **Verification Command**:
   ```bash
-  curl -i -X POST http://localhost:3000/api/v1/auth/login/password \
+  curl -i -X POST http://localhost:3000/auth/login/password \
     -H "Content-Type: application/json" \
     -H "X-Forwarded-For: 192.168.1.50" \
     -d '{
@@ -92,7 +92,7 @@ This document details the manual and automated validation scenarios to verify th
 - **Goal**: Verify that requests from restricted IPs are denied immediately.
 - **Verification Command**:
   ```bash
-  curl -i -X POST http://localhost:3000/api/v1/auth/login/password \
+  curl -i -X POST http://localhost:3000/auth/login/password \
     -H "Content-Type: application/json" \
     -H "X-Forwarded-For: 8.8.8.8" \
     -d '{

@@ -2,7 +2,7 @@
 
 ## 1. User MFA Endpoints (`MfaController`)
 
-### `POST /api/v1/auth/mfa/enroll`
+### `POST /auth/mfa/enroll`
 Initiates factor enrollment.
 
 - **Request Headers**: `Authorization: Bearer <RestrictedSessionToken>`
@@ -25,7 +25,7 @@ Initiates factor enrollment.
 
 ---
 
-### `POST /api/v1/auth/mfa/enroll/verify`
+### `POST /auth/mfa/enroll/verify`
 Verifies enrollment code and activates the factor.
 
 - **Request Body**:
@@ -49,7 +49,7 @@ Verifies enrollment code and activates the factor.
 
 ---
 
-### `POST /api/v1/auth/mfa/challenge/verify`
+### `POST /auth/mfa/challenge/verify`
 Submits challenge verification during primary login flow.
 
 - **Request Body**:
@@ -73,7 +73,7 @@ Submits challenge verification during primary login flow.
 
 ## 2. Admin MFA Endpoints (`MfaAdminController`)
 
-### `POST /api/v1/admin/users/:userId/mfa/reset`
+### `POST /admin/users/:userId/mfa/reset`
 Resets all MFA factors for a target user and revokes their active sessions.
 
 - **Request Headers**: `Authorization: Bearer <AdminAccessToken>`
