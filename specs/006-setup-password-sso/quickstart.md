@@ -41,7 +41,7 @@ pnpm start:dev
 Invoke the endpoint using `curl` to simulate the password setup request:
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/auth/password/setup/firebase \
+curl -X POST http://localhost:3000/auth/password/setup/firebase \
   -H "Authorization: Bearer flow_test_sso123" \
   -H "Content-Type: application/json" \
   -d '{

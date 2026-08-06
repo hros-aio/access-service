@@ -21,14 +21,14 @@ npm run test:e2e -- test/mfa.e2e-spec.ts
 
 ### Scenario 1: Factor Enrollment & Activation
 1. Perform restricted authentication as user `user-1`.
-2. Post `POST /api/v1/auth/mfa/enroll` with `factorType: "totp"`.
-3. Submit verification code via `POST /api/v1/auth/mfa/enroll/verify`.
+2. Post `POST /auth/mfa/enroll` with `factorType: "totp"`.
+3. Submit verification code via `POST /auth/mfa/enroll/verify`.
 4. Verify DB `mfa_methods` record has `status = 'active'` and `encrypted_secret` is populated using envelope encryption.
 5. Verify `auth_security_events_outbox` contains an `authentication.mfa-enrolled` event.
 
 ### Scenario 2: Admin MFA Reset & Session Invalidation
 1. Active user `user-1` has an active session in Redis.
-2. Tenant administrator invokes `POST /api/v1/admin/users/{user-1-id}/mfa/reset`.
+2. Tenant administrator invokes `POST /admin/users/{user-1-id}/mfa/reset`.
 3. Verify `mfa_methods` status for `user-1` is set to `disabled`.
 4. Verify `users.security_version` is incremented.
 5. Verify `auth:session:{sessionId}` for `user-1` is deleted from Redis.

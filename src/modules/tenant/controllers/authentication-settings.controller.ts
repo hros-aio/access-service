@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Headers, Patch } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 
 import {
   AuthenticationSettingsResponseDto,
@@ -6,6 +7,7 @@ import {
 } from '../dto/authentication-settings.dto';
 import { AuthenticationSettingsService } from '../services/authentication-settings.service';
 
+@ApiTags('Authentication Settings')
 @Controller('admin/settings/authentication')
 export class AuthenticationSettingsController {
   constructor(private readonly service: AuthenticationSettingsService) {}

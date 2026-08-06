@@ -48,7 +48,7 @@ pnpm test:e2e src/modules/session/tests/session.e2e-spec.ts
 1. **Mint Session & Token**: Authenticate as User A and obtain Bearer JWT `JWT_A` and `sessionId_S1`.
 2. **Execute Single Logout**:
    ```bash
-   curl -X POST http://localhost:3000/api/v1/auth/logout \
+   curl -X POST http://localhost:3000/auth/logout \
      -H "Authorization: Bearer JWT_A"
    ```
 3. **Verify Outcomes**:
@@ -62,7 +62,7 @@ pnpm test:e2e src/modules/session/tests/session.e2e-spec.ts
 1. **Mint Active Sessions**: Create sessions `S1` and `S2` for target user `U2` in Tenant `TENANT_ACME`.
 2. **Admin Force Logout Call**:
    ```bash
-   curl -X POST http://localhost:3000/api/v1/admin/users/U2/force-logout \
+   curl -X POST http://localhost:3000/admin/users/U2/force-logout \
      -H "Authorization: Bearer ADMIN_JWT" \
      -H "Content-Type: application/json" \
      -d '{"reason": "SECURITY_AUDIT"}'

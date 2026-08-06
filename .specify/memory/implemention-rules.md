@@ -116,7 +116,7 @@ All exceptions are caught by the global exception filter (`libs-apis`), which pr
 
 ## 10. API Versioning
 
-- URI versioning (`/api/v1/...`), configured once in `libs-apis`. A new major version is introduced only for breaking changes; additive fields/endpoints stay within the current version.
+- API versioning configured in `libs-apis`. A new major version is introduced only for breaking changes; additive fields/endpoints stay within the current version.
 - Deprecated versions are marked in Swagger (`deprecated: true`) with a documented sunset date before removal.
 
 ## 11. Swagger

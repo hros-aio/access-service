@@ -5,7 +5,7 @@ Defines the contract for creating a password using an active SSO setup session.
 ## Request Details
 
 - **Method**: `POST`
-- **Path**: `/api/v1/auth/password/setup/firebase`
+- **Path**: `/auth/password/setup/firebase`
 - **Headers**:
   - `Authorization`: `Bearer <restricted_session_token>`
   - `Content-Type`: `application/json`

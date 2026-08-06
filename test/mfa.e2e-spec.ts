@@ -50,9 +50,9 @@ describe('MFA Integration E2E Test Suite', () => {
   });
 
   describe('User Story 1: MFA Enrollment', () => {
-    it('POST /api/v1/auth/mfa/enroll - should initiate factor enrollment', async () => {
+    it('POST /auth/mfa/enroll - should initiate factor enrollment', async () => {
       const res = await request(app.getHttpServer())
-        .post('/api/v1/auth/mfa/enroll')
+        .post('/auth/mfa/enroll')
         .send({ factorType: 'totp' })
         .expect(HttpStatus.CREATED);
 
@@ -61,9 +61,9 @@ describe('MFA Integration E2E Test Suite', () => {
       expect(res.body.qrCodeUrl).toContain('otpauth://totp/HRMS');
     });
 
-    it('POST /api/v1/auth/mfa/enroll/verify - should fail on invalid code', async () => {
+    it('POST /auth/mfa/enroll/verify - should fail on invalid code', async () => {
       await request(app.getHttpServer())
-        .post('/api/v1/auth/mfa/enroll/verify')
+        .post('/auth/mfa/enroll/verify')
         .send({
           factorId: '00000000-0000-0000-0000-000000000001',
           factorType: 'totp',
@@ -74,9 +74,9 @@ describe('MFA Integration E2E Test Suite', () => {
   });
 
   describe('User Story 2: MFA Login Challenge', () => {
-    it('POST /api/v1/auth/mfa/challenge/verify - should fail on expired/missing challenge', async () => {
+    it('POST /auth/mfa/challenge/verify - should fail on expired/missing challenge', async () => {
       await request(app.getHttpServer())
-        .post('/api/v1/auth/mfa/challenge/verify')
+        .post('/auth/mfa/challenge/verify')
         .send({
           challengeId: '00000000-0000-0000-0000-000000000002',
           code: '123456',
@@ -86,9 +86,9 @@ describe('MFA Integration E2E Test Suite', () => {
   });
 
   describe('User Story 4: Admin Reset MFA', () => {
-    it('POST /api/v1/admin/users/:userId/mfa/reset - should attempt reset for user', async () => {
+    it('POST /admin/users/:userId/mfa/reset - should attempt reset for user', async () => {
       await request(app.getHttpServer())
-        .post('/api/v1/admin/users/00000000-0000-0000-0000-000000000099/mfa/reset')
+        .post('/admin/users/00000000-0000-0000-0000-000000000099/mfa/reset')
         .expect(HttpStatus.NOT_FOUND);
     });
   });

@@ -15,7 +15,7 @@ Ensure local environment or test container services are active:
 1. **Seed Data**: Ensure active tenant `TENANT_01`, user `user-1`, and mapping `(TENANT_01, 'firebase', 'fb_uid_001')` with active password credential exist.
 2. **Execute Request**:
    ```bash
-   curl -X POST http://localhost:3000/api/v1/auth/login/firebase \
+   curl -X POST http://localhost:3000/auth/login/firebase \
      -H "Content-Type: application/json" \
      -d '{
        "tenantCode": "TENANT_01",
@@ -31,7 +31,7 @@ Ensure local environment or test container services are active:
 
 1. **Execute Request**:
    ```bash
-   curl -X POST http://localhost:3000/api/v1/auth/login/firebase \
+   curl -X POST http://localhost:3000/auth/login/firebase \
      -H "Content-Type: application/json" \
      -d '{
        "tenantCode": "TENANT_01",
@@ -48,7 +48,7 @@ Ensure local environment or test container services are active:
 1. **Seed Data**: Create 2 user mappings in `external_identities` pointing `fb_uid_duplicate` to `user-1` AND `user-2`.
 2. **Execute Request**:
    ```bash
-   curl -X POST http://localhost:3000/api/v1/auth/login/firebase \
+   curl -X POST http://localhost:3000/auth/login/firebase \
      -H "Content-Type: application/json" \
      -d '{
        "tenantCode": "TENANT_01",
@@ -64,7 +64,7 @@ Ensure local environment or test container services are active:
 1. **Simulate Service Error**: Configure test mock adapter to trigger network timeout (>5000ms).
 2. **Execute Request**:
    ```bash
-   curl -X POST http://localhost:3000/api/v1/auth/login/firebase \
+   curl -X POST http://localhost:3000/auth/login/firebase \
      -H "Content-Type: application/json" \
      -d '{
        "tenantCode": "TENANT_01",
