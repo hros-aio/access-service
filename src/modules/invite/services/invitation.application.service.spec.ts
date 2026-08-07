@@ -5,6 +5,7 @@ import { TransactionService } from '@new-hros/libs-sql';
 
 import { CryptoAdapter } from './crypto.adapter';
 import { InvitationApplicationService } from './invitation.application.service';
+import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 import { CredentialStatus, InvitationStatus, UserStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { Credential } from '../../auth/entities/credential.entity';
@@ -312,12 +313,12 @@ describe('InvitationApplicationService', () => {
 
       expect(result).toEqual({ success: true, userId: 'user-uuid' });
       expect(mockRedisClient.smembers).toHaveBeenCalledWith(
-        'auth:user-sessions:tenant-123:user-uuid',
+        GenerateUserSessionsKey('tenant-123', 'user-uuid'),
       );
       expect(mockRedisClient.del).toHaveBeenCalledWith(
-        'auth:session:session-1',
-        'auth:session:session-2',
-        'auth:user-sessions:tenant-123:user-uuid',
+        GenerateSessionKey('session-1'),
+        GenerateSessionKey('session-2'),
+        GenerateUserSessionsKey('tenant-123', 'user-uuid'),
       );
       expect(mockRedisClient.keys).toHaveBeenCalledWith('auth:mfa-challenge:*');
       expect(mockRedisClient.get).toHaveBeenCalledWith('auth:mfa-challenge:1');

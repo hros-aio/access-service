@@ -9,6 +9,7 @@ import {
 import * as jwt from 'jsonwebtoken';
 
 import { CredentialDomainService } from './credential.domain.service';
+import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 import { UserStatus } from '../../../enums';
 import { IpRestrictionService } from '../../ip-restriction/services/ip-restriction.service';
 import { LockoutService } from '../../lockout/services/lockout.service';
@@ -25,6 +26,9 @@ import {
   InvalidCredentialsError,
 } from '../exceptions/auth.exception';
 import { CredentialRepository } from '../repositories/credential.repository';
+
+import { AuthenticationSettings } from '@/modules/tenant/entities/authentication-settings.entity';
+import { User } from '@/modules/user/entities/user.entity';
 
 @Injectable()
 export class AuthApplicationService {
@@ -49,13 +53,66 @@ export class AuthApplicationService {
     challengeId?: string;
   }> {
     const { tenantCode, email, password, rememberMe } = dto;
-
-    // Load RequestContext details
     const currentContext = RequestContextService.current();
     const sourceIp = currentContext?.clientMetadata?.ip || 'unknown';
     const userAgent = currentContext?.clientMetadata?.userAgent || 'unknown';
 
-    // 0. Fetch Tenant Settings & Evaluate IP Restriction Policy
+    // Step 0: Validate IP Policy & Fetch Tenant Settings
+    const authSettings = await this.validateIpPolicy(tenantCode, email, sourceIp, userAgent);
+
+    // Step 1: Verify tenant existence
+    await this.verifyTenantExistence(tenantCode);
+
+    // Step 2 & 3: Fetch and validate user status
+    const user = await this.fetchAndValidateUser(tenantCode, email, password, sourceIp, userAgent);
+
+    // Step 4 & 5: Verify password & handle lockout on failure
+    await this.verifyUserPassword(
+      user,
+      password,
+      tenantCode,
+      email,
+      authSettings,
+      sourceIp,
+      userAgent,
+    );
+
+    // Step 5.5: Check MFA requirements and issue challenge if required
+    const mfaResult = await this.evaluateMfa(user, tenantCode, authSettings, rememberMe ?? false);
+    if (mfaResult) {
+      return mfaResult;
+    }
+
+    // Step 6: Generate Access and Refresh JWT Tokens
+    const { sessionId, accessToken, refreshToken } = this.generateAuthTokens(
+      user,
+      tenantCode,
+      rememberMe ?? false,
+    );
+
+    // Step 7: Store session state and log successful login
+    await this.storeSessionAndLogSuccess(
+      user,
+      tenantCode,
+      sessionId,
+      rememberMe ?? false,
+      sourceIp,
+      userAgent,
+    );
+
+    return {
+      authState: 'AUTHENTICATED',
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  private async validateIpPolicy(
+    tenantCode: string,
+    email: string,
+    sourceIp: string,
+    userAgent: string,
+  ): Promise<AuthenticationSettings | null> {
     const authSettings = await this.authenticationSettingsRepository.findByTenantCode(tenantCode);
     try {
       this.ipRestrictionService.evaluate(sourceIp, authSettings || undefined);
@@ -75,18 +132,27 @@ export class AuthApplicationService {
       );
       throw err;
     }
+    return authSettings;
+  }
 
-    // 1. Verify tenant exists and is active
+  private async verifyTenantExistence(tenantCode: string): Promise<void> {
     const tenantExists = await this.tenantRepository.exists(tenantCode);
     if (!tenantExists) {
       throw new InvalidCredentialsError();
     }
+  }
 
-    // 2. Fetch user scoped by tenant and email
+  private async fetchAndValidateUser(
+    tenantCode: string,
+    email: string,
+    password: string,
+    sourceIp: string,
+    userAgent: string,
+  ): Promise<User> {
     const normalizedEmail = email.toLowerCase().trim();
     const user = await this.userRepository.findOne({ tenantCode, normalizedEmail });
+
     if (!user) {
-      // Execute constant-time dummy password verification defense against timing enumeration
       await this.credentialDomainService.verifyPassword(
         '$2b$10$e8p.9p56x8P90Q2m7qX67eO0jU5vK.hZl4u/eZzN7cZ5.0J6.y7iW',
         password,
@@ -102,9 +168,7 @@ export class AuthApplicationService {
       throw new InvalidCredentialsError();
     }
 
-    // 3. Verify user status
     if (user.status !== UserStatus.ACTIVE) {
-      // Execute constant-time dummy verification for non-active status
       await this.credentialDomainService.verifyPassword(
         '$2b$10$e8p.9p56x8P90Q2m7qX67eO0jU5vK.hZl4u/eZzN7cZ5.0J6.y7iW',
         password,
@@ -142,10 +206,20 @@ export class AuthApplicationService {
       }
     }
 
-    // 4. Fetch active password credential
+    return user;
+  }
+
+  private async verifyUserPassword(
+    user: User,
+    password: string,
+    tenantCode: string,
+    email: string,
+    authSettings: AuthenticationSettings | null,
+    sourceIp: string,
+    userAgent: string,
+  ): Promise<void> {
     const credential = await this.credentialRepository.findActiveByUserId(user.id);
 
-    // 5. Verify plaintext password against hash
     let isPasswordValid = false;
     if (credential) {
       isPasswordValid = await this.credentialDomainService.verifyPassword(
@@ -174,10 +248,15 @@ export class AuthApplicationService {
       throw new InvalidCredentialsError();
     }
 
-    // Reset lockout failure count on successful authentication
     await this.lockoutService.resetFailureCount(tenantCode, user.id);
+  }
 
-    // 5.5 Check if MFA is required or enrolled
+  private async evaluateMfa(
+    user: User,
+    tenantCode: string,
+    authSettings: AuthenticationSettings | null,
+    rememberMe: boolean,
+  ): Promise<{ authState: string; challengeId: string } | null> {
     const mfaMethods = await this.mfaMethodRepository.findActiveByUserId(user.id);
     const mfaRequired =
       authSettings?.restrictedMfaEnabled === true ||
@@ -192,12 +271,12 @@ export class AuthApplicationService {
         challengeId,
         userId: user.id,
         tenantCode,
-        rememberMe: rememberMe ?? false,
+        rememberMe,
         createdAt: new Date().toISOString(),
       };
 
       try {
-        await this.redisCacheProvider.set(challengeKey, challengeData, 300); // 5 minutes TTL
+        await this.redisCacheProvider.set(challengeKey, challengeData, 300);
       } catch (err) {
         throw new AuthStoreUnavailableError(
           'Service temporarily unavailable. Please try again later.',
@@ -211,7 +290,14 @@ export class AuthApplicationService {
       };
     }
 
-    // 6. Generate session ID and sign JWT tokens
+    return null;
+  }
+
+  private generateAuthTokens(
+    user: User,
+    tenantCode: string,
+    rememberMe: boolean,
+  ): { sessionId: string; accessToken: string; refreshToken: string } {
     const sessionId = crypto.randomUUID();
     const privateKey = this.configService.get<string>('jwt.privateKey');
     if (!privateKey) {
@@ -232,28 +318,36 @@ export class AuthApplicationService {
       type: 'refresh',
     };
 
-    let accessToken: string;
-    let refreshToken: string;
     try {
-      accessToken = jwt.sign(payload, privateKey, {
+      const accessToken = jwt.sign(payload, privateKey, {
         algorithm: 'RS256',
         expiresIn: '2h',
       });
 
-      refreshToken = jwt.sign(refreshPayload, privateKey, {
+      const refreshToken = jwt.sign(refreshPayload, privateKey, {
         algorithm: 'RS256',
         expiresIn: rememberMe ? '30d' : '7d',
       });
+
+      return { sessionId, accessToken, refreshToken };
     } catch (jwtErr) {
       throw new AuthStoreUnavailableError(
         'Service temporarily unavailable. Please try again later.',
         jwtErr,
       );
     }
+  }
 
-    // 7. Store session in Redis
-    const ttlSeconds = rememberMe ? 2592000 : 604800; // 30 days or 7 days
-    const sessionKey = `auth:session:${sessionId}`;
+  private async storeSessionAndLogSuccess(
+    user: User,
+    tenantCode: string,
+    sessionId: string,
+    rememberMe: boolean,
+    sourceIp: string,
+    userAgent: string,
+  ): Promise<void> {
+    const ttlSeconds = rememberMe ? 2592000 : 604800;
+    const sessionKey = GenerateSessionKey(sessionId);
     const sessionData = {
       sessionId,
       userId: user.id,
@@ -262,7 +356,7 @@ export class AuthApplicationService {
         id: user.id,
         tenantCode,
         email: user.displayEmail,
-        roles: [], // empty roles array by default
+        roles: [],
       },
       createdAt: new Date().toISOString(),
     };
@@ -278,7 +372,7 @@ export class AuthApplicationService {
       };
       const client = provider.getClient?.();
       if (client) {
-        const userSessionsKey = `auth:user-sessions:${tenantCode}:${user.id}`;
+        const userSessionsKey = GenerateUserSessionsKey(tenantCode, user.id);
         await client.sadd(userSessionsKey, sessionId);
         await client.expire(userSessionsKey, ttlSeconds);
       }
@@ -289,20 +383,13 @@ export class AuthApplicationService {
       );
     }
 
-    // Log successful login security event
     await this.securityEventService.logLoginSucceeded(
       tenantCode,
       user.id,
       sessionId,
       sourceIp,
       userAgent,
-      rememberMe ?? false,
+      rememberMe,
     );
-
-    return {
-      authState: 'AUTHENTICATED',
-      accessToken,
-      refreshToken,
-    };
   }
 }

@@ -4,6 +4,7 @@ import { RedisCacheProvider } from '@new-hros/libs-core';
 import { DataSource } from 'typeorm';
 
 import { MfaAdminApplicationService } from './mfa_admin_application.service';
+import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 import { MfaMethodRepository } from '../repositories/mfa-method.repository';
 
 describe('MfaAdminApplicationService', () => {
@@ -73,9 +74,9 @@ describe('MfaAdminApplicationService', () => {
 
     expect(result.success).toBe(true);
     expect(repository.disableAllUserFactors).toHaveBeenCalledWith('t-1', 'u-1');
-    expect(mockRedisClient.smembers).toHaveBeenCalledWith('auth:user-sessions:t-1:u-1');
-    expect(mockRedisClient.del).toHaveBeenCalledWith('auth:session:sess-1');
-    expect(mockRedisClient.del).toHaveBeenCalledWith('auth:session:sess-2');
+    expect(mockRedisClient.smembers).toHaveBeenCalledWith(GenerateUserSessionsKey('t-1', 'u-1'));
+    expect(mockRedisClient.del).toHaveBeenCalledWith(GenerateSessionKey('sess-1'));
+    expect(mockRedisClient.del).toHaveBeenCalledWith(GenerateSessionKey('sess-2'));
     expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
   });
 });

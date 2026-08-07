@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post, Res, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Res } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '@new-hros/libs-apis';
 import { Response } from 'express';
@@ -19,7 +19,7 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Invalid payload' })
   @ApiResponse({ status: 401, description: 'Invalid credentials or restricted access' })
   async login(
-    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
+    @Body()
     dto: LoginWithPasswordDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{
