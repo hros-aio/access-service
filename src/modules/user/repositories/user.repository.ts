@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
+import { FindOneOptions } from 'typeorm';
 
 import { User } from '../entities/user.entity';
 
@@ -16,6 +17,21 @@ export class UserRepository extends BaseRepository<User> {
 
   async findByEmployeeId(employeeRefId: string): Promise<User | null> {
     return this.findOne({ employeeRefId });
+  }
+
+  async findOneWithOptions(options: FindOneOptions<User>): Promise<User | null> {
+    return this.repository.findOne(options);
+  }
+
+  async findByIdWithLock(id: string): Promise<User | null> {
+    return this.repository.findOne({
+      where: { id },
+      lock: { mode: 'pessimistic_write' },
+    });
+  }
+
+  async save(user: User): Promise<User> {
+    return this.repository.save(user);
   }
 
   /**

@@ -18,6 +18,10 @@ export class AuthSecurityEventOutboxRepository {
     return this.repository.save(entity);
   }
 
+  async save(entity: AuthSecurityEventOutbox): Promise<AuthSecurityEventOutbox> {
+    return this.repository.save(entity);
+  }
+
   async find(where: FindOptionsWhere<AuthSecurityEventOutbox>): Promise<AuthSecurityEventOutbox[]> {
     return this.repository.find({ where });
   }

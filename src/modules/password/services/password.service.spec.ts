@@ -8,12 +8,16 @@ import { PasswordService } from './password.service';
 import { UserStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { Credential } from '../../auth/entities/credential.entity';
+import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { CredentialRepository } from '../../auth/repositories/credential.repository';
 import { CredentialDomainService } from '../../auth/services/credential.domain.service';
 import { SessionApplicationService } from '../../auth/services/session.application.service';
 import { Invitation } from '../../invite/entities/invitation.entity';
 import { InvitationRepository } from '../../invite/repositories/invitation.repository';
 import { AuthenticationSettings } from '../../tenant/entities/authentication-settings.entity';
+import { AuthenticationSettingsRepository } from '../../tenant/repositories/authentication-settings.repository';
 import { User } from '../../user/entities/user.entity';
+import { UserRepository } from '../../user/repositories/user.repository';
 import { PasswordResetRedisAdapter } from '../adapters/password-reset-redis.adapter';
 import {
   InvalidResetChallengeException,
@@ -25,6 +29,10 @@ import {
 describe('PasswordService', () => {
   let service: PasswordService;
   let mockTransactionService: any;
+  let mockUserRepository: any;
+  let mockCredentialRepository: any;
+  let mockAuthSecurityEventOutboxRepository: any;
+  let mockAuthenticationSettingsRepository: any;
   let mockCredentialDomainService: any;
   let mockRedisCacheProvider: any;
   let mockRedisClient: any;
@@ -79,6 +87,35 @@ describe('PasswordService', () => {
       getManager: jest.fn().mockReturnValue(mockEntityManager),
     };
 
+    mockUserRepository = {
+      findOne: jest
+        .fn()
+        .mockImplementation((opts) => mockTypeormUserRepository.findOne({ where: opts })),
+      findOneWithOptions: jest
+        .fn()
+        .mockImplementation((opts) => mockTypeormUserRepository.findOne(opts)),
+      save: jest.fn().mockImplementation((u) => mockTypeormUserRepository.save(u)),
+    };
+
+    mockCredentialRepository = {
+      findOne: jest
+        .fn()
+        .mockImplementation((opts) => mockTypeormCredentialRepository.findOne(opts)),
+      save: jest.fn().mockImplementation((c) => mockTypeormCredentialRepository.save(c)),
+    };
+
+    mockAuthSecurityEventOutboxRepository = {
+      save: jest.fn().mockImplementation((o) => mockTypeormOutboxRepository.save(o)),
+    };
+
+    mockAuthenticationSettingsRepository = {
+      findByTenantCode: jest
+        .fn()
+        .mockImplementation((tenantCode) =>
+          mockTypeormSettingsRepository.findOne({ where: { tenant: { tenantCode } } }),
+        ),
+    };
+
     mockCredentialDomainService = {
       hashPassword: jest.fn().mockResolvedValue('hashed-password-123'),
     };
@@ -97,6 +134,9 @@ describe('PasswordService', () => {
 
     mockInvitationRepository = {
       cancelPendingInvitations: jest.fn().mockResolvedValue(undefined),
+      findOne: jest
+        .fn()
+        .mockImplementation((opts) => mockTypeormInvitationRepository.findOne(opts)),
     };
 
     mockPasswordResetRedisAdapter = {
@@ -111,6 +151,16 @@ describe('PasswordService', () => {
       providers: [
         PasswordService,
         CredentialPolicy,
+        { provide: UserRepository, useValue: mockUserRepository },
+        { provide: CredentialRepository, useValue: mockCredentialRepository },
+        {
+          provide: AuthSecurityEventOutboxRepository,
+          useValue: mockAuthSecurityEventOutboxRepository,
+        },
+        {
+          provide: AuthenticationSettingsRepository,
+          useValue: mockAuthenticationSettingsRepository,
+        },
         { provide: TransactionService, useValue: mockTransactionService },
         { provide: CredentialDomainService, useValue: mockCredentialDomainService },
         { provide: RedisCacheProvider, useValue: mockRedisCacheProvider },

@@ -1,6 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
-import { Repository } from 'typeorm';
+import { FindOneOptions, Repository } from 'typeorm';
 
 import { AuthenticationSettings } from '../entities/authentication-settings.entity';
 
@@ -14,6 +14,12 @@ export class AuthenticationSettingsRepository {
 
   async findByTenantCode(tenantCode: string): Promise<AuthenticationSettings | null> {
     return this.repository.findOne({ where: { tenantCode } });
+  }
+
+  async findOne(
+    options: FindOneOptions<AuthenticationSettings>,
+  ): Promise<AuthenticationSettings | null> {
+    return this.repository.findOne(options);
   }
 
   async updateWithOptimisticLock(

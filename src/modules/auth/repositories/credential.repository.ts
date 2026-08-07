@@ -20,6 +20,10 @@ export class CredentialRepository {
     return this.repository.findOne({ where: { id } });
   }
 
+  async findOne(options: import('typeorm').FindOneOptions<Credential>): Promise<Credential | null> {
+    return this.repository.findOne(options);
+  }
+
   async findActiveByUserId(userId: string): Promise<Credential | null> {
     return this.repository.findOne({ where: { userId, status: 'active' } });
   }

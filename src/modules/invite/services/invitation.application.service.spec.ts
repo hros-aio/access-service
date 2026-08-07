@@ -5,25 +5,31 @@ import { TransactionService } from '@new-hros/libs-sql';
 
 import { CryptoAdapter } from './crypto.adapter';
 import { InvitationApplicationService } from './invitation.application.service';
-import { UserStatus, CredentialStatus, InvitationStatus } from '../../../enums';
+import { CredentialStatus, InvitationStatus, UserStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { Credential } from '../../auth/entities/credential.entity';
+import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { CredentialRepository } from '../../auth/repositories/credential.repository';
 import { CredentialDomainService } from '../../auth/services/credential.domain.service';
 import { User } from '../../user/entities/user.entity';
+import { UserRepository } from '../../user/repositories/user.repository';
 import { Invitation } from '../entities/invitation.entity';
 import {
   AuthInvitationInvalidError,
   AuthSessionStoreUnavailableError,
+  CrossTenantAccessDeniedError,
   InvalidPasswordPolicyError,
   InvitationNotAllowedError,
-  CrossTenantAccessDeniedError,
 } from '../exceptions/invitation.exception';
 import { InvitationRepository } from '../repositories/invitation.repository';
 
 describe('InvitationApplicationService', () => {
   let service: InvitationApplicationService;
   let mockTransactionService: any;
+  let mockUserRepository: any;
   let mockInvitationRepository: any;
+  let mockCredentialRepository: any;
+  let mockAuthSecurityEventOutboxRepository: any;
   let mockCryptoAdapter: any;
   let mockCredentialDomainService: any;
   let mockRedisCacheProvider: any;
@@ -70,9 +76,43 @@ describe('InvitationApplicationService', () => {
       getManager: jest.fn().mockReturnValue(mockEntityManager),
     };
 
+    mockUserRepository = {
+      findById: jest
+        .fn()
+        .mockImplementation((id) => mockTypeormUserRepository.findOne({ where: { id } })),
+      findByIdWithLock: jest
+        .fn()
+        .mockImplementation((id) => mockTypeormUserRepository.findOne({ where: { id } })),
+      findOneWithOptions: jest
+        .fn()
+        .mockImplementation((opts) => mockTypeormUserRepository.findOne(opts)),
+      findOne: jest.fn().mockImplementation((opts) => mockTypeormUserRepository.findOne(opts)),
+      save: jest.fn().mockImplementation((u) => mockTypeormUserRepository.save(u)),
+    };
+
     mockInvitationRepository = {
-      findByTokenHash: jest.fn(),
-      save: jest.fn(),
+      findByTokenHash: jest
+        .fn()
+        .mockImplementation((tokenHash) =>
+          mockTypeormInvitationRepository.findOne({ where: { tokenHash } }),
+        ),
+      findOne: jest
+        .fn()
+        .mockImplementation((opts) => mockTypeormInvitationRepository.findOne(opts)),
+      save: jest.fn().mockImplementation((i) => mockTypeormInvitationRepository.save(i)),
+    };
+
+    mockCredentialRepository = {
+      findActiveByUserId: jest
+        .fn()
+        .mockImplementation((userId) =>
+          mockTypeormCredentialRepository.findOne({ where: { userId, status: 'active' } }),
+        ),
+      save: jest.fn().mockImplementation((c) => mockTypeormCredentialRepository.save(c)),
+    };
+
+    mockAuthSecurityEventOutboxRepository = {
+      save: jest.fn().mockImplementation((o) => mockTypeormOutboxRepository.save(o)),
     };
 
     mockCryptoAdapter = {
@@ -101,7 +141,13 @@ describe('InvitationApplicationService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InvitationApplicationService,
+        { provide: UserRepository, useValue: mockUserRepository },
         { provide: InvitationRepository, useValue: mockInvitationRepository },
+        { provide: CredentialRepository, useValue: mockCredentialRepository },
+        {
+          provide: AuthSecurityEventOutboxRepository,
+          useValue: mockAuthSecurityEventOutboxRepository,
+        },
         { provide: TransactionService, useValue: mockTransactionService },
         { provide: CryptoAdapter, useValue: mockCryptoAdapter },
         { provide: CredentialDomainService, useValue: mockCredentialDomainService },

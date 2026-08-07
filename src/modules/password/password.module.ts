@@ -8,9 +8,10 @@ import { PasswordService } from './services/password.service';
 import { AuthModule } from '../auth/auth.module';
 import { InviteModule } from '../invite/invite.module';
 import { TenantModule } from '../tenant/tenant.module';
+import { UserModule } from '../user/user.module';
 
 @Module({
-  imports: [AuthModule, InviteModule, TenantModule],
+  imports: [AuthModule, InviteModule, TenantModule, UserModule],
   controllers: [PasswordController],
   providers: [PasswordService, CredentialPolicy, RestrictedSessionGuard, PasswordResetRedisAdapter],
   exports: [PasswordService],
