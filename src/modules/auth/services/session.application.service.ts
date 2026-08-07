@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { RedisCacheProvider } from '@new-hros/libs-core';
 
+import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
+
 @Injectable()
 export class SessionApplicationService {
   constructor(private readonly redisCacheProvider: RedisCacheProvider) {}
@@ -17,10 +19,10 @@ export class SessionApplicationService {
       return;
     }
 
-    const setKey = `auth:user-sessions:${tenantCode}:${userId}`;
+    const setKey = GenerateUserSessionsKey(tenantCode, userId);
     const sessionIds: string[] = await client.smembers(setKey);
     if (sessionIds && sessionIds.length > 0) {
-      const keys = sessionIds.map((sid) => `auth:session:${sid}`);
+      const keys = sessionIds.map((sid) => GenerateSessionKey(sid));
       await client.del(...keys, setKey);
     }
   }

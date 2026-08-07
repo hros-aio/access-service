@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 
+import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
+
 @Injectable()
 export class RedisSessionAdapter {
   private readonly logger = new Logger(RedisSessionAdapter.name);
@@ -12,8 +14,8 @@ export class RedisSessionAdapter {
    * Uses cluster hash tags {tenantCode:userId} to ensure slot alignment in Redis Cluster.
    */
   async deleteSession(tenantCode: string, userId: string, sessionId: string): Promise<number> {
-    const sessionKey = `auth:session:${sessionId}`;
-    const userSessionsKey = `auth:user-sessions:{${tenantCode}:${userId}}`;
+    const sessionKey = GenerateSessionKey(sessionId);
+    const userSessionsKey = GenerateUserSessionsKey(tenantCode, userId, { useHashTag: true });
 
     const luaScript = `
       redis.call("DEL", KEYS[1])
@@ -44,13 +46,13 @@ export class RedisSessionAdapter {
    * Uses cluster hash tags {tenantCode:userId} to guarantee slot alignment.
    */
   async purgeAllUserSessions(tenantCode: string, userId: string): Promise<number> {
-    const userSessionsKey = `auth:user-sessions:{${tenantCode}:${userId}}`;
+    const userSessionsKey = GenerateUserSessionsKey(tenantCode, userId, { useHashTag: true });
 
     const luaScript = `
       local sessions = redis.call("SMEMBERS", KEYS[1])
       local count = 0
       for _, sid in ipairs(sessions) do
-        redis.call("DEL", "auth:session:" .. sid)
+        redis.call("DEL", ARGV[1] .. sid)
         count = count + 1
       end
       redis.call("DEL", KEYS[1])
@@ -58,7 +60,12 @@ export class RedisSessionAdapter {
     `;
 
     try {
-      const result = await this.redisClient.eval(luaScript, 1, userSessionsKey);
+      const result = await this.redisClient.eval(
+        luaScript,
+        1,
+        userSessionsKey,
+        GenerateSessionKey(''),
+      );
       return Number(result) || 0;
     } catch (error) {
       this.logger.error(

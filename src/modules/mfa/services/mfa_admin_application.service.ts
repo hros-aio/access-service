@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { RedisCacheProvider } from '@new-hros/libs-core';
 import { DataSource } from 'typeorm';
 
+import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 import { MfaMethodRepository } from '../repositories/mfa-method.repository';
 
 @Injectable()
@@ -76,14 +77,14 @@ export class MfaAdminApplicationService {
           } | null;
         };
         const client = provider.getClient?.();
-        const userSessionsKey = `auth:user-sessions:${tenantCode}:${targetUserId}`;
+        const userSessionsKey = GenerateUserSessionsKey(tenantCode, targetUserId);
 
         if (client) {
           const sessionIds: string[] = await client.smembers(userSessionsKey);
           if (sessionIds && sessionIds.length > 0) {
             revokedCount = sessionIds.length;
             for (const sid of sessionIds) {
-              await client.del(`auth:session:${sid}`);
+              await client.del(GenerateSessionKey(sid));
             }
             await client.del(userSessionsKey);
           }

@@ -97,7 +97,7 @@ export class PasswordController {
   @ApiResponse({ status: 409, description: 'Credential already exists' })
   async setupPassword(
     @Req() req: RestrictedSessionRequest,
-    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
+    @Body()
     dto: SetupPasswordViaSsoDto,
   ): Promise<{
     status: string;

@@ -25,7 +25,7 @@ export class InvitationController {
   @ApiResponse({ status: 400, description: 'Invalid password policy or invalid token' })
   @ApiResponse({ status: 503, description: 'Redis session store unavailable' })
   async accept(
-    @Body(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
+    @Body()
     dto: AcceptInvitationDto,
   ): Promise<{ success: boolean; userId: string }> {
     return this.invitationService.acceptInvitation(dto);

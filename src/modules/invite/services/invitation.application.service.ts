@@ -3,6 +3,7 @@ import { RedisCacheProvider } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { CryptoAdapter } from './crypto.adapter';
+import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 import { EventType, UserStatus, CredentialStatus, InvitationStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { Credential } from '../../auth/entities/credential.entity';
@@ -243,10 +244,10 @@ export class InvitationApplicationService {
     }
 
     try {
-      const userSessionsKey = `auth:user-sessions:${tenantCode}:${userId}`;
+      const userSessionsKey = GenerateUserSessionsKey(tenantCode, userId);
       const sessionIds: string[] = await client.smembers(userSessionsKey);
       if (sessionIds && sessionIds.length > 0) {
-        const keys = sessionIds.map((sid) => `auth:session:${sid}`);
+        const keys = sessionIds.map((sid) => GenerateSessionKey(sid));
         await client.del(...keys, userSessionsKey);
       }
 

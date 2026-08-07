@@ -1,6 +1,7 @@
 import Redis from 'ioredis';
 
 import { RedisSessionAdapter } from './redis-session.adapter';
+import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 
 describe('RedisSessionAdapter', () => {
   let adapter: RedisSessionAdapter;
@@ -23,8 +24,8 @@ describe('RedisSessionAdapter', () => {
       expect(mockRedis.eval).toHaveBeenCalledWith(
         expect.stringContaining('redis.call("DEL", KEYS[1])'),
         2,
-        'auth:session:sess-456',
-        'auth:user-sessions:{TENANT_A:usr-123}',
+        GenerateSessionKey('sess-456'),
+        GenerateUserSessionsKey('TENANT_A', 'usr-123', { useHashTag: true }),
         'sess-456',
       );
       expect(count).toBe(1);
@@ -48,7 +49,8 @@ describe('RedisSessionAdapter', () => {
       expect(mockRedis.eval).toHaveBeenCalledWith(
         expect.stringContaining('SMEMBERS'),
         1,
-        'auth:user-sessions:{TENANT_A:usr-123}',
+        GenerateUserSessionsKey('TENANT_A', 'usr-123', { useHashTag: true }),
+        GenerateSessionKey(''),
       );
       expect(count).toBe(3);
     });

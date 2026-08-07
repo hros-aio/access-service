@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RedisCacheProvider } from '@new-hros/libs-core';
 
 import { SessionApplicationService } from './session.application.service';
+import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 
 describe('SessionApplicationService', () => {
   let service: SessionApplicationService;
@@ -50,12 +51,12 @@ describe('SessionApplicationService', () => {
       await service.revokeAllSessions(tenantCode, userId);
 
       expect(mockRedisClient.smembers).toHaveBeenCalledWith(
-        `auth:user-sessions:${tenantCode}:${userId}`,
+        GenerateUserSessionsKey(tenantCode, userId),
       );
       expect(mockRedisClient.del).toHaveBeenCalledWith(
-        'auth:session:sid-1',
-        'auth:session:sid-2',
-        `auth:user-sessions:${tenantCode}:${userId}`,
+        GenerateSessionKey('sid-1'),
+        GenerateSessionKey('sid-2'),
+        GenerateUserSessionsKey(tenantCode, userId),
       );
     });
 
@@ -68,7 +69,7 @@ describe('SessionApplicationService', () => {
       await service.revokeAllSessions(tenantCode, userId);
 
       expect(mockRedisClient.smembers).toHaveBeenCalledWith(
-        `auth:user-sessions:${tenantCode}:${userId}`,
+        GenerateUserSessionsKey(tenantCode, userId),
       );
       expect(mockRedisClient.del).not.toHaveBeenCalled();
     });
