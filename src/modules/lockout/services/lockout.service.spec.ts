@@ -32,7 +32,13 @@ describe('LockoutService', () => {
     };
 
     mockUserRepository = {
-      save: jest.fn(),
+      findByIdWithLock: jest
+        .fn()
+        .mockImplementation((id) => mockTypeormRepository.findOne({ where: { id } })),
+      findOneWithOptions: jest
+        .fn()
+        .mockImplementation((opts) => mockTypeormRepository.findOne(opts)),
+      save: jest.fn().mockImplementation((u) => mockTypeormRepository.save(u)),
     };
 
     mockTypeormRepository = {

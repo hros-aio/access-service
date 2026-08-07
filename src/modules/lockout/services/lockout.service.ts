@@ -7,7 +7,6 @@ import { UserStatus } from '../../../enums';
 import { AuthStoreUnavailableError } from '../../auth/exceptions/auth.exception';
 import { SecurityEventService } from '../../security-event/services/security-event.service';
 import { AuthenticationSettings } from '../../tenant/entities/authentication-settings.entity';
-import { User } from '../../user/entities/user.entity';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { RedisLockoutAdapter } from '../adapters/redis-lockout.adapter';
 
@@ -97,18 +96,12 @@ export class LockoutService {
 
     if (count >= threshold) {
       return this.transactionService.runInTransaction(async () => {
-        const lockedUser = await this.transactionService
-          .getManager()
-          .getRepository(User)
-          .findOne({
-            where: { id: userId },
-            lock: { mode: 'pessimistic_write' },
-          });
+        const lockedUser = await this.userRepository.findByIdWithLock(userId);
 
         if (lockedUser && lockedUser.status !== UserStatus.LOCKED) {
           lockedUser.status = UserStatus.LOCKED;
           lockedUser.securityVersion = (lockedUser.securityVersion || 1) + 1;
-          await this.transactionService.getManager().getRepository(User).save(lockedUser);
+          await this.userRepository.save(lockedUser);
           await this.resetFailureCount(tenantCode, userId);
           return true;
         }

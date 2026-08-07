@@ -3,12 +3,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { ProvisioningApplicationService } from './provisioning.application.service';
-import { EventType, UserStatus, InvitationStatus } from '../../../enums';
+import { EventType, InvitationStatus, UserStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { SessionApplicationService } from '../../auth/services/session.application.service';
 import { EmployeeReference } from '../../employee/entities/employee-reference.entity';
+import { EmployeeReferenceRepository } from '../../employee/repositories/employee-reference.repository';
 import { Invitation } from '../../invite/entities/invitation.entity';
+import { InvitationRepository } from '../../invite/repositories/invitation.repository';
 import { User } from '../../user/entities/user.entity';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { ConsumedEvent } from '../entities/consumed-event.entity';
@@ -18,6 +20,8 @@ describe('ProvisioningApplicationService', () => {
   let service: ProvisioningApplicationService;
   let mockTransactionService: { runInTransaction: jest.Mock; getManager: jest.Mock };
   let mockUserRepository: Record<string, unknown>;
+  let mockEmployeeReferenceRepository: Record<string, unknown>;
+  let mockInvitationRepository: Record<string, unknown>;
   let mockConsumedEventRepository: { exists: jest.Mock; save: jest.Mock };
   let mockOutboxRepository: Record<string, unknown>;
   let mockSessionService: { revokeAllSessions: jest.Mock };
@@ -74,12 +78,30 @@ describe('ProvisioningApplicationService', () => {
       getManager: jest.fn().mockReturnValue(mockEntityManager),
     };
 
-    mockUserRepository = {};
+    mockUserRepository = {
+      findOneWithOptions: jest
+        .fn()
+        .mockImplementation((opts) => mockTypeormUserRepository.findOne(opts)),
+      save: jest.fn().mockImplementation((u) => mockTypeormUserRepository.save(u)),
+    };
+    mockEmployeeReferenceRepository = {
+      findOne: jest
+        .fn()
+        .mockImplementation((opts) => mockTypeormEmployeeRefRepository.findOne(opts)),
+      save: jest.fn().mockImplementation((er) => mockTypeormEmployeeRefRepository.save(er)),
+    };
+    mockInvitationRepository = {
+      find: jest.fn().mockImplementation((opts) => mockTypeormInvitationRepository.find(opts)),
+      save: jest.fn().mockImplementation((inv) => mockTypeormInvitationRepository.save(inv)),
+      bulkSave: jest.fn().mockImplementation((invs) => mockTypeormInvitationRepository.save(invs)),
+    };
     mockConsumedEventRepository = {
       exists: jest.fn().mockResolvedValue(false),
-      save: jest.fn(),
+      save: jest.fn().mockImplementation((c) => mockTypeormConsumedEventRepository.save(c)),
     };
-    mockOutboxRepository = {};
+    mockOutboxRepository = {
+      save: jest.fn().mockImplementation((o) => mockTypeormOutboxRepository.save(o)),
+    };
     mockSessionService = {
       revokeAllSessions: jest.fn().mockResolvedValue(undefined),
     };
@@ -89,8 +111,10 @@ describe('ProvisioningApplicationService', () => {
         ProvisioningApplicationService,
         { provide: TransactionService, useValue: mockTransactionService },
         { provide: UserRepository, useValue: mockUserRepository },
+        { provide: EmployeeReferenceRepository, useValue: mockEmployeeReferenceRepository },
         { provide: ConsumedEventRepository, useValue: mockConsumedEventRepository },
         { provide: AuthSecurityEventOutboxRepository, useValue: mockOutboxRepository },
+        { provide: InvitationRepository, useValue: mockInvitationRepository },
         { provide: SessionApplicationService, useValue: mockSessionService },
       ],
     }).compile();

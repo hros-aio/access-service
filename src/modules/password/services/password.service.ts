@@ -9,12 +9,13 @@ import { CredentialPolicy } from './credential.policy';
 import { CredentialStatus, EventType, InvitationStatus, UserStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { Credential } from '../../auth/entities/credential.entity';
+import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { CredentialRepository } from '../../auth/repositories/credential.repository';
 import { CredentialDomainService } from '../../auth/services/credential.domain.service';
 import { SessionApplicationService } from '../../auth/services/session.application.service';
-import { Invitation } from '../../invite/entities/invitation.entity';
 import { InvitationRepository } from '../../invite/repositories/invitation.repository';
-import { AuthenticationSettings } from '../../tenant/entities/authentication-settings.entity';
-import { User } from '../../user/entities/user.entity';
+import { AuthenticationSettingsRepository } from '../../tenant/repositories/authentication-settings.repository';
+import { UserRepository } from '../../user/repositories/user.repository';
 import { PasswordResetRedisAdapter } from '../adapters/password-reset-redis.adapter';
 import {
   InvalidResetChallengeException,
@@ -35,6 +36,10 @@ export class PasswordService {
   private readonly hmacSecret = process.env.RESET_HMAC_SECRET || 'default-reset-hmac-secret';
 
   constructor(
+    private readonly userRepository: UserRepository,
+    private readonly credentialRepository: CredentialRepository,
+    private readonly authSecurityEventOutboxRepository: AuthSecurityEventOutboxRepository,
+    private readonly authenticationSettingsRepository: AuthenticationSettingsRepository,
     private readonly transactionService: TransactionService,
     private readonly credentialDomainService: CredentialDomainService,
     private readonly credentialPolicy: CredentialPolicy,
@@ -54,20 +59,16 @@ export class PasswordService {
   }
 
   async requestResetCode(dto: { tenantCode: string; email: string }): Promise<{ message: string }> {
-    const entityManager = this.transactionService.getManager();
-    const settingsRepo = entityManager.getRepository(AuthenticationSettings);
-    const usersRepo = entityManager.getRepository(User);
-
-    const settings = await settingsRepo.findOne({
-      where: { tenant: { tenantCode: dto.tenantCode } },
-    });
+    const settings = await this.authenticationSettingsRepository.findByTenantCode(dto.tenantCode);
     if (settings && settings.needAdminResetPassword) {
       throw new SelfServiceResetDisabledException();
     }
 
     const normalizedEmail = dto.email.trim().toLowerCase();
-    const user = await usersRepo.findOne({
-      where: { tenantCode: dto.tenantCode, normalizedEmail, status: UserStatus.ACTIVE },
+    const user = await this.userRepository.findOne({
+      tenantCode: dto.tenantCode,
+      normalizedEmail,
+      status: UserStatus.ACTIVE,
     });
 
     if (!user) {
@@ -87,9 +88,6 @@ export class PasswordService {
     });
 
     await this.transactionService.runInTransaction(async () => {
-      const txManager = this.transactionService.getManager();
-      const outboxRepo = txManager.getRepository(AuthSecurityEventOutbox);
-
       const event = new AuthSecurityEventOutbox();
       event.tenantCode = dto.tenantCode;
       event.userId = user.id;
@@ -102,7 +100,7 @@ export class PasswordService {
         initiatedByAdmin: false,
       };
       event.publishStatus = 'pending';
-      await outboxRepo.save(event);
+      await this.authSecurityEventOutboxRepository.save(event);
     });
 
     return { message: 'If an active account exists, recovery instructions have been sent.' };
@@ -174,27 +172,19 @@ export class PasswordService {
     }
 
     await this.transactionService.runInTransaction(async () => {
-      const entityManager = this.transactionService.getManager();
-      const usersRepo = entityManager.getRepository(User);
-      const credentialsRepo = entityManager.getRepository(Credential);
-      const outboxRepo = entityManager.getRepository(AuthSecurityEventOutbox);
-
-      const user = await usersRepo.findOne({
-        where: { id: dto.userId, tenantCode: dto.tenantCode },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const user = await this.userRepository.findByIdWithLock(dto.userId);
 
       if (!user) {
         throw new InvalidResetChallengeException();
       }
 
-      const activeCredential = await credentialsRepo.findOne({
+      const activeCredential = await this.credentialRepository.findOne({
         where: { userId: user.id, status: CredentialStatus.ACTIVE },
       });
 
       if (activeCredential) {
         activeCredential.status = CredentialStatus.SUPERSEDED;
-        await credentialsRepo.save(activeCredential);
+        await this.credentialRepository.save(activeCredential);
       }
 
       const { hash: passwordHash, algorithm } = await this.credentialDomainService.hashPassword(
@@ -207,10 +197,10 @@ export class PasswordService {
       newCred.algorithm = algorithm;
       newCred.status = CredentialStatus.ACTIVE;
       newCred.passwordChangedAt = new Date();
-      await credentialsRepo.save(newCred);
+      await this.credentialRepository.save(newCred);
 
       user.securityVersion += 1;
-      await usersRepo.save(user);
+      await this.userRepository.save(user);
 
       const event = new AuthSecurityEventOutbox();
       event.tenantCode = dto.tenantCode;
@@ -222,7 +212,7 @@ export class PasswordService {
         resetMethod: 'self_service',
       };
       event.publishStatus = 'pending';
-      await outboxRepo.save(event);
+      await this.authSecurityEventOutboxRepository.save(event);
     });
 
     try {
@@ -244,11 +234,10 @@ export class PasswordService {
     tenantCode: string;
     userId: string;
   }): Promise<{ message: string }> {
-    const entityManager = this.transactionService.getManager();
-    const usersRepo = entityManager.getRepository(User);
-
-    const user = await usersRepo.findOne({
-      where: { id: dto.userId, tenantCode: dto.tenantCode, status: UserStatus.ACTIVE },
+    const user = await this.userRepository.findOne({
+      id: dto.userId,
+      tenantCode: dto.tenantCode,
+      status: UserStatus.ACTIVE,
     });
 
     if (!user) {
@@ -267,9 +256,6 @@ export class PasswordService {
     });
 
     await this.transactionService.runInTransaction(async () => {
-      const txManager = this.transactionService.getManager();
-      const outboxRepo = txManager.getRepository(AuthSecurityEventOutbox);
-
       const event = new AuthSecurityEventOutbox();
       event.tenantCode = dto.tenantCode;
       event.userId = user.id;
@@ -282,7 +268,7 @@ export class PasswordService {
         initiatedByAdmin: true,
       };
       event.publishStatus = 'pending';
-      await outboxRepo.save(event);
+      await this.authSecurityEventOutboxRepository.save(event);
     });
 
     return { message: 'Password reset workflow initiated for user.' };
@@ -304,22 +290,13 @@ export class PasswordService {
     }
 
     await this.transactionService.runInTransaction(async () => {
-      const entityManager = this.transactionService.getManager();
-      const usersRepo = entityManager.getRepository(User);
-      const credentialsRepo = entityManager.getRepository(Credential);
-      const invitationsRepo = entityManager.getRepository(Invitation);
-      const outboxRepo = entityManager.getRepository(AuthSecurityEventOutbox);
-
-      const user = await usersRepo.findOne({
-        where: { id: userId, tenantCode },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const user = await this.userRepository.findByIdWithLock(userId);
 
       if (!user) {
         throw new AuthSessionExpiredError('User not found');
       }
 
-      const existingCredential = await credentialsRepo.findOne({
+      const existingCredential = await this.credentialRepository.findOne({
         where: { userId: user.id, status: CredentialStatus.ACTIVE },
       });
 
@@ -337,14 +314,14 @@ export class PasswordService {
       credential.algorithm = algorithm;
       credential.status = CredentialStatus.ACTIVE;
       credential.passwordChangedAt = new Date();
-      await credentialsRepo.save(credential);
+      await this.credentialRepository.save(credential);
 
       user.status = UserStatus.ACTIVE;
       user.credentialStatus = CredentialStatus.ACTIVE;
       user.securityVersion += 1;
-      await usersRepo.save(user);
+      await this.userRepository.save(user);
 
-      const pendingInvite = await invitationsRepo.findOne({
+      const pendingInvite = await this.invitationRepository.findOne({
         where: { userId: user.id, status: In([InvitationStatus.PENDING, InvitationStatus.SENT]) },
       });
 
@@ -363,7 +340,7 @@ export class PasswordService {
         },
       };
       passwordChangedEvent.publishStatus = 'pending';
-      await outboxRepo.save(passwordChangedEvent);
+      await this.authSecurityEventOutboxRepository.save(passwordChangedEvent);
 
       if (pendingInvite) {
         const invitationAcceptedEvent = new AuthSecurityEventOutbox();
@@ -376,7 +353,7 @@ export class PasswordService {
           supersededBy: 'SSO_SETUP',
         };
         invitationAcceptedEvent.publishStatus = 'pending';
-        await outboxRepo.save(invitationAcceptedEvent);
+        await this.authSecurityEventOutboxRepository.save(invitationAcceptedEvent);
       }
     });
 

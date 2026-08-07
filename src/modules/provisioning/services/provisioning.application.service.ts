@@ -3,12 +3,13 @@ import crypto from 'crypto';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
 
-import { EventType, UserStatus, CredentialStatus, InvitationStatus } from '../../../enums';
+import { CredentialStatus, EventType, InvitationStatus, UserStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { SessionApplicationService } from '../../auth/services/session.application.service';
-import { EmployeeReference } from '../../employee/entities/employee-reference.entity';
+import { EmployeeReferenceRepository } from '../../employee/repositories/employee-reference.repository';
 import { Invitation } from '../../invite/entities/invitation.entity';
+import { InvitationRepository } from '../../invite/repositories/invitation.repository';
 import { User } from '../../user/entities/user.entity';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { ConsumedEvent } from '../entities/consumed-event.entity';
@@ -19,8 +20,10 @@ export class ProvisioningApplicationService {
   constructor(
     private readonly transactionService: TransactionService,
     private readonly userRepository: UserRepository,
+    private readonly employeeReferenceRepository: EmployeeReferenceRepository,
     private readonly consumedEventRepository: ConsumedEventRepository,
-    private readonly outboxRepository: AuthSecurityEventOutboxRepository,
+    private readonly authSecurityEventOutboxRepository: AuthSecurityEventOutboxRepository,
+    private readonly invitationRepository: InvitationRepository,
     private readonly sessionService: SessionApplicationService,
   ) {}
 
@@ -48,8 +51,7 @@ export class ProvisioningApplicationService {
       }
 
       // 3. Concurrency Lock: Check if a root admin already exists
-      const usersRepo = this.transactionService.getManager().getRepository(User);
-      const existingRootAdmin = await usersRepo.findOne({
+      const existingRootAdmin = await this.userRepository.findOneWithOptions({
         where: { tenantCode, protectedRootAdmin: true },
         lock: { mode: 'pessimistic_write' },
       });
@@ -73,7 +75,7 @@ export class ProvisioningApplicationService {
       newUser.protectedRootAdmin = true;
       newUser.securityVersion = 1;
 
-      const savedUser = await usersRepo.save(newUser);
+      const savedUser = await this.userRepository.save(newUser);
 
       // 5. Append security outbox event
       const outbox = new AuthSecurityEventOutbox();
@@ -89,10 +91,7 @@ export class ProvisioningApplicationService {
       };
       outbox.publishStatus = 'pending';
 
-      const outboxRepo = this.transactionService
-        .getManager()
-        .getRepository(AuthSecurityEventOutbox);
-      await outboxRepo.save(outbox);
+      await this.authSecurityEventOutboxRepository.save(outbox);
 
       // 6. Record consumed event
       const consumed = new ConsumedEvent();
@@ -119,15 +118,8 @@ export class ProvisioningApplicationService {
     let userIdToRevoke: string | null = null;
 
     const result = await this.transactionService.runInTransaction(async () => {
-      const manager = this.transactionService.getManager();
-      const employeeRefRepo = manager.getRepository(EmployeeReference);
-      const userRepo = manager.getRepository(User);
-      const consumedRepo = manager.getRepository(ConsumedEvent);
-      const outboxRepo = manager.getRepository(AuthSecurityEventOutbox);
-      const invitationRepo = manager.getRepository(Invitation);
-
       // 2. Lock & Retrieve EmployeeReference
-      const employeeRef = await employeeRefRepo.findOne({
+      const employeeRef = await this.employeeReferenceRepository.findOne({
         where: { employeeId, tenantCode },
         lock: { mode: 'pessimistic_write' },
       });
@@ -145,7 +137,7 @@ export class ProvisioningApplicationService {
       }
 
       // 4. Retrieve User associated with this employee
-      const user = await userRepo.findOne({
+      const user = await this.userRepository.findOneWithOptions({
         where: { tenantCode, employeeRefId: employeeId },
         lock: { mode: 'pessimistic_write' },
       });
@@ -160,12 +152,12 @@ export class ProvisioningApplicationService {
         } else if (eventType === EventType.EMPLOYEE_REACTIVATED) {
           employeeRef.status = 'reactivated';
         }
-        await employeeRefRepo.save(employeeRef);
+        await this.employeeReferenceRepository.save(employeeRef);
 
         const consumed = new ConsumedEvent();
         consumed.id = eventId;
         consumed.topic = 'employee.lifecycle-events';
-        await consumedRepo.save(consumed);
+        await this.consumedEventRepository.save(consumed);
 
         return { success: true };
       }
@@ -178,9 +170,9 @@ export class ProvisioningApplicationService {
         user.securityVersion += 1;
         employeeRef.status = 'suspended';
 
-        await userRepo.save(user);
+        await this.userRepository.save(user);
         employeeRef.sourceVersion = sourceVersion.toString();
-        await employeeRefRepo.save(employeeRef);
+        await this.employeeReferenceRepository.save(employeeRef);
 
         // Write outbox security event
         const outbox = new AuthSecurityEventOutbox();
@@ -194,7 +186,7 @@ export class ProvisioningApplicationService {
           newStatus: 'DISABLED',
         };
         outbox.publishStatus = 'pending';
-        await outboxRepo.save(outbox);
+        await this.authSecurityEventOutboxRepository.save(outbox);
       }
 
       // 5. Update state for US2 Termination
@@ -203,12 +195,12 @@ export class ProvisioningApplicationService {
         user.securityVersion += 1;
         employeeRef.status = 'terminated';
 
-        await userRepo.save(user);
+        await this.userRepository.save(user);
         employeeRef.sourceVersion = sourceVersion.toString();
-        await employeeRefRepo.save(employeeRef);
+        await this.employeeReferenceRepository.save(employeeRef);
 
         // Revoke active/pending invitations
-        const invitations = await invitationRepo.find({
+        const invitations = await this.invitationRepository.find({
           where: { userId: user.id, status: InvitationStatus.PENDING },
         });
         if (invitations.length > 0) {
@@ -216,7 +208,7 @@ export class ProvisioningApplicationService {
             invite.status = InvitationStatus.REVOKED;
             invite.revokedAt = new Date();
           }
-          await invitationRepo.save(invitations);
+          await this.invitationRepository.bulkSave(invitations);
         }
 
         // Write outbox security event
@@ -231,7 +223,7 @@ export class ProvisioningApplicationService {
           newStatus: 'ARCHIVED',
         };
         outbox.publishStatus = 'pending';
-        await outboxRepo.save(outbox);
+        await this.authSecurityEventOutboxRepository.save(outbox);
       }
 
       // 5. Update state for US3 Reactivation
@@ -240,12 +232,12 @@ export class ProvisioningApplicationService {
         user.securityVersion += 1;
         employeeRef.status = 'reactivated';
 
-        await userRepo.save(user);
+        await this.userRepository.save(user);
         employeeRef.sourceVersion = sourceVersion.toString();
-        await employeeRefRepo.save(employeeRef);
+        await this.employeeReferenceRepository.save(employeeRef);
 
         // Revoke old active/pending invitations
-        const invitations = await invitationRepo.find({
+        const invitations = await this.invitationRepository.find({
           where: { userId: user.id, status: InvitationStatus.PENDING },
         });
         if (invitations.length > 0) {
@@ -253,7 +245,7 @@ export class ProvisioningApplicationService {
             invite.status = InvitationStatus.REVOKED;
             invite.revokedAt = new Date();
           }
-          await invitationRepo.save(invitations);
+          await this.invitationRepository.bulkSave(invitations);
         }
 
         // Create new pending invitation
@@ -264,7 +256,7 @@ export class ProvisioningApplicationService {
         newInvite.tokenHash = crypto.createHash('sha256').update(randomToken).digest('hex');
         newInvite.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
         newInvite.version = 1;
-        const savedInvite = await invitationRepo.save(newInvite);
+        const savedInvite = await this.invitationRepository.save(newInvite);
 
         // Write outbox security event (user-invited)
         const outbox = new AuthSecurityEventOutbox();
@@ -278,14 +270,14 @@ export class ProvisioningApplicationService {
           email: user.displayEmail,
         };
         outbox.publishStatus = 'pending';
-        await outboxRepo.save(outbox);
+        await this.authSecurityEventOutboxRepository.save(outbox);
       }
 
       // 6. Record consumed event
       const consumed = new ConsumedEvent();
       consumed.id = eventId;
       consumed.topic = 'employee.lifecycle-events';
-      await consumedRepo.save(consumed);
+      await this.consumedEventRepository.save(consumed);
 
       return { success: true };
     });

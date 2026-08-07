@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
-import { Repository } from 'typeorm';
+import { FindOneOptions, Repository } from 'typeorm';
 
 import { EmployeeReference } from '../entities/employee-reference.entity';
 
@@ -18,6 +18,10 @@ export class EmployeeReferenceRepository {
 
   async findById(employeeId: string): Promise<EmployeeReference | null> {
     return this.repository.findOne({ where: { employeeId } });
+  }
+
+  async findOne(options: FindOneOptions<EmployeeReference>): Promise<EmployeeReference | null> {
+    return this.repository.findOne(options);
   }
 
   async findByCode(tenantCode: string, employeeCode: string): Promise<EmployeeReference | null> {

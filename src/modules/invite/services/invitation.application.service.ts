@@ -6,8 +6,10 @@ import { CryptoAdapter } from './crypto.adapter';
 import { EventType, UserStatus, CredentialStatus, InvitationStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { Credential } from '../../auth/entities/credential.entity';
+import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { CredentialRepository } from '../../auth/repositories/credential.repository';
 import { CredentialDomainService } from '../../auth/services/credential.domain.service';
-import { User } from '../../user/entities/user.entity';
+import { UserRepository } from '../../user/repositories/user.repository';
 import { AcceptInvitationDto } from '../dto/invitation.dto';
 import { Invitation } from '../entities/invitation.entity';
 import {
@@ -22,7 +24,10 @@ import { InvitationRepository } from '../repositories/invitation.repository';
 @Injectable()
 export class InvitationApplicationService {
   constructor(
+    private readonly userRepository: UserRepository,
     private readonly invitationRepository: InvitationRepository,
+    private readonly credentialRepository: CredentialRepository,
+    private readonly authSecurityEventOutboxRepository: AuthSecurityEventOutboxRepository,
     private readonly transactionService: TransactionService,
     private readonly cryptoAdapter: CryptoAdapter,
     private readonly credentialDomainService: CredentialDomainService,
@@ -44,9 +49,7 @@ export class InvitationApplicationService {
       throw new AuthInvitationInvalidError();
     }
 
-    const entityManager = this.transactionService.getManager();
-    const usersRepo = entityManager.getRepository(User);
-    const user = await usersRepo.findOne({ where: { id: invitation.userId } });
+    const user = await this.userRepository.findById(invitation.userId);
 
     if (!user) {
       throw new AuthInvitationInvalidError();
@@ -68,15 +71,7 @@ export class InvitationApplicationService {
     const tokenHash = this.cryptoAdapter.hashToken(dto.token);
 
     return this.transactionService.runInTransaction(async () => {
-      const entityManager = this.transactionService.getManager();
-      const usersRepo = entityManager.getRepository(User);
-      const invitationsRepo = entityManager.getRepository(Invitation);
-      const credentialsRepo = entityManager.getRepository(Credential);
-      const outboxRepo = entityManager.getRepository(AuthSecurityEventOutbox);
-
-      const invitation = await invitationsRepo.findOne({
-        where: { tokenHash },
-      });
+      const invitation = await this.invitationRepository.findByTokenHash(tokenHash);
 
       if (
         !invitation ||
@@ -87,16 +82,13 @@ export class InvitationApplicationService {
         throw new AuthInvitationInvalidError();
       }
 
-      const user = await usersRepo.findOne({
-        where: { id: invitation.userId },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const user = await this.userRepository.findByIdWithLock(invitation.userId);
 
       if (!user) {
         throw new AuthInvitationInvalidError();
       }
 
-      const lockedInvitation = await invitationsRepo.findOne({
+      const lockedInvitation = await this.invitationRepository.findOne({
         where: { id: invitation.id },
         lock: { mode: 'pessimistic_write' },
       });
@@ -109,9 +101,7 @@ export class InvitationApplicationService {
         throw new AuthInvitationInvalidError();
       }
 
-      const existingCredential = await credentialsRepo.findOne({
-        where: { userId: user.id, status: 'active' },
-      });
+      const existingCredential = await this.credentialRepository.findActiveByUserId(user.id);
 
       const { hash: passwordHash, algorithm } = await this.credentialDomainService.hashPassword(
         dto.password,
@@ -121,7 +111,7 @@ export class InvitationApplicationService {
         existingCredential.passwordHash = passwordHash;
         existingCredential.algorithm = algorithm;
         existingCredential.passwordChangedAt = new Date();
-        await credentialsRepo.save(existingCredential);
+        await this.credentialRepository.save(existingCredential);
       } else {
         const newCredential = new Credential();
         newCredential.userId = user.id;
@@ -129,17 +119,17 @@ export class InvitationApplicationService {
         newCredential.algorithm = algorithm;
         newCredential.status = 'active';
         newCredential.passwordChangedAt = new Date();
-        await credentialsRepo.save(newCredential);
+        await this.credentialRepository.save(newCredential);
       }
 
       lockedInvitation.status = InvitationStatus.ACCEPTED;
       lockedInvitation.acceptedAt = new Date();
-      await invitationsRepo.save(lockedInvitation);
+      await this.invitationRepository.save(lockedInvitation);
 
       user.status = UserStatus.ACTIVE;
       user.credentialStatus = CredentialStatus.ACTIVE;
       user.securityVersion += 1;
-      await usersRepo.save(user);
+      await this.userRepository.save(user);
 
       const outbox = new AuthSecurityEventOutbox();
       outbox.tenantCode = user.tenantCode;
@@ -152,7 +142,7 @@ export class InvitationApplicationService {
         acceptedAt: lockedInvitation.acceptedAt.toISOString(),
       };
       outbox.publishStatus = 'pending';
-      await outboxRepo.save(outbox);
+      await this.authSecurityEventOutboxRepository.save(outbox);
 
       await this.revokeSessionsAndChallenges(user.tenantCode, user.id);
 
@@ -165,35 +155,24 @@ export class InvitationApplicationService {
     targetUserId: string,
   ): Promise<{ success: boolean; invitationId: string; rawToken: string; expiresAt: Date }> {
     return this.transactionService.runInTransaction(async () => {
-      const entityManager = this.transactionService.getManager();
-      const usersRepo = entityManager.getRepository(User);
-      const invitationsRepo = entityManager.getRepository(Invitation);
-      const credentialsRepo = entityManager.getRepository(Credential);
-      const outboxRepo = entityManager.getRepository(AuthSecurityEventOutbox);
-
-      const user = await usersRepo.findOne({
-        where: { id: targetUserId, tenantCode: actorContext.tenantCode },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const user = await this.userRepository.findByIdWithLock(targetUserId);
 
       if (!user) {
         throw new CrossTenantAccessDeniedError();
       }
 
-      const activeCredential = await credentialsRepo.findOne({
-        where: { userId: user.id, status: 'active' },
-      });
+      const activeCredential = await this.credentialRepository.findActiveByUserId(user.id);
 
       if (activeCredential) {
         throw new InvitationNotAllowedError();
       }
 
-      const oldInvitation = await invitationsRepo.findOne({
+      const oldInvitation = await this.invitationRepository.findOne({
         where: { userId: user.id, status: InvitationStatus.PENDING },
         lock: { mode: 'pessimistic_write' },
       });
 
-      const oldInvitationSent = await invitationsRepo.findOne({
+      const oldInvitationSent = await this.invitationRepository.findOne({
         where: { userId: user.id, status: InvitationStatus.SENT },
         lock: { mode: 'pessimistic_write' },
       });
@@ -203,7 +182,7 @@ export class InvitationApplicationService {
       if (targetOldInvitation) {
         targetOldInvitation.status = InvitationStatus.REVOKED;
         targetOldInvitation.revokedAt = new Date();
-        await invitationsRepo.save(targetOldInvitation);
+        await this.invitationRepository.save(targetOldInvitation);
       }
 
       const { rawToken, tokenHash } = this.cryptoAdapter.generateToken();
@@ -218,7 +197,7 @@ export class InvitationApplicationService {
       newInvitation.issuedBy = actorContext.userId;
       newInvitation.sentAt = new Date();
 
-      const savedInvite = await invitationsRepo.save(newInvitation);
+      const savedInvite = await this.invitationRepository.save(newInvitation);
 
       const outbox = new AuthSecurityEventOutbox();
       outbox.tenantCode = user.tenantCode;
@@ -231,7 +210,7 @@ export class InvitationApplicationService {
         resentByActorId: actorContext.userId,
       };
       outbox.publishStatus = 'pending';
-      await outboxRepo.save(outbox);
+      await this.authSecurityEventOutboxRepository.save(outbox);
 
       return {
         success: true,
