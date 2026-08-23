@@ -1,0 +1,11 @@
+flowchart TD
+    A([Reporting line changes])
+    --> B[Employee now has direct reports]
+    --> C[Re-evaluate groups using direct-report criteria]
+    --> D{Matches Manager-oriented Group?}
+
+    D -- No --> E([No change])
+    D -- Yes --> F[Add Group membership]
+    --> G[Receive assigned Manager Role]
+    --> H[Apply configured Scope]
+    --> I([Access updated])

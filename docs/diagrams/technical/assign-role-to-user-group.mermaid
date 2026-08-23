@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+
+    actor Admin
+    participant FE as HROS Web
+    participant API as UserGroupController
+    participant Impact as ImpactAnalyzer
+    participant UG as UserGroupModule
+    participant DB as PostgreSQL
+
+    Admin->>FE: Assign Role
+    FE->>API: Preview assignment
+
+    API->>Impact: calculate Group affected count
+    Impact->>DB: Read current membership
+    DB-->>Impact: employee count
+    Impact-->>API: impact
+
+    API-->>FE: Show impact
+    Admin->>FE: Confirm
+
+    FE->>API: Add Role assignment
+    API->>UG: assignRole()
+
+    UG->>DB: BEGIN
+    UG->>DB: Insert UserGroup-Role assignment
+    UG->>DB: Increment User Group version
+    UG->>DB: COMMIT
+
+    UG-->>API: status=PENDING
+    API-->>FE: Pending synchronization

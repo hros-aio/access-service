@@ -1,0 +1,24 @@
+sequenceDiagram
+    autonumber
+
+    participant Scheduler as Reconciliation Scheduler
+    participant DB as PostgreSQL
+    participant Worker as Sync Worker
+
+    Scheduler->>DB: Find configurations with unapplied changes
+    DB-->>Scheduler: Dirty Roles / User Groups
+
+    loop Each pending configuration
+        Scheduler->>DB: Create or reuse SCHEDULED job
+    end
+
+    Worker->>DB: Claim pending job
+    DB-->>Worker: Synchronization job
+
+    Worker->>Worker: Execute synchronization
+
+    alt Successful
+        Worker->>DB: Mark COMPLETED
+    else Failed
+        Worker->>DB: Mark FAILED
+    end

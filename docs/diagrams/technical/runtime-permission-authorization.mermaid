@@ -1,0 +1,36 @@
+sequenceDiagram
+    autonumber
+
+    actor User
+    participant Service as Business Service
+    participant AuthN as Authentication Guard
+    participant Context as RequestContext
+    participant AuthZ as Authorization Guard
+    participant Redis as Redis
+    participant RoleCache as Role Permission Cache
+    participant Business as Business Handler
+
+    User->>Service: Business request
+
+    Service->>AuthN: Authenticate
+
+    alt Authentication failed
+        AuthN-->>User: 401
+    else Authenticated
+        AuthN->>Context: Set tenant + user
+
+        Service->>AuthZ: Require permission
+
+        AuthZ->>Redis: Load effective Roles for user
+        Redis-->>AuthZ: Roles + Scopes
+
+        AuthZ->>RoleCache: Resolve Permissions
+        RoleCache-->>AuthZ: Role Permissions
+
+        alt Permission missing
+            AuthZ-->>User: 403
+        else Permission granted
+            AuthZ->>Business: Continue
+            Business-->>User: Response
+        end
+    end

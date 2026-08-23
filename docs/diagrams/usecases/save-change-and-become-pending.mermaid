@@ -1,0 +1,8 @@
+flowchart TD
+    A([Authorization change confirmed])
+    --> B[Save latest configuration]
+    --> C[Mark latest configuration unsynchronized]
+    --> D[Status = Pending]
+    --> E[Show affected count]
+    --> F[Show Sync Now action]
+    --> G([Wait for synchronization])

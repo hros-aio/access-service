@@ -1,0 +1,42 @@
+sequenceDiagram
+    autonumber
+
+    actor Admin
+    participant FE as HROS Web
+    participant API as RoleController
+    participant Role as RoleModule
+    participant Catalog as PermissionCatalog
+    participant Impact as ImpactAnalyzer
+    participant DB as PostgreSQL
+    participant Redis as Redis
+    participant Outbox as Outbox
+
+    Admin->>FE: Change Role Permissions
+    FE->>API: Preview Role change
+
+    API->>Role: validate proposed Permissions
+    Role->>Catalog: Validate dependencies
+    Catalog-->>Role: result
+
+    Role->>Role: Verify protected capabilities
+
+    Role->>Impact: estimate affected users
+    Impact->>DB: Query Role reach
+    DB-->>Impact: affected count
+    Impact-->>API: impact
+
+    API-->>FE: Impact preview
+
+    Admin->>FE: Confirm
+    FE->>API: Save Role change
+
+    API->>Role: updatePermissions()
+    Role->>DB: BEGIN
+    Role->>DB: Update Role Permissions + version
+    Role->>Outbox: Append authorization audit event
+    Role->>DB: COMMIT
+
+    Role->>Redis: Invalidate/replace Role Permission cache
+
+    Role-->>API: Updated
+    API-->>FE: Success

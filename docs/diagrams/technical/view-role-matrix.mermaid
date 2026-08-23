@@ -1,0 +1,24 @@
+sequenceDiagram
+    autonumber
+
+    actor Admin
+    participant FE as HROS Web
+    participant API as RoleController
+    participant Role as RoleModule
+    participant Catalog as PermissionCatalog
+    participant DB as PostgreSQL
+
+    Admin->>FE: Open Role Matrix
+    FE->>API: GET Role Matrix
+
+    API->>Role: getRole(roleId)
+    Role->>DB: Read Role + assigned Permission codes
+    DB-->>Role: Role configuration
+
+    Role->>Catalog: getPermissionCatalog()
+    Catalog-->>Role: Platform Permission Catalog
+
+    Role->>Role: Merge catalog with Role grants
+    Role-->>API: Role Matrix DTO
+    API-->>FE: Grouped Permissions + granted state
+    FE-->>Admin: Display Matrix

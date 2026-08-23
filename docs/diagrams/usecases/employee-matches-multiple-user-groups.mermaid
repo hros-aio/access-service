@@ -1,0 +1,10 @@
+flowchart TD
+    A([Evaluate Employee])
+    --> B[Find all matching User Groups]
+    --> C[Collect Roles from Group A]
+    --> D[Collect Roles from Group B and others]
+    --> E[Combine all Roles]
+    --> F[Combine Permissions]
+    --> G[Preserve each User Group Scope]
+    --> H[Effective access is union]
+    --> I([Completed])

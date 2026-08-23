@@ -1,0 +1,28 @@
+sequenceDiagram
+    autonumber
+
+    participant Kafka as Kafka
+    participant Consumer as EmployeeConsumer
+    participant DB as PostgreSQL
+    participant Match as MatchingEngine
+    participant Projection as EffectiveRoleProjection
+    participant Redis as Redis
+
+    Kafka->>Consumer: Employee attribute changed
+    Consumer->>DB: Update employee projection
+
+    Consumer->>Match: evaluateMembership()
+
+    Match->>DB: Read relevant User Groups
+    DB-->>Match: Candidate Groups
+
+    Match->>Match: Employee no longer matches
+
+    Match->>DB: Remove membership
+    Match->>Projection: recompute effective access
+
+    Projection->>DB: Resolve Roles from remaining memberships
+    DB-->>Projection: Remaining grants
+
+    Projection->>DB: Update effective Roles
+    Projection->>Redis: Replace user authz cache

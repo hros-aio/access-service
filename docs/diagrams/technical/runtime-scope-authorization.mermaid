@@ -1,0 +1,26 @@
+sequenceDiagram
+    autonumber
+
+    actor User
+    participant AuthZ as Authorization Guard
+    participant Redis as Redis
+    participant Resource as Target Resource Resolver
+    participant Scope as ScopeEvaluator
+    participant Handler as Business Handler
+
+    AuthZ->>Redis: Load user Role + Scope entries
+    Redis-->>AuthZ: Effective access
+
+    AuthZ->>Resource: Resolve target attributes
+    Resource-->>AuthZ: company/location/department/manager/owner
+
+    loop Every grant containing required Permission
+        AuthZ->>Scope: covers(scope, target)?
+        Scope-->>AuthZ: true / false
+    end
+
+    alt At least one Scope covers target
+        AuthZ->>Handler: Allow
+    else No applicable Scope
+        AuthZ-->>User: 403 Forbidden
+    end

@@ -1,0 +1,15 @@
+flowchart TD
+    A([Start])
+    --> B[Choose Create User Group]
+    --> C[Enter name and description]
+    --> D[Define Matching Criteria]
+    --> E[Select Scope]
+    --> F[Assign Roles]
+    --> G{Group name unique?}
+
+    G -- No --> H[Show validation error]
+    --> C
+
+    G -- Yes --> I[Create User Group]
+    --> J[Record audit]
+    --> K([User Group created])

@@ -1,0 +1,14 @@
+flowchart TD
+    A([Administrator deliberately revokes sensitive access])
+    --> B[Save revocation]
+    --> C[Identify change as security-sensitive]
+    --> D[Do not wait only for normal schedule]
+    --> E[Prioritize synchronization]
+    --> F[Apply revocation]
+    --> G{Successful?}
+
+    G -- Yes --> H[Access no longer usable]
+    --> I[Record completion]
+
+    G -- No --> J[Mark failure]
+    --> K[Surface urgent failure]

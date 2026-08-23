@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+
+    actor Admin
+    participant FE as HROS Web
+    participant API as UserGroupController
+    participant UG as UserGroupModule
+    participant Match as MatchingEngine
+    participant DB as PostgreSQL
+    participant Outbox as Outbox
+
+    Admin->>FE: Configure User Group
+    FE->>API: Preview User Group
+
+    API->>UG: validate configuration
+    UG->>Match: estimate matching population
+    Match->>DB: Evaluate employee projection
+    DB-->>Match: Matching employees
+    Match-->>UG: matching count
+    UG-->>API: Preview result
+    API-->>FE: Matching count
+
+    Admin->>FE: Save
+    FE->>API: POST User Group
+
+    API->>UG: create()
+    UG->>DB: BEGIN
+    UG->>DB: Insert User Group + criteria + scope + assignments
+    UG->>Outbox: Append audit event
+    UG->>DB: COMMIT
+
+    UG-->>API: Created
+    API-->>FE: 201 Created
