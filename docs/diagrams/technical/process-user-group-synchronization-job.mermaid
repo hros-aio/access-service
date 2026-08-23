@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+
+    participant Worker as Sync Worker
+    participant DB as PostgreSQL
+    participant Match as MatchingEngine
+    participant Projection as EffectiveRoleProjection
+    participant Redis as Redis
+    participant Outbox as Outbox
+
+    Worker->>DB: Claim pending User Group job
+    DB-->>Worker: Current source version
+
+    Worker->>Match: rebuild Group membership
+    Match->>DB: Evaluate matching population
+    DB-->>Match: Employee rows
+    Match-->>Worker: Membership diff
+
+    Worker->>DB: Apply membership additions/removals
+
+    loop Affected employees
+        Worker->>Projection: recompute effective Roles
+        Projection->>DB: Persist effective Role projection
+        Projection->>Redis: Replace user authorization cache
+    end
+
+    Worker->>DB: Set projection version = source version
+    Worker->>DB: Mark job COMPLETED
+    Worker->>Outbox: Append sync-completed event

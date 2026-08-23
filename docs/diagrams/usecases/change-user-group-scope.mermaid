@@ -1,0 +1,18 @@
+flowchart TD
+    A([Start])
+    --> B[Administrator opens User Group]
+    --> C[Choose new Scope]
+    --> D[Estimate affected reach]
+    --> E[Show impact]
+    --> F{High impact?}
+
+    F -- Yes --> G[Require explicit confirmation]
+    --> H{Confirmed?}
+
+    H -- No --> I([Cancel])
+    H -- Yes --> J[Save new Scope]
+
+    F -- No --> J
+
+    J --> K[Mark pending synchronization]
+    --> L([Completed])

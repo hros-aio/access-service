@@ -1,0 +1,9 @@
+flowchart TD
+    A([Start])
+    --> B[Administrator opens System Role]
+    --> C[Attempt to deselect protected Permission]
+    --> D[System detects protected capability]
+    --> E[Reject operation]
+    --> F[Explain capability cannot be removed]
+    --> G[Record security-sensitive audit]
+    --> H([No configuration changed])

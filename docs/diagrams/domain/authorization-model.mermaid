@@ -1,0 +1,162 @@
+classDiagram
+    direction LR
+
+    class Permission {
+        +id: string
+        +module: string
+        +resource: string
+        +action: string
+    }
+
+    class Role {
+        +id
+        +name
+        +description
+        +type
+        +status
+    }
+
+    class SystemRole {
+        +systemRoleKey
+    }
+
+    class CustomRole {
+    }
+
+    class RolePermission {
+        +isProtected: boolean
+    }
+
+    Role <|-- SystemRole
+    Role <|-- CustomRole
+
+    Role "1" o-- "0..*" RolePermission
+    RolePermission "*" --> "1" Permission
+
+    Permission "0..*" --> "0..*" Permission : requires
+
+    note for Permission "Platform-defined.\nTenant cannot create, rename or delete."
+    note for RolePermission "isProtected applies to\nSystem Role capabilities."
+
+    direction LR
+
+    class UserGroup {
+        +id
+        +name
+        +description
+        +status
+    }
+
+    class MatchingCriteria {
+        +field
+        +operator
+        +value
+    }
+
+    class Employee {
+        +employeeId
+        +employmentStatus
+        +companyId
+        +locationId
+        +departmentId
+        +gradeId
+        +jobTitleId
+        +hasDirectReports
+    }
+
+    class UserGroupMembership {
+        +matchedAt
+    }
+
+    UserGroup "1" *-- "1..*" MatchingCriteria
+
+    UserGroup "1" -- "0..*" UserGroupMembership
+    Employee "1" -- "0..*" UserGroupMembership
+
+    note for MatchingCriteria "All criteria in one User Group\nuse logical AND."
+    note for UserGroupMembership "Membership is dynamic,\nnot manually assigned."
+
+    direction LR
+
+    class UserGroup {
+        +id
+        +name
+    }
+
+    class Role {
+        +id
+        +name
+    }
+
+    class RoleAssignment {
+        +assignedAt
+    }
+
+    class Scope {
+        +type
+        +referenceId
+    }
+
+    class ScopeType {
+        <<enumeration>>
+        SELF
+        DIRECT_REPORTEES
+        COMPANY
+        LOCATION
+        DEPARTMENT
+        TENANT
+    }
+
+    UserGroup "1" --> "1" Scope
+    Scope --> ScopeType
+
+    UserGroup "1" -- "0..*" RoleAssignment
+    Role "1" -- "0..*" RoleAssignment
+
+    note for UserGroup "Membership determines WHO"
+    note for Scope "Scope determines WHERE / ON WHOM"
+
+    direction LR
+
+    class AuthorizationConfiguration {
+        +id
+        +version
+        +syncStatus
+    }
+
+    class ImpactAnalysis {
+        +affectedCount
+        +gainCount
+        +lossCount
+        +isEstimate
+        +isHighImpact
+    }
+
+    class SynchronizationJob {
+        +id
+        +triggerType
+        +status
+        +requestedAt
+        +completedAt
+    }
+
+    class SyncStatus {
+        <<enumeration>>
+        PENDING
+        PROCESSING
+        COMPLETED
+        FAILED
+    }
+
+    class SyncTrigger {
+        <<enumeration>>
+        MANUAL
+        SCHEDULED
+        URGENT
+    }
+
+    AuthorizationConfiguration --> ImpactAnalysis
+    AuthorizationConfiguration --> "0..*" SynchronizationJob
+
+    SynchronizationJob --> SyncStatus
+    SynchronizationJob --> SyncTrigger

@@ -1,0 +1,18 @@
+flowchart TD
+    A([Start])
+    --> B[Administrator opens User Group]
+    --> C[Select Role]
+    --> D[Calculate affected population]
+    --> E[Show impact]
+    --> F{High impact?}
+
+    F -- Yes --> G[Require confirmation]
+    --> H{Confirmed?}
+    H -- No --> I([Cancel])
+    H -- Yes --> J[Assign Role]
+
+    F -- No --> J
+
+    J --> K[Mark configuration pending synchronization]
+    --> L[Record audit]
+    --> M([Completed])

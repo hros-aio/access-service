@@ -1,0 +1,15 @@
+flowchart TD
+    A([Start])
+    --> B[Open Matching Criteria]
+    --> C[Select employee attribute]
+    --> D[Select operator and value]
+    --> E{Add another criterion?}
+
+    E -- Yes --> C
+    E -- No --> F[Evaluate criteria against employees]
+    --> G[Display matching employee count]
+    --> H{Administrator saves?}
+
+    H -- No --> I([Cancel])
+    H -- Yes --> J[Save Matching Criteria]
+    --> K([Pending synchronization])

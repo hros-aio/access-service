@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+
+    actor Admin
+    participant FE as HROS Web
+    participant API as SyncController
+    participant Sync as SynchronizationModule
+    participant DB as PostgreSQL
+    participant Worker as Sync Worker
+
+    Admin->>FE: Click Sync Now
+    FE->>API: POST Sync request
+
+    API->>Sync: requestSync(sourceId, version)
+    Sync->>DB: Find active job for source + version
+
+    alt Existing active job
+        DB-->>Sync: Existing job
+        Sync-->>API: Existing status
+        API-->>FE: 202 Existing job
+    else No active job
+        Sync->>DB: Create MANUAL PENDING job
+        DB-->>Sync: jobId
+        Sync-->>API: Accepted
+        API-->>FE: 202 Accepted
+
+        Worker->>DB: Claim PENDING job
+        DB-->>Worker: Job
+        Worker->>DB: Mark PROCESSING
+    end

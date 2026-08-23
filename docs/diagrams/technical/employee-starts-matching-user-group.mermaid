@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+
+    participant Directory as Directory Service
+    participant Kafka as Kafka
+    participant Consumer as EmployeeConsumer
+    participant DB as PostgreSQL
+    participant Match as MatchingEngine
+    participant Projection as EffectiveRoleProjection
+    participant Redis as Redis
+
+    Directory->>Kafka: employee.updated
+    Kafka->>Consumer: Event
+
+    Consumer->>DB: Update Employee Reference
+    Consumer->>Match: evaluate changed employee
+
+    Match->>DB: Find User Groups dependent on changed attributes
+    DB-->>Match: Candidate Groups
+
+    Match->>Match: Evaluate Matching Criteria
+
+    alt Newly matches
+        Match->>DB: Insert membership
+        Match->>Projection: recompute employee access
+        Projection->>DB: Persist effective Roles
+        Projection->>Redis: Update user authorization cache
+    else Membership unchanged
+        Match-->>Consumer: No authorization change
+    end

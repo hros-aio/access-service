@@ -1,0 +1,18 @@
+flowchart TD
+    A([Start])
+    --> B[Administrator chooses Create Role]
+    --> C[Enter name and description]
+    --> D[Select Permissions]
+    --> E{Role name unique?}
+
+    E -- No --> F[Show duplicate name error]
+    F --> C
+
+    E -- Yes --> G{Permission dependencies valid?}
+
+    G -- No --> H[Explain dependency violation]
+    H --> D
+
+    G -- Yes --> I[Create Custom Role]
+    --> J[Record audit]
+    --> K([Role created])

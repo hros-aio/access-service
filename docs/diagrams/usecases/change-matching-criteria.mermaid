@@ -1,0 +1,18 @@
+flowchart TD
+    A([Start])
+    --> B[Edit Matching Criteria]
+    --> C[Evaluate proposed criteria]
+    --> D[Calculate current vs proposed population]
+    --> E[Show affected employee count]
+    --> F[Show gain/loss where available]
+    --> G{High impact?}
+
+    G -- Yes --> H[Require confirmation]
+    --> I{Confirmed?}
+    I -- No --> J([Cancel])
+    I -- Yes --> K[Save criteria]
+
+    G -- No --> K
+
+    K --> L[Mark User Group pending synchronization]
+    --> M([Completed])

@@ -1,0 +1,15 @@
+flowchart TD
+    A([Employee attribute changes])
+    --> B[Identify relevant User Groups]
+    --> C[Evaluate Matching Criteria]
+    --> D{Employee matches?}
+
+    D -- No --> E([No membership change])
+
+    D -- Yes --> F{Already a member?}
+
+    F -- Yes --> E
+    F -- No --> G[Add employee to User Group]
+    --> H[Employee becomes eligible for assigned Roles]
+    --> I[Update effective access]
+    --> J([Completed])

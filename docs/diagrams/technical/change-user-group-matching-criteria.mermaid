@@ -1,0 +1,34 @@
+sequenceDiagram
+    autonumber
+
+    actor Admin
+    participant FE as HROS Web
+    participant API as UserGroupController
+    participant UG as UserGroupModule
+    participant Impact as ImpactAnalyzer
+    participant Match as MatchingEngine
+    participant DB as PostgreSQL
+
+    Admin->>FE: Edit Matching Criteria
+    FE->>API: Preview criteria change
+
+    API->>Impact: estimate old vs new membership
+    Impact->>Match: Evaluate proposed rule
+    Match->>DB: Query tenant Employee References
+    DB-->>Match: Matching population
+    Match-->>Impact: Proposed membership
+
+    Impact->>DB: Read current membership
+    DB-->>Impact: Current membership
+
+    Impact-->>API: affected / gain / loss
+    API-->>FE: Show impact
+
+    Admin->>FE: Confirm
+    FE->>API: Save criteria
+
+    API->>UG: updateMatchingCriteria()
+    UG->>DB: Update rule
+    UG->>DB: Increment configuration version
+    UG-->>API: PENDING
+    API-->>FE: Pending Sync

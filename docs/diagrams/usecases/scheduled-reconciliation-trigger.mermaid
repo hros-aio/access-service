@@ -1,0 +1,11 @@
+flowchart TD
+    A([Scheduled time reached])
+    --> B[Start tenant reconciliation]
+    --> C[Find only configurations with unapplied changes]
+    --> D{Anything pending?}
+
+    D -- No --> E([Finish without recalculation])
+
+    D -- Yes --> F[Queue pending configurations]
+    --> G[Process each configuration]
+    --> H([Reconciliation finished])

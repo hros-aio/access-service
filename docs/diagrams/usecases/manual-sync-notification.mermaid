@@ -1,0 +1,17 @@
+flowchart TD
+    A([Manual synchronization finishes])
+    --> B{Synchronization result}
+
+    B -- Completed --> C{Significant synchronization?}
+    C -- No --> D([Finish])
+    C -- Yes --> E[Create success notification]
+
+    B -- Failed --> F[Create failure notification]
+
+    E --> G[Send in-app notification]
+    F --> G
+
+    G --> H{Email appropriate?}
+    H -- Yes --> I[Send email notification]
+    H -- No --> D
+    I --> D

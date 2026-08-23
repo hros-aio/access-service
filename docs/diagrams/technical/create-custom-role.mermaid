@@ -1,0 +1,32 @@
+sequenceDiagram
+    autonumber
+
+    actor Admin
+    participant FE as HROS Web
+    participant API as RoleController
+    participant Role as RoleModule
+    participant Catalog as PermissionCatalog
+    participant DB as PostgreSQL
+    participant Outbox as Outbox
+
+    Admin->>FE: Create Custom Role
+    FE->>API: POST Role
+
+    API->>Role: createRole(command)
+
+    Role->>DB: Check tenant role-name uniqueness
+    DB-->>Role: Available
+
+    Role->>Catalog: Validate Permission codes
+    Catalog-->>Role: Valid
+
+    Role->>Catalog: Validate dependencies
+    Catalog-->>Role: Valid
+
+    Role->>DB: BEGIN
+    Role->>DB: Insert Role + Role Permissions
+    Role->>Outbox: Insert audit/event record
+    Role->>DB: COMMIT
+
+    Role-->>API: Created Role
+    API-->>FE: 201 Created

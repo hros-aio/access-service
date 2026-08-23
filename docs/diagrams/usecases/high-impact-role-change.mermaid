@@ -1,0 +1,15 @@
+flowchart TD
+    A([Start])
+    --> B[Administrator proposes Role change]
+    --> C[Estimate affected employees]
+    --> D[Display impact]
+    --> E{Above high-impact threshold?}
+
+    E -- No --> F[Save change]
+    --> G([Completed])
+
+    E -- Yes --> H[Display high-impact warning]
+    --> I{Administrator confirms?}
+
+    I -- No --> J([Cancel without change])
+    I -- Yes --> F

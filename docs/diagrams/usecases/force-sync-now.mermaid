@@ -1,0 +1,15 @@
+flowchart TD
+    A([Pending authorization change])
+    --> B[Administrator clicks Sync Now]
+    --> C{Sync already requested?}
+
+    C -- Yes --> D[Show existing synchronization status]
+    --> E([No duplicate request])
+
+    C -- No --> F[Submit synchronization request]
+    --> G[Status = Processing]
+    --> H[Apply pending authorization state]
+    --> I{Successful?}
+
+    I -- Yes --> J[Status = Completed]
+    I -- No --> K[Status = Failed]

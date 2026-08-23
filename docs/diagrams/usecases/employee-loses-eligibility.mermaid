@@ -1,0 +1,11 @@
+flowchart TD
+    A([Relevant employee attribute changes])
+    --> B[Re-evaluate User Group]
+    --> C{Criteria still satisfied?}
+
+    C -- Yes --> D([No change])
+
+    C -- No --> E[Remove Group membership]
+    --> F[Determine Roles delivered by Group]
+    --> G[Recalculate cumulative access]
+    --> H([Effective access updated])

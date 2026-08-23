@@ -1,0 +1,32 @@
+sequenceDiagram
+    autonumber
+
+    actor Admin
+    participant API as Authorization API
+    participant Authz as AuthorizationModule
+    participant DB as PostgreSQL
+    participant Sync as SynchronizationModule
+    participant Worker as Sync Worker
+    participant Redis as Redis
+    participant Outbox as Outbox
+
+    Admin->>API: Revoke sensitive access
+    API->>Authz: revoke()
+
+    Authz->>DB: Persist new configuration
+    Authz->>Sync: Request URGENT synchronization
+
+    Sync->>DB: Create high-priority sync job
+    Sync-->>API: Revocation accepted
+
+    Worker->>DB: Claim urgent job
+    Worker->>DB: Recalculate affected access
+    Worker->>Redis: Replace affected authorization cache
+
+    alt Success
+        Worker->>DB: Mark COMPLETED
+        Worker->>Outbox: sync-completed
+    else Failure
+        Worker->>DB: Mark FAILED
+        Worker->>Outbox: sync-failed
+    end

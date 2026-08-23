@@ -1,0 +1,20 @@
+flowchart TD
+    A([Scheduled reconciliation starts])
+    --> B[Find configurations with pending changes]
+    --> C{Pending configuration exists?}
+
+    C -- No --> D([Finish])
+
+    C -- Yes --> E[Select pending configuration]
+    --> F[Set Processing]
+    --> G[Apply latest configuration]
+    --> H{Success?}
+
+    H -- Yes --> I[Set Completed]
+    H -- No --> J[Set Failed]
+
+    I --> K{More pending configurations?}
+    J --> K
+
+    K -- Yes --> E
+    K -- No --> D

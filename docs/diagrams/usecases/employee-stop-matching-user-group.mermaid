@@ -1,0 +1,16 @@
+flowchart TD
+    A([Employee attribute changes])
+    --> B[Re-evaluate current User Groups]
+    --> C{Still matches group?}
+
+    C -- Yes --> D([No membership change])
+
+    C -- No --> E[Remove User Group membership]
+    --> F[Remove Roles delivered by this Group]
+    --> G{Role still granted through another Group?}
+
+    G -- Yes --> H[Keep access from remaining Group]
+    G -- No --> I[Remove resulting access]
+
+    H --> J([Completed])
+    I --> J

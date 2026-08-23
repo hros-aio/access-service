@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+
+    actor Admin
+    participant FE as HROS Web
+    participant API as UserGroupController
+    participant Impact as ImpactAnalyzer
+    participant UG as UserGroupModule
+    participant DB as PostgreSQL
+
+    Admin->>FE: Remove Role
+    FE->>API: Preview removal
+
+    API->>Impact: calculate affected members
+    Impact->>DB: Read Group membership
+    DB-->>Impact: affected population
+    Impact-->>API: impact
+    API-->>FE: Show impact
+
+    Admin->>FE: Confirm
+    FE->>API: Remove Role assignment
+
+    API->>UG: removeRole()
+    UG->>DB: Delete UserGroup-Role assignment
+    UG->>DB: Increment User Group version
+
+    Note over UG,DB: Role entity itself remains unchanged
+
+    UG-->>API: PENDING
+    API-->>FE: Pending synchronization
