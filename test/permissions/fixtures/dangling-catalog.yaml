@@ -1,0 +1,6 @@
+permissions:
+  - id: location.update
+    module: setting
+    resource: location
+    action: update
+    requires: [location.non_existent]

@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "assets": [
+      {
+        "include": "**/*.yaml",
+        "watchAssets": true
+      }
+    ]
+  }
+}
