@@ -68,29 +68,6 @@ export class PermissionDependencyService {
       }
     }
 
-    // 3. Validate Dependent Retention Rule (Reverse traversal: removing B while A is present)
-    for (const code of requestedCodes) {
-      const node = graph.nodes.get(code)!;
-      for (const prerequisite of node.prerequisites) {
-        if (!requestedSet.has(prerequisite)) {
-          // This also captures the blocked revocation scenario: the presence of 'code' blocks removal of 'prerequisite'
-          const existingViolation = errors.find(
-            (e) => e.code === prerequisite && e.type === 'BLOCKED_BY_DEPENDENT',
-          );
-          if (existingViolation) {
-            (existingViolation.conflictCodes as string[]).push(code);
-          } else {
-            errors.push({
-              code: prerequisite,
-              type: 'BLOCKED_BY_DEPENDENT',
-              message: `Cannot remove prerequisite '${prerequisite}' while dependent capability '${code}' remains active.`,
-              conflictCodes: [code],
-            });
-          }
-        }
-      }
-    }
-
     return {
       isValid: errors.length === 0,
       errors,

@@ -79,9 +79,7 @@ src/
         │   ├── permission-catalog-response.dto.ts
         │   └── permission-dependencies-response.dto.ts
         ├── errors/
-        │   ├── cyclic-permission-dependency.error.ts
-        │   ├── dangling-permission-prerequisite.error.ts
-        │   └── invalid-permission-format.error.ts
+        │   └── permission-catalog.errors.ts
         ├── interfaces/
         │   ├── permission-definition.interface.ts
         │   ├── permission-dependency-graph.interface.ts
@@ -100,8 +98,8 @@ test/
 └── permissions/
     ├── permission-catalog.e2e-spec.ts
     └── fixtures/
-        ├── cyclic-permission-catalog.yaml
-        └── dangling-permission-catalog.yaml
+        ├── cyclic-catalog.yaml
+        └── dangling-catalog.yaml
 ```
 
 **Structure Decision**: Structured as an in-memory sub-domain module `src/modules/permissions/` inside `hros-access-service` following Clean Architecture and NestJS modular conventions.

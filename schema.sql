@@ -487,26 +487,33 @@ CREATE INDEX idx_user_groups_dirty
 -- USER GROUP -> ROLE ASSIGNMENT
 -- ---------------------------------------------------------
 CREATE TABLE user_group_roles (
+    tenant_code VARCHAR(50) NOT NULL,
     user_group_id UUID NOT NULL,
     role_id UUID NOT NULL,
 
     PRIMARY KEY (user_group_id, role_id),
 
+    CONSTRAINT fk_user_group_roles_tenant
+        FOREIGN KEY (tenant_code)
+        REFERENCES tenants (tenant_code)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+
     CONSTRAINT fk_user_group_roles_group
-        FOREIGN KEY (user_group_id)
-        REFERENCES user_groups (id)
+        FOREIGN KEY (tenant_code, user_group_id)
+        REFERENCES user_groups (tenant_code, id)
         ON UPDATE CASCADE
         ON DELETE CASCADE,
 
     CONSTRAINT fk_user_group_roles_role
-        FOREIGN KEY (role_id)
-        REFERENCES roles (id)
+        FOREIGN KEY (tenant_code, role_id)
+        REFERENCES roles (tenant_code, id)
         ON UPDATE CASCADE
         ON DELETE RESTRICT
 );
 
 CREATE INDEX idx_user_group_roles_role
-    ON user_group_roles (role_id, user_group_id);
+    ON user_group_roles (tenant_code, role_id, user_group_id);
 
 -- ---------------------------------------------------------
 -- MATERIALIZED USER GROUP MEMBERSHIPS

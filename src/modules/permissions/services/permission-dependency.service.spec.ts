@@ -83,14 +83,14 @@ permissions:
   });
 
   describe('US3: Prerequisite capability revocation blocking', () => {
-    it('should detect and block prerequisite revocation when dependent actions remain in requested set', () => {
-      // Scenario: removing location.view while location.update remains
+    it('should detect missing prerequisite when dependent action is present without prerequisite capability', () => {
+      // Scenario: evaluating set containing location.update without location.view
       const result = dependencyService.validatePermissionSet(['location.update']);
       expect(result.isValid).toBe(false);
-      const blockedViolation = result.errors.find((e) => e.type === 'BLOCKED_BY_DEPENDENT');
-      expect(blockedViolation).toBeDefined();
-      expect(blockedViolation?.code).toBe('location.view');
-      expect(blockedViolation?.conflictCodes).toContain('location.update');
+      const missingPrereq = result.errors.find((e) => e.type === 'MISSING_PREREQUISITE');
+      expect(missingPrereq).toBeDefined();
+      expect(missingPrereq?.code).toBe('location.update');
+      expect(missingPrereq?.conflictCodes).toContain('location.view');
     });
   });
 

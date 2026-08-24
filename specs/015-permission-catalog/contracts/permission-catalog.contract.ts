@@ -27,11 +27,11 @@ export const PermissionCodes = {
 export type PermissionCode = (typeof PermissionCodes)[keyof typeof PermissionCodes];
 
 export const PlatformModules = [
-  "setting",
-  "directory",
-  "authorization",
-  "leave",
-  "payroll"
+  'setting',
+  'directory',
+  'authorization',
+  'leave',
+  'payroll',
 ] as const;
 export type PlatformModule = (typeof PlatformModules)[number];
 
