@@ -1,0 +1,108 @@
+permissions:
+  - id: location.view
+    module: setting
+    resource: location
+    action: view
+    entry: true
+
+  - id: location.create
+    module: setting
+    resource: location
+    action: create
+    requires: [location.view]
+
+  - id: location.update
+    module: setting
+    resource: location
+    action: update
+    requires: [location.view]
+
+  - id: location.deactivate
+    module: setting
+    resource: location
+    action: deactivate
+    requires: [location.view]
+
+  - id: location.delete
+    module: setting
+    resource: location
+    action: delete
+    requires: [location.view, location.deactivate]
+
+  - id: employee.view
+    module: directory
+    resource: employee
+    action: view
+    entry: true
+
+  - id: employee.create
+    module: directory
+    resource: employee
+    action: create
+    requires: [employee.view]
+
+  - id: employee.update
+    module: directory
+    resource: employee
+    action: update
+    requires: [employee.view]
+
+  - id: employee.archive
+    module: directory
+    resource: employee
+    action: archive
+    requires: [employee.view]
+
+  - id: role.view
+    module: authorization
+    resource: role
+    action: view
+    entry: true
+
+  - id: role.create
+    module: authorization
+    resource: role
+    action: create
+    requires: [role.view]
+
+  - id: role.update
+    module: authorization
+    resource: role
+    action: update
+    requires: [role.view]
+
+  - id: role.delete
+    module: authorization
+    resource: role
+    action: delete
+    requires: [role.view]
+
+  - id: leave.view
+    module: leave
+    resource: leave
+    action: view
+    entry: true
+
+  - id: leave.request
+    module: leave
+    resource: leave
+    action: request
+    requires: [leave.view]
+
+  - id: leave.approve
+    module: leave
+    resource: leave
+    action: approve
+    requires: [leave.view]
+
+  - id: payroll.view
+    module: payroll
+    resource: payroll
+    action: view
+    entry: true
+
+  - id: payroll.run
+    module: payroll
+    resource: payroll
+    action: run
+    requires: [payroll.view]

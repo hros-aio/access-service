@@ -1,0 +1,12 @@
+permissions:
+  - id: location.view
+    module: setting
+    resource: location
+    action: view
+    requires: [location.update]
+
+  - id: location.update
+    module: setting
+    resource: location
+    action: update
+    requires: [location.view]

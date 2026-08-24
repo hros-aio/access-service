@@ -1,6 +1,3 @@
-import fs from 'fs';
-import path from 'path';
-
 import { Module } from '@nestjs/common';
 import { ApisModule } from '@new-hros/libs-apis';
 import { ConfigurationModule, ConfigurationService, CoreModule } from '@new-hros/libs-core';
@@ -13,31 +10,10 @@ import { InviteModule } from './modules/invite/invite.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { MfaModule } from './modules/mfa/mfa.module';
 import { PasswordModule } from './modules/password/password.module';
+import { PermissionsModule } from './modules/permissions';
 import { ProvisioningModule } from './modules/provisioning/provisioning.module';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { UserModule } from './modules/user/user.module';
-
-// Load local .env file if available
-const envPath = path.resolve(process.cwd(), '.env');
-if (fs.existsSync(envPath)) {
-  const content = fs.readFileSync(envPath, 'utf8');
-  const lines = content.split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const match = trimmed.match(/^([^=]+)=(.*)$/);
-    if (!match) continue;
-    const key = match[1].trim();
-    let val = match[2].trim();
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-      val = val.substring(1, val.length - 1);
-      val = val.replace(/\\n/g, '\n');
-    }
-    if (process.env[key] === undefined) {
-      process.env[key] = val;
-    }
-  }
-}
 
 const config = new ConfigurationService({});
 
@@ -62,14 +38,6 @@ const config = new ConfigurationService({});
     }),
     HealthModule,
     MetricsModule,
-    TenantModule,
-    EmployeeModule,
-    UserModule,
-    InviteModule,
-    AuthModule,
-    MfaModule,
-    PasswordModule,
-    ProvisioningModule,
     SqlModule.forRootAsync({
       inject: [ConfigurationService],
       useFactory: (config: ConfigurationService) => ({
@@ -83,6 +51,15 @@ const config = new ConfigurationService({});
         autoLoadEntities: true,
       }),
     }),
+    TenantModule,
+    EmployeeModule,
+    UserModule,
+    InviteModule,
+    AuthModule,
+    MfaModule,
+    PasswordModule,
+    ProvisioningModule,
+    PermissionsModule,
   ],
 })
 export class AppModule {}
