@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { ProvisioningApplicationService } from './provisioning.application.service';
+import { SystemRoleSeederService } from './system-role-seeder.service';
 import { EventType, InvitationStatus, UserStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
@@ -25,6 +26,7 @@ describe('ProvisioningApplicationService', () => {
   let mockConsumedEventRepository: { exists: jest.Mock; save: jest.Mock };
   let mockOutboxRepository: Record<string, unknown>;
   let mockSessionService: { revokeAllSessions: jest.Mock };
+  let mockSystemRoleSeederService: { seedBaselineSystemRoles: jest.Mock };
   let mockEntityManager: { getRepository: jest.Mock };
 
   let mockTypeormUserRepository: { findOne: jest.Mock; save: jest.Mock };
@@ -105,6 +107,9 @@ describe('ProvisioningApplicationService', () => {
     mockSessionService = {
       revokeAllSessions: jest.fn().mockResolvedValue(undefined),
     };
+    mockSystemRoleSeederService = {
+      seedBaselineSystemRoles: jest.fn().mockResolvedValue([]),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -116,6 +121,7 @@ describe('ProvisioningApplicationService', () => {
         { provide: AuthSecurityEventOutboxRepository, useValue: mockOutboxRepository },
         { provide: InvitationRepository, useValue: mockInvitationRepository },
         { provide: SessionApplicationService, useValue: mockSessionService },
+        { provide: SystemRoleSeederService, useValue: mockSystemRoleSeederService },
       ],
     }).compile();
 
@@ -172,7 +178,7 @@ describe('ProvisioningApplicationService', () => {
       expect(result).toEqual({ success: true, reason: 'ALREADY_EXISTS' });
     });
 
-    it('should create root admin successfully', async () => {
+    it('should create root admin and seed system roles successfully', async () => {
       mockTypeormUserRepository.findOne.mockResolvedValue(null);
 
       const result = await service.bootstrapRootAdmin('evt-123', 'topic-name', {
@@ -182,6 +188,7 @@ describe('ProvisioningApplicationService', () => {
 
       expect(result).toEqual({ success: true });
       expect(mockTypeormUserRepository.save).toHaveBeenCalled();
+      expect(mockSystemRoleSeederService.seedBaselineSystemRoles).toHaveBeenCalledWith('TENANT_A');
     });
   });
 

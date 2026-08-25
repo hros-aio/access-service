@@ -9,4 +9,11 @@ export enum TableName {
   AUTHENTICATION_SETTINGS = 'authentication_settings',
   TENANTS = 'tenants',
   USERS = 'users',
+  ROLES = 'roles',
+  ROLE_PERMISSIONS = 'role_permissions',
+  USER_GROUPS = 'user_groups',
+  USER_GROUP_ROLES = 'user_group_roles',
+  USER_GROUP_MEMBERSHIPS = 'user_group_memberships',
+  USER_EFFECTIVE_ROLES = 'user_effective_roles',
+  AUTHORIZATION_SYNC_JOBS = 'authorization_sync_jobs',
 }

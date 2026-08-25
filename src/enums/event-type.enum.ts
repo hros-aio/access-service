@@ -9,4 +9,8 @@ export enum EventType {
   AUTHENTICATION_INVITATION_ACCEPTED = 'authentication.invitation-accepted',
   AUTHENTICATION_INVITATION_RESENT = 'authentication.invitation-resent',
   AUTHENTICATION_PASSWORD_CHANGED = 'authentication.password-changed',
+  AUTHORIZATION_ROLE_UPDATED = 'authorization.role-updated',
+  ROLE_RENAMED = 'role.renamed',
+  ROLE_PERMISSIONS_UPDATED = 'role.permissions-updated',
+  ROLE_PROTECTED_CAPABILITY_VIOLATION = 'role.protected-capability-violation',
 }
