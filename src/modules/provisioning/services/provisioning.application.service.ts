@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
 
+import { SystemRoleSeederService } from './system-role-seeder.service';
 import { CredentialStatus, EventType, InvitationStatus, UserStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
@@ -25,6 +26,7 @@ export class ProvisioningApplicationService {
     private readonly authSecurityEventOutboxRepository: AuthSecurityEventOutboxRepository,
     private readonly invitationRepository: InvitationRepository,
     private readonly sessionService: SessionApplicationService,
+    private readonly systemRoleSeederService: SystemRoleSeederService,
   ) {}
 
   async bootstrapRootAdmin(
@@ -77,7 +79,10 @@ export class ProvisioningApplicationService {
 
       const savedUser = await this.userRepository.save(newUser);
 
-      // 5. Append security outbox event
+      // 5. Seed default baseline System Roles for the newly provisioned tenant
+      await this.systemRoleSeederService.seedBaselineSystemRoles(tenantCode);
+
+      // 6. Append security outbox event
       const outbox = new AuthSecurityEventOutbox();
       outbox.tenantCode = tenantCode;
       outbox.userId = savedUser.id;
@@ -93,7 +98,7 @@ export class ProvisioningApplicationService {
 
       await this.authSecurityEventOutboxRepository.save(outbox);
 
-      // 6. Record consumed event
+      // 7. Record consumed event
       const consumed = new ConsumedEvent();
       consumed.id = eventId;
       consumed.topic = topic;

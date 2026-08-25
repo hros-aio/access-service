@@ -12,6 +12,7 @@ import { MfaModule } from './modules/mfa/mfa.module';
 import { PasswordModule } from './modules/password/password.module';
 import { PermissionsModule } from './modules/permissions';
 import { ProvisioningModule } from './modules/provisioning/provisioning.module';
+import { RoleModule } from './modules/roles/role.module';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { UserModule } from './modules/user/user.module';
 
@@ -60,6 +61,7 @@ const config = new ConfigurationService({});
     PasswordModule,
     ProvisioningModule,
     PermissionsModule,
+    RoleModule,
   ],
 })
 export class AppModule {}
