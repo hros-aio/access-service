@@ -10,9 +10,10 @@ import { RolePermission } from '../entities/role-permission.entity';
 import { Role } from '../entities/role.entity';
 import {
   CannotDeleteSystemRoleException,
-  CriticalRoleDeactivationException,
+  CannotMutateSystemRoleException,
   DuplicateRoleNameException,
-  ProtectedCapabilityRemovalException,
+  RoleNotFoundException,
+  RoleVersionConflictException,
 } from '../exceptions/role.exceptions';
 import { RoleStatus, RoleType, SystemRoleKey } from '../interfaces/system-role-template.interface';
 import { RolePermissionRepository } from '../repositories/role-permission.repository';
@@ -25,6 +26,8 @@ describe('RoleApplicationService', () => {
     findById: jest.Mock;
     findByName: jest.Mock;
     countAssignedUsers: jest.Mock;
+    countActiveUserReach: jest.Mock;
+    countAssignedUserGroups: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
   };
@@ -53,6 +56,8 @@ describe('RoleApplicationService', () => {
       findById: jest.fn().mockResolvedValue(null),
       findByName: jest.fn().mockResolvedValue(null),
       countAssignedUsers: jest.fn().mockResolvedValue(0),
+      countActiveUserReach: jest.fn().mockResolvedValue(0),
+      countAssignedUserGroups: jest.fn().mockResolvedValue(0),
       save: jest.fn().mockImplementation((r) => r),
       delete: jest.fn().mockResolvedValue(undefined),
     };
@@ -98,6 +103,264 @@ describe('RoleApplicationService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('createCustomRole (US1)', () => {
+    it('should create a custom role, persist permissions with is_protected=false, seed cache, and emit outbox event', async () => {
+      mockRoleRepository.findByName.mockResolvedValue(null);
+      mockRoleRepository.findById.mockImplementation((id) =>
+        Promise.resolve({
+          id,
+          name: 'HR Specialist',
+          type: RoleType.CUSTOM,
+          status: RoleStatus.ACTIVE,
+          version: 1,
+          tenantCode: 'tenant-01',
+          permissions: [
+            { permissionCode: 'employee.view', isProtected: false },
+            { permissionCode: 'employee.update', isProtected: false },
+          ],
+        }),
+      );
+
+      const result = await service.createCustomRole({
+        name: 'HR Specialist',
+        description: 'Specialist handling employees',
+        permissionCodes: ['employee.view', 'employee.update'],
+      });
+
+      expect(result.name).toBe('HR Specialist');
+      expect(result.type).toBe(RoleType.CUSTOM);
+      expect(result.version).toBe(1);
+      expect(result.isUnassigned).toBe(true);
+      expect(mockRolePermissionRepository.bulkSave).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ permissionCode: 'employee.view', isProtected: false }),
+          expect.objectContaining({ permissionCode: 'employee.update', isProtected: false }),
+        ]),
+      );
+      expect(mockOutboxRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: EventType.ROLE_CREATED,
+        }),
+      );
+      expect(mockRoleCacheService.syncRole).toHaveBeenCalled();
+    });
+
+    it('should reject creation if capability dependencies are invalid', async () => {
+      mockPermissionDependencyService.validatePermissionSet.mockReturnValue({
+        isValid: false,
+        errors: ['employee.update requires employee.view'],
+      });
+
+      await expect(
+        service.createCustomRole({
+          name: 'HR Specialist',
+          permissionCodes: ['employee.update'],
+        }),
+      ).rejects.toThrow(/Capability dependency validation failed/);
+    });
+
+    it('should reject creation if role name is duplicate in tenant', async () => {
+      mockRoleRepository.findByName.mockResolvedValue({ id: 'existing-id', name: 'HR Specialist' });
+
+      await expect(
+        service.createCustomRole({
+          name: 'HR Specialist',
+          permissionCodes: ['employee.view'],
+        }),
+      ).rejects.toThrow(DuplicateRoleNameException);
+    });
+  });
+
+  describe('copyRole (US2)', () => {
+    it('should clone a System Role to a Custom Role with is_protected reset to false', async () => {
+      const systemRole = new Role();
+      systemRole.id = 'sys-admin';
+      systemRole.name = 'Built-in Administrator';
+      systemRole.type = RoleType.SYSTEM;
+      systemRole.systemRoleKey = SystemRoleKey.ADMINISTRATOR;
+      systemRole.permissions = [
+        { permissionCode: 'employee.view', isProtected: true } as RolePermission,
+        { permissionCode: 'employee.delete', isProtected: true } as RolePermission,
+      ];
+
+      mockRoleRepository.findById.mockResolvedValue(systemRole);
+      mockRoleRepository.findByName.mockResolvedValue(null);
+
+      const result = await service.copyRole('sys-admin', {
+        name: 'Custom Admin',
+        description: 'Cloned from Admin',
+      });
+
+      expect(result).toBeDefined();
+      expect(mockRolePermissionRepository.bulkSave).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ permissionCode: 'employee.view', isProtected: false }),
+          expect.objectContaining({ permissionCode: 'employee.delete', isProtected: false }),
+        ]),
+      );
+      expect(mockOutboxRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: EventType.ROLE_COPIED,
+          sanitizedPayload: expect.objectContaining({
+            sourceRoleId: 'sys-admin',
+          }),
+        }),
+      );
+      expect(mockRoleCacheService.syncRole).toHaveBeenCalled();
+    });
+
+    it('should throw RoleNotFoundException if source role does not exist in tenant', async () => {
+      mockRoleRepository.findById.mockResolvedValue(null);
+
+      await expect(
+        service.copyRole('missing-role', {
+          name: 'New Custom Role',
+        }),
+      ).rejects.toThrow(RoleNotFoundException);
+    });
+  });
+
+  describe('updateCustomRole (US3)', () => {
+    it('should block mutation of System Roles via custom role endpoint', async () => {
+      const systemRole = new Role();
+      systemRole.id = 'sys-1';
+      systemRole.name = 'Manager';
+      systemRole.type = RoleType.SYSTEM;
+
+      mockRoleRepository.findById.mockResolvedValue(systemRole);
+
+      await expect(
+        service.updateCustomRole('sys-1', {
+          name: 'Updated Manager',
+          version: 1,
+          permissionCodes: ['employee.view'],
+        }),
+      ).rejects.toThrow(CannotMutateSystemRoleException);
+    });
+
+    it('should throw RoleVersionConflictException on optimistic concurrency mismatch', async () => {
+      const customRole = new Role();
+      customRole.id = 'cust-1';
+      customRole.name = 'Specialist';
+      customRole.type = RoleType.CUSTOM;
+      customRole.version = 3;
+
+      mockRoleRepository.findById.mockResolvedValue(customRole);
+
+      await expect(
+        service.updateCustomRole('cust-1', {
+          name: 'Specialist',
+          version: 2, // Stale version
+          permissionCodes: ['employee.view'],
+        }),
+      ).rejects.toThrow(RoleVersionConflictException);
+    });
+
+    it('should estimate reach metrics accurately in estimateImpact', async () => {
+      const role = new Role();
+      role.id = 'role-1';
+      mockRoleRepository.findById.mockResolvedValue(role);
+      mockRoleRepository.countActiveUserReach.mockResolvedValue(45);
+      mockRoleRepository.countAssignedUserGroups.mockResolvedValue(2);
+
+      const impact = await service.estimateImpact('role-1');
+
+      expect(impact.roleId).toBe('role-1');
+      expect(impact.activeUserReachCount).toBe(45);
+      expect(impact.assignedUserGroupCount).toBe(2);
+      expect(impact.isUnassigned).toBe(false);
+    });
+  });
+
+  describe('deactivateRole & reactivateRole (US4)', () => {
+    it('should require confirmation when deactivating role assigned to user groups', async () => {
+      const customRole = new Role();
+      customRole.id = 'role-assigned';
+      customRole.name = 'Assigned Role';
+      customRole.type = RoleType.CUSTOM;
+      customRole.status = RoleStatus.ACTIVE;
+
+      mockRoleRepository.findById.mockResolvedValue(customRole);
+      mockRoleRepository.countAssignedUserGroups.mockResolvedValue(3);
+      mockRoleRepository.countActiveUserReach.mockResolvedValue(80);
+
+      const result = await service.deactivateRole('role-assigned', { confirmed: false });
+
+      expect(result.confirmationRequired).toBe(true);
+      expect(result.affectedUserGroupCount).toBe(3);
+      expect(result.affectedUserCount).toBe(80);
+      expect(mockRoleRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should deactivate role when confirmed, update version, and sync cache', async () => {
+      const customRole = new Role();
+      customRole.id = 'role-assigned';
+      customRole.name = 'Assigned Role';
+      customRole.type = RoleType.CUSTOM;
+      customRole.status = RoleStatus.ACTIVE;
+      customRole.version = 1;
+
+      mockRoleRepository.findById.mockResolvedValue(customRole);
+      mockRoleRepository.countAssignedUserGroups.mockResolvedValue(1);
+      mockRoleRepository.countActiveUserReach.mockResolvedValue(10);
+
+      const result = await service.deactivateRole('role-assigned', { confirmed: true });
+
+      expect(result.role?.status).toBe(RoleStatus.INACTIVE);
+      expect(mockOutboxRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: EventType.ROLE_DEACTIVATED,
+        }),
+      );
+      expect(mockRoleCacheService.syncRole).toHaveBeenCalled();
+    });
+
+    it('should reactivate a deactivated role, increment version, and sync cache', async () => {
+      const customRole = new Role();
+      customRole.id = 'role-deactivated';
+      customRole.name = 'Custom Role';
+      customRole.type = RoleType.CUSTOM;
+      customRole.status = RoleStatus.INACTIVE;
+      customRole.version = 2;
+
+      mockRoleRepository.findById.mockResolvedValue(customRole);
+
+      const result = await service.reactivateRole('role-deactivated');
+
+      expect(result.status).toBe(RoleStatus.ACTIVE);
+      expect(mockOutboxRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: EventType.ROLE_REACTIVATED,
+        }),
+      );
+      expect(mockRoleCacheService.syncRole).toHaveBeenCalled();
+    });
+  });
+
+  describe('listRoles & getRoleById (US5)', () => {
+    it('should enrich role list with isUnassigned and reach count', async () => {
+      const role1 = new Role();
+      role1.id = 'r1';
+      role1.name = 'Unassigned Role';
+
+      const role2 = new Role();
+      role2.id = 'r2';
+      role2.name = 'Assigned Role';
+
+      mockRoleRepository.findAllByTenant.mockResolvedValue([role1, role2]);
+      mockRoleRepository.countAssignedUserGroups.mockResolvedValueOnce(0).mockResolvedValueOnce(2);
+      mockRoleRepository.countActiveUserReach.mockResolvedValueOnce(0).mockResolvedValueOnce(35);
+
+      const list = await service.listRoles();
+
+      expect(list).toHaveLength(2);
+      expect(list[0].isUnassigned).toBe(true);
+      expect(list[0].activeUserReachCount).toBe(0);
+      expect(list[1].isUnassigned).toBe(false);
+      expect(list[1].activeUserReachCount).toBe(35);
+    });
+  });
+
   describe('deleteRole', () => {
     it('should throw CannotDeleteSystemRoleException if role is of type SYSTEM', async () => {
       const systemRole = new Role();
@@ -125,181 +388,6 @@ describe('RoleApplicationService', () => {
       expect(mockRolePermissionRepository.deleteByRoleId).toHaveBeenCalledWith('role-456');
       expect(mockRoleRepository.delete).toHaveBeenCalledWith('role-456');
       expect(mockRoleCacheService.invalidateRole).toHaveBeenCalled();
-    });
-  });
-
-  describe('updatePermissions - Invariant Protection & Auditing', () => {
-    it('should throw ProtectedCapabilityRemovalException and record audit event when protected capability is omitted', async () => {
-      const systemRole = new Role();
-      systemRole.id = 'role-admin';
-      systemRole.name = 'Built-in Administrator';
-      systemRole.type = RoleType.SYSTEM;
-      systemRole.systemRoleKey = SystemRoleKey.ADMINISTRATOR;
-      systemRole.tenantCode = 'tenant-01';
-
-      const perm1 = new RolePermission();
-      perm1.permissionCode = 'role.view';
-      perm1.isProtected = true;
-
-      const perm2 = new RolePermission();
-      perm2.permissionCode = 'location.view';
-      perm2.isProtected = true;
-
-      systemRole.permissions = [perm1, perm2];
-      mockRoleRepository.findById.mockResolvedValue(systemRole);
-
-      // Attempt update with only role.view (omitting protected location.view)
-      await expect(
-        service.updatePermissions('role-admin', {
-          permissionCodes: ['role.view'],
-        }),
-      ).rejects.toThrow(ProtectedCapabilityRemovalException);
-
-      expect(mockOutboxRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: EventType.ROLE_PROTECTED_CAPABILITY_VIOLATION,
-          sanitizedPayload: expect.objectContaining({
-            roleId: 'role-admin',
-            omittedProtectedCapabilities: ['location.view'],
-          }),
-        }),
-      );
-
-      expect(mockRolePermissionRepository.deleteNonProtectedByRoleId).not.toHaveBeenCalled();
-    });
-
-    it('should throw if PermissionDependencyService detects dependency violation', async () => {
-      mockPermissionDependencyService.validatePermissionSet.mockReturnValue({
-        isValid: false,
-        errors: ['location.update requires location.view'],
-      });
-
-      await expect(
-        service.updatePermissions('role-123', {
-          permissionCodes: ['location.update'],
-        }),
-      ).rejects.toThrow(/Capability dependency validation failed/);
-    });
-
-    it('should successfully update permissions, increment version, and sync cache', async () => {
-      const role = new Role();
-      role.id = 'role-emp';
-      role.name = 'Employee';
-      role.type = RoleType.SYSTEM;
-      role.tenantCode = 'tenant-01';
-      role.version = 1;
-
-      const permProtected = new RolePermission();
-      permProtected.permissionCode = 'employee.view';
-      permProtected.isProtected = true;
-
-      role.permissions = [permProtected];
-      mockRoleRepository.findById.mockResolvedValue(role);
-
-      const result = await service.updatePermissions('role-emp', {
-        permissionCodes: ['employee.view', 'location.view'],
-      });
-
-      expect(result.role).toBeDefined();
-      expect(mockRolePermissionRepository.deleteNonProtectedByRoleId).toHaveBeenCalledWith(
-        'role-emp',
-      );
-      expect(mockRolePermissionRepository.bulkSave).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({
-            permissionCode: 'location.view',
-            isProtected: false,
-          }),
-        ]),
-      );
-      expect(mockRoleCacheService.syncRole).toHaveBeenCalled();
-      expect(mockOutboxRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: EventType.ROLE_PERMISSIONS_UPDATED,
-        }),
-      );
-    });
-
-    it('should prompt for confirmation when high-impact threshold is reached without explicit flag', async () => {
-      mockRoleRepository.countAssignedUsers.mockResolvedValue(100);
-
-      const result = await service.updatePermissions('role-high', {
-        permissionCodes: ['employee.view'],
-        confirmedHighImpact: false,
-      });
-
-      expect(result.confirmationRequired).toBe(true);
-      expect(result.affectedUserCount).toBe(100);
-      expect(mockRoleRepository.save).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('renameRole', () => {
-    it('should throw DuplicateRoleNameException if new name conflicts with existing role in tenant', async () => {
-      const role = new Role();
-      role.id = 'role-1';
-      role.name = 'Employee';
-      role.tenantCode = 'tenant-01';
-
-      const conflictingRole = new Role();
-      conflictingRole.id = 'role-2';
-      conflictingRole.name = 'Team Member';
-      conflictingRole.tenantCode = 'tenant-01';
-
-      mockRoleRepository.findById.mockResolvedValue(role);
-      mockRoleRepository.findByName.mockResolvedValue(conflictingRole);
-
-      await expect(
-        service.renameRole('role-1', {
-          name: 'Team Member',
-        }),
-      ).rejects.toThrow(DuplicateRoleNameException);
-    });
-
-    it('should rename role, increment version, emit role.renamed and sync cache', async () => {
-      const role = new Role();
-      role.id = 'role-1';
-      role.name = 'Employee';
-      role.type = RoleType.SYSTEM;
-      role.systemRoleKey = SystemRoleKey.EMPLOYEE;
-      role.tenantCode = 'tenant-01';
-      role.version = 1;
-      role.permissions = [];
-
-      mockRoleRepository.findById.mockResolvedValue(role);
-      mockRoleRepository.findByName.mockResolvedValue(null);
-
-      const result = await service.renameRole('role-1', {
-        name: 'Team Member',
-      });
-
-      expect(result.name).toBe('Team Member');
-      expect(result.systemRoleKey).toBe(SystemRoleKey.EMPLOYEE);
-      expect(mockOutboxRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: EventType.ROLE_RENAMED,
-          sanitizedPayload: expect.objectContaining({
-            oldName: 'Employee',
-            newName: 'Team Member',
-          }),
-        }),
-      );
-      expect(mockRoleCacheService.syncRole).toHaveBeenCalled();
-    });
-  });
-
-  describe('updateRoleStatus', () => {
-    it('should throw CriticalRoleDeactivationException when deactivating Built-in Administrator', async () => {
-      const adminRole = new Role();
-      adminRole.id = 'role-admin';
-      adminRole.name = 'Built-in Administrator';
-      adminRole.systemRoleKey = SystemRoleKey.ADMINISTRATOR;
-
-      mockRoleRepository.findById.mockResolvedValue(adminRole);
-
-      await expect(service.updateRoleStatus('role-admin', RoleStatus.INACTIVE)).rejects.toThrow(
-        CriticalRoleDeactivationException,
-      );
     });
   });
 });

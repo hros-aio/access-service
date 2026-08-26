@@ -1,11 +1,27 @@
-import { Body, Controller, Delete, Get, Param, Patch, Put } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import {
+  CopyRoleDto,
+  CreateCustomRoleDto,
+  DeactivateRoleDto,
   HighImpactConfirmationRequiredResponseDto,
   RenameRoleDto,
+  RoleImpactResponseDto,
   RoleResponseDto,
-  UpdateRolePermissionsDto,
+  UpdateCustomRoleDto,
 } from '../dto/role.dto';
 import { RoleStatus } from '../interfaces/system-role-template.interface';
 import { RoleApplicationService } from '../services/role.application.service';
@@ -16,10 +32,15 @@ export class RoleController {
   constructor(private readonly roleApplicationService: RoleApplicationService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all roles in current tenant with assigned user counts' })
+  @ApiOperation({ summary: 'List all roles in current tenant with metrics and unassigned badges' })
+  @ApiQuery({ name: 'type', required: false, enum: ['SYSTEM', 'CUSTOM'] })
+  @ApiQuery({ name: 'status', required: false, enum: ['ACTIVE', 'INACTIVE'] })
   @ApiResponse({ status: 200, type: [RoleResponseDto] })
-  async listRoles(): Promise<RoleResponseDto[]> {
-    return this.roleApplicationService.listRoles();
+  async listRoles(
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+  ): Promise<RoleResponseDto[]> {
+    return this.roleApplicationService.listRoles({ type, status });
   }
 
   @Get(':id')
@@ -29,30 +50,80 @@ export class RoleController {
     return this.roleApplicationService.getRoleById(id);
   }
 
-  @Patch(':id/rename')
-  @ApiOperation({ summary: 'Rename tenant-facing display label for a role' })
-  @ApiResponse({ status: 200, type: RoleResponseDto })
-  async renameRole(@Param('id') id: string, @Body() dto: RenameRoleDto): Promise<RoleResponseDto> {
-    return this.roleApplicationService.renameRole(id, dto);
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Create a new active custom role with permission dependency validation',
+  })
+  @ApiResponse({ status: 201, type: RoleResponseDto })
+  async createCustomRole(@Body() dto: CreateCustomRoleDto): Promise<RoleResponseDto> {
+    return this.roleApplicationService.createCustomRole(dto);
   }
 
-  @Put(':id/permissions')
+  @Post(':id/copy')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Clone an existing System or Custom role with protection reset' })
+  @ApiResponse({ status: 201, type: RoleResponseDto })
+  async copyRole(@Param('id') id: string, @Body() dto: CopyRoleDto): Promise<RoleResponseDto> {
+    return this.roleApplicationService.copyRole(id, dto);
+  }
+
+  @Get(':id/impact')
+  @ApiOperation({ summary: 'Estimate reach and blast-radius for role changes' })
+  @ApiResponse({ status: 200, type: RoleImpactResponseDto })
+  async estimateImpact(@Param('id') id: string): Promise<RoleImpactResponseDto> {
+    return this.roleApplicationService.estimateImpact(id);
+  }
+
+  @Put(':id')
   @ApiOperation({
-    summary:
-      'Update granted permissions on a role with capability protection and dependency validation',
+    summary: 'Update custom role metadata and permissions with optimistic locking',
   })
   @ApiResponse({ status: 200, type: RoleResponseDto })
   @ApiResponse({ status: 200, type: HighImpactConfirmationRequiredResponseDto })
-  async updatePermissions(
+  async updateCustomRole(
     @Param('id') id: string,
-    @Body() dto: UpdateRolePermissionsDto,
+    @Body() dto: UpdateCustomRoleDto,
   ): Promise<{
     role?: RoleResponseDto;
     confirmationRequired?: boolean;
     affectedUserCount?: number;
     message?: string;
   }> {
-    return this.roleApplicationService.updatePermissions(id, dto);
+    return this.roleApplicationService.updateCustomRole(id, dto);
+  }
+
+  @Post(':id/deactivate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Deactivate a custom role with multi-group impact check' })
+  @ApiResponse({ status: 200, type: RoleResponseDto })
+  @ApiResponse({ status: 200, type: HighImpactConfirmationRequiredResponseDto })
+  async deactivateRole(
+    @Param('id') id: string,
+    @Body() dto?: DeactivateRoleDto,
+  ): Promise<{
+    role?: RoleResponseDto;
+    confirmationRequired?: boolean;
+    affectedUserGroupCount?: number;
+    affectedUserCount?: number;
+    message?: string;
+  }> {
+    return this.roleApplicationService.deactivateRole(id, dto);
+  }
+
+  @Post(':id/reactivate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reactivate a deactivated custom role' })
+  @ApiResponse({ status: 200, type: RoleResponseDto })
+  async reactivateRole(@Param('id') id: string): Promise<RoleResponseDto> {
+    return this.roleApplicationService.reactivateRole(id);
+  }
+
+  @Patch(':id/rename')
+  @ApiOperation({ summary: 'Rename tenant-facing display label for a role' })
+  @ApiResponse({ status: 200, type: RoleResponseDto })
+  async renameRole(@Param('id') id: string, @Body() dto: RenameRoleDto): Promise<RoleResponseDto> {
+    return this.roleApplicationService.renameRole(id, dto);
   }
 
   @Patch(':id/status')

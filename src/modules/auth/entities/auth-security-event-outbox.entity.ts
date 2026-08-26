@@ -10,6 +10,27 @@ export interface OutboxContext {
   userId?: string;
 }
 
+export interface RoleCreatedEventData {
+  role: Role;
+  permissionCodes: string[];
+}
+
+export interface RoleCopiedEventData {
+  role: Role;
+  sourceRoleId: string;
+  permissionCodes: string[];
+}
+
+export interface RoleDeactivatedEventData {
+  role: Role;
+  affectedUserGroupCount?: number;
+  affectedUserCount?: number;
+}
+
+export interface RoleReactivatedEventData {
+  role: Role;
+}
+
 export interface RenameRoleEventData {
   role: Role;
   oldName: string;
@@ -49,6 +70,89 @@ export class AuthSecurityEventOutbox extends BaseEntity {
   @ManyToOne(() => User, { onDelete: 'SET NULL', onUpdate: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user?: User;
+
+  static fromRoleCreated(ctx: OutboxContext, data: RoleCreatedEventData): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.ROLE_CREATED;
+    outbox.sanitizedPayload = {
+      roleId: data.role.id,
+      tenantCode: ctx.tenantCode,
+      roleName: data.role.name,
+      roleType: data.role.type,
+      version: data.role.version,
+      permissionCodes: data.permissionCodes,
+      actorUserId: ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromRoleCopied(ctx: OutboxContext, data: RoleCopiedEventData): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.ROLE_COPIED;
+    outbox.sanitizedPayload = {
+      roleId: data.role.id,
+      sourceRoleId: data.sourceRoleId,
+      tenantCode: ctx.tenantCode,
+      roleName: data.role.name,
+      roleType: data.role.type,
+      version: data.role.version,
+      permissionCodes: data.permissionCodes,
+      actorUserId: ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromRoleDeactivated(
+    ctx: OutboxContext,
+    data: RoleDeactivatedEventData,
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.ROLE_DEACTIVATED;
+    outbox.sanitizedPayload = {
+      roleId: data.role.id,
+      tenantCode: ctx.tenantCode,
+      roleName: data.role.name,
+      roleType: data.role.type,
+      version: data.role.version,
+      affectedUserGroupCount: data.affectedUserGroupCount ?? 0,
+      affectedUserCount: data.affectedUserCount ?? 0,
+      actorUserId: ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromRoleReactivated(
+    ctx: OutboxContext,
+    data: RoleReactivatedEventData,
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.ROLE_REACTIVATED;
+    outbox.sanitizedPayload = {
+      roleId: data.role.id,
+      tenantCode: ctx.tenantCode,
+      roleName: data.role.name,
+      roleType: data.role.type,
+      version: data.role.version,
+      actorUserId: ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
 
   static fromRenameRole(ctx: OutboxContext, data: RenameRoleEventData): AuthSecurityEventOutbox {
     const outbox = new AuthSecurityEventOutbox();

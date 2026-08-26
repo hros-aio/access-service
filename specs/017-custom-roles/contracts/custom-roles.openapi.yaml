@@ -1,0 +1,356 @@
+openapi: 3.0.3
+info:
+  title: Custom Role Lifecycle Management API
+  version: 1.0.0
+  description: Endpoints for tenant-scoped custom role lifecycle management, copying, impact estimation, and inspection.
+paths:
+  /authorization/roles:
+    get:
+      summary: List all roles with metrics and unassigned badges
+      tags:
+        - Roles
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [SYSTEM, CUSTOM]
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE]
+      responses:
+        '200':
+          description: List of roles in tenant
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoleDetailsResponse'
+
+    post:
+      summary: Create a new custom role
+      tags:
+        - Roles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomRoleRequest'
+      responses:
+        '201':
+          description: Custom role created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleDetailsResponse'
+        '400':
+          description: Malformed input
+        '409':
+          description: Duplicate role name in tenant
+        '422':
+          description: Capability dependency or invalid permission error
+
+  /authorization/roles/{roleId}:
+    get:
+      summary: Get role details by ID
+      tags:
+        - Roles
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleDetailsResponse'
+        '404':
+          description: Role not found
+
+    put:
+      summary: Update custom role metadata and permissions
+      tags:
+        - Roles
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomRoleRequest'
+      responses:
+        '200':
+          description: Custom role updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleDetailsResponse'
+        '409':
+          description: Optimistic concurrency version mismatch or duplicate name
+        '422':
+          description: Capability dependency violation
+
+  /authorization/roles/{roleId}/copy:
+    post:
+      summary: Copy an existing System or Custom role to a new Custom role
+      tags:
+        - Roles
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CopyRoleRequest'
+      responses:
+        '201':
+          description: Custom role copied successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleDetailsResponse'
+        '404':
+          description: Source role not found
+        '409':
+          description: Target role name conflict
+
+  /authorization/roles/{roleId}/impact:
+    get:
+      summary: Estimate reach and blast-radius for role changes
+      tags:
+        - Roles
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Impact estimation metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleImpactResponse'
+
+  /authorization/roles/{roleId}/deactivate:
+    post:
+      summary: Deactivate a custom role
+      tags:
+        - Roles
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeactivateRoleRequest'
+      responses:
+        '200':
+          description: Role deactivated or confirmation requested
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/RoleDetailsResponse'
+                  - $ref: '#/components/schemas/RoleDeactivationWarningResponse'
+        '409':
+          description: Concurrency version mismatch
+
+  /authorization/roles/{roleId}/reactivate:
+    post:
+      summary: Reactivate a deactivated custom role
+      tags:
+        - Roles
+      parameters:
+        - name: roleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Role reactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleDetailsResponse'
+
+components:
+  schemas:
+    CreateCustomRoleRequest:
+      type: object
+      required:
+        - name
+        - permissionCodes
+      properties:
+        name:
+          type: string
+          example: HR Specialist
+          maxLength: 150
+        description:
+          type: string
+          example: Specialist managing employee profiles and records
+        permissionCodes:
+          type: array
+          items:
+            type: string
+          example: [employee.view, employee.update]
+
+    CopyRoleRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: Custom Operations Admin
+        description:
+          type: string
+          example: Cloned from Built-in Admin with customized capabilities
+
+    UpdateCustomRoleRequest:
+      type: object
+      required:
+        - name
+        - permissionCodes
+        - version
+      properties:
+        name:
+          type: string
+          example: Senior HR Specialist
+        description:
+          type: string
+          example: Updated role description
+        version:
+          type: integer
+          example: 2
+        permissionCodes:
+          type: array
+          items:
+            type: string
+          example: [employee.view, employee.update, department.view]
+        confirmedHighImpact:
+          type: boolean
+          default: false
+
+    DeactivateRoleRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          example: 1
+        confirmed:
+          type: boolean
+          default: false
+
+    RolePermissionItem:
+      type: object
+      properties:
+        permissionCode:
+          type: string
+          example: employee.view
+        isProtected:
+          type: boolean
+          example: false
+
+    RoleDetailsResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantCode:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [SYSTEM, CUSTOM]
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        systemRoleKey:
+          type: string
+          nullable: true
+        version:
+          type: integer
+        isUnassigned:
+          type: boolean
+          description: True if assigned to 0 User Groups
+        assignedUserGroupCount:
+          type: integer
+        activeUserReachCount:
+          type: integer
+        permissions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RolePermissionItem'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    RoleImpactResponse:
+      type: object
+      properties:
+        roleId:
+          type: string
+          format: uuid
+        assignedUserGroupCount:
+          type: integer
+        activeUserReachCount:
+          type: integer
+        isUnassigned:
+          type: boolean
+
+    RoleDeactivationWarningResponse:
+      type: object
+      properties:
+        confirmationRequired:
+          type: boolean
+          example: true
+        affectedUserGroupCount:
+          type: integer
+          example: 2
+        affectedUserCount:
+          type: integer
+          example: 45
+        message:
+          type: string
+          example: This role is currently assigned to 2 User Groups affecting 45 users. Explicit confirmation required.
