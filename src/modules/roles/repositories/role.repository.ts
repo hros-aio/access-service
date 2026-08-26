@@ -58,16 +58,11 @@ export class RoleRepository {
     });
   }
 
-  async findAllByTenant(tenantCode?: string): Promise<Role[]> {
-    const tenant = tenantCode ?? RequestContextService.getTenantCode();
-    return this.repository.find({
-      where: { tenantCode: tenant ?? undefined },
-      relations: ['permissions'],
-      order: { createdAt: 'ASC' },
-    });
+  async countAssignedUsers(roleId: string, tenantCode?: string): Promise<number> {
+    return this.countActiveUserReach(roleId, tenantCode);
   }
 
-  async countAssignedUsers(roleId: string, tenantCode?: string): Promise<number> {
+  async countActiveUserReach(roleId: string, tenantCode?: string): Promise<number> {
     const tenant = tenantCode ?? RequestContextService.getTenantCode();
     const result = await this.transactionService
       .getManager()
@@ -78,6 +73,40 @@ export class RoleRepository {
       .catch(() => [{ count: 0 }]);
 
     return parseInt(result[0]?.count ?? '0', 10);
+  }
+
+  async countAssignedUserGroups(roleId: string, tenantCode?: string): Promise<number> {
+    const tenant = tenantCode ?? RequestContextService.getTenantCode();
+    const result = await this.transactionService
+      .getManager()
+      .query(
+        `SELECT COUNT(DISTINCT user_group_id) as count FROM user_group_roles WHERE role_id = $1 AND tenant_code = $2`,
+        [roleId, tenant],
+      )
+      .catch(() => [{ count: 0 }]);
+
+    return parseInt(result[0]?.count ?? '0', 10);
+  }
+
+  async findAllByTenant(
+    tenantCode?: string,
+    filters?: { type?: string; status?: string },
+  ): Promise<Role[]> {
+    const tenant = tenantCode ?? RequestContextService.getTenantCode();
+    const query = this.repository
+      .createQueryBuilder('role')
+      .leftJoinAndSelect('role.permissions', 'permissions')
+      .where('role.tenantCode = :tenantCode', { tenantCode: tenant });
+
+    if (filters?.type) {
+      query.andWhere('role.type = :type', { type: filters.type });
+    }
+    if (filters?.status) {
+      query.andWhere('role.status = :status', { status: filters.status });
+    }
+
+    query.orderBy('role.createdAt', 'ASC');
+    return query.getMany();
   }
 
   async delete(id: string): Promise<void> {
