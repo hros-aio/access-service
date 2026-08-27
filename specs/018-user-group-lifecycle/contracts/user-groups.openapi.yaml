@@ -1,0 +1,351 @@
+openapi: 3.0.3
+info:
+  title: User Group Definition & Lifecycle API
+  version: 1.0.0
+  description: Endpoints for managing dynamic user groups, scope assignments, roles, and lifecycle states in HROS.
+paths:
+  /admin/user-groups:
+    get:
+      summary: List user groups for tenant
+      tags:
+        - User Groups
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE]
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated list of user groups
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserGroupResponse'
+
+    post:
+      summary: Create a dynamic user group
+      tags:
+        - User Groups
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserGroupRequest'
+      responses:
+        '201':
+          description: User group created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserGroupDetailsResponse'
+        '400':
+          description: Invalid request or disallowed matching criteria
+        '409':
+          description: Duplicate user group name in tenant
+
+  /admin/user-groups/{id}:
+    get:
+      summary: Get user group details
+      tags:
+        - User Groups
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User group details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserGroupDetailsResponse'
+        '404':
+          description: User group not found
+
+    put:
+      summary: Update user group details and role mappings
+      tags:
+        - User Groups
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserGroupRequest'
+      responses:
+        '200':
+          description: User group updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserGroupDetailsResponse'
+        '400':
+          description: Validation error in matching rule or scope
+        '404':
+          description: User group not found
+        '409':
+          description: Version conflict or name collision
+
+  /admin/user-groups/{id}/deactivate:
+    post:
+      summary: Deactivate an active user group
+      tags:
+        - User Groups
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleTransitionRequest'
+      responses:
+        '200':
+          description: User group deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserGroupDetailsResponse'
+        '404':
+          description: User group not found
+        '409':
+          description: Version conflict or invalid state transition
+
+  /admin/user-groups/{id}/reactivate:
+    post:
+      summary: Reactivate an inactive user group
+      tags:
+        - User Groups
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleTransitionRequest'
+      responses:
+        '200':
+          description: User group reactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserGroupDetailsResponse'
+        '404':
+          description: User group not found
+        '409':
+          description: Version conflict or invalid state transition
+
+components:
+  schemas:
+    MatchingRuleClause:
+      type: object
+      required:
+        - attribute
+        - operator
+      properties:
+        attribute:
+          type: string
+          enum: [employmentStatus, companyId, locationId, departmentId, gradeId, jobTitleId, reporteesCount, hasReportees]
+        operator:
+          type: string
+          enum: [EQUALS, NOT_EQUALS, IN, NOT_IN, GREATER_THAN, LESS_THAN, IS_TRUE, IS_FALSE]
+        value:
+          type: string
+        values:
+          type: array
+          items:
+            type: string
+
+    MatchingRule:
+      type: object
+      required:
+        - clauses
+      properties:
+        clauses:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchingRuleClause'
+
+    CreateUserGroupRequest:
+      type: object
+      required:
+        - name
+        - scopeType
+        - matchingRule
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        description:
+          type: string
+          nullable: true
+        scopeType:
+          type: string
+          enum: [SELF, DIRECT_REPORTEES, COMPANY, LOCATION, DEPARTMENT, TENANT_WIDE]
+        scopeRefId:
+          type: string
+          nullable: true
+        matchingRule:
+          $ref: '#/components/schemas/MatchingRule'
+        roleIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          default: []
+
+    UpdateUserGroupRequest:
+      type: object
+      required:
+        - name
+        - scopeType
+        - matchingRule
+        - version
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        description:
+          type: string
+          nullable: true
+        scopeType:
+          type: string
+          enum: [SELF, DIRECT_REPORTEES, COMPANY, LOCATION, DEPARTMENT, TENANT_WIDE]
+        scopeRefId:
+          type: string
+          nullable: true
+        matchingRule:
+          $ref: '#/components/schemas/MatchingRule'
+        roleIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        version:
+          type: integer
+
+    LifecycleTransitionRequest:
+      type: object
+      required:
+        - version
+      properties:
+        version:
+          type: integer
+
+    AssignedRoleSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        roleType:
+          type: string
+          enum: [SYSTEM, CUSTOM]
+
+    UserGroupDetailsResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantCode:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        scopeType:
+          type: string
+          enum: [SELF, DIRECT_REPORTEES, COMPANY, LOCATION, DEPARTMENT, TENANT_WIDE]
+        scopeRefId:
+          type: string
+          nullable: true
+        matchingRule:
+          $ref: '#/components/schemas/MatchingRule'
+        ruleAttributeKeys:
+          type: array
+          items:
+            type: string
+        version:
+          type: integer
+        projectionVersion:
+          type: integer
+        isPendingSync:
+          type: boolean
+        hasNoAssignedRoles:
+          type: boolean
+        assignedRoles:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssignedRoleSummary'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaginatedUserGroupResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserGroupDetailsResponse'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
