@@ -121,7 +121,7 @@ describe('RoleApplicationService', () => {
         }),
       );
 
-      const result = await service.createCustomRole({
+      const result = await service.createCustom({
         name: 'HR Specialist',
         description: 'Specialist handling employees',
         permissionCodes: ['employee.view', 'employee.update'],
@@ -152,7 +152,7 @@ describe('RoleApplicationService', () => {
       });
 
       await expect(
-        service.createCustomRole({
+        service.createCustom({
           name: 'HR Specialist',
           permissionCodes: ['employee.update'],
         }),
@@ -163,7 +163,7 @@ describe('RoleApplicationService', () => {
       mockRoleRepository.findByName.mockResolvedValue({ id: 'existing-id', name: 'HR Specialist' });
 
       await expect(
-        service.createCustomRole({
+        service.createCustom({
           name: 'HR Specialist',
           permissionCodes: ['employee.view'],
         }),
@@ -186,7 +186,7 @@ describe('RoleApplicationService', () => {
       mockRoleRepository.findById.mockResolvedValue(systemRole);
       mockRoleRepository.findByName.mockResolvedValue(null);
 
-      const result = await service.copyRole('sys-admin', {
+      const result = await service.copy('sys-admin', {
         name: 'Custom Admin',
         description: 'Cloned from Admin',
       });
@@ -213,7 +213,7 @@ describe('RoleApplicationService', () => {
       mockRoleRepository.findById.mockResolvedValue(null);
 
       await expect(
-        service.copyRole('missing-role', {
+        service.copy('missing-role', {
           name: 'New Custom Role',
         }),
       ).rejects.toThrow(RoleNotFoundException);
@@ -230,7 +230,7 @@ describe('RoleApplicationService', () => {
       mockRoleRepository.findById.mockResolvedValue(systemRole);
 
       await expect(
-        service.updateCustomRole('sys-1', {
+        service.updateCustom('sys-1', {
           name: 'Updated Manager',
           version: 1,
           permissionCodes: ['employee.view'],
@@ -248,7 +248,7 @@ describe('RoleApplicationService', () => {
       mockRoleRepository.findById.mockResolvedValue(customRole);
 
       await expect(
-        service.updateCustomRole('cust-1', {
+        service.updateCustom('cust-1', {
           name: 'Specialist',
           version: 2, // Stale version
           permissionCodes: ['employee.view'],
@@ -284,7 +284,7 @@ describe('RoleApplicationService', () => {
       mockRoleRepository.countAssignedUserGroups.mockResolvedValue(3);
       mockRoleRepository.countActiveUserReach.mockResolvedValue(80);
 
-      const result = await service.deactivateRole('role-assigned', { confirmed: false });
+      const result = await service.deactivate('role-assigned', { confirmed: false });
 
       expect(result.confirmationRequired).toBe(true);
       expect(result.affectedUserGroupCount).toBe(3);
@@ -304,7 +304,7 @@ describe('RoleApplicationService', () => {
       mockRoleRepository.countAssignedUserGroups.mockResolvedValue(1);
       mockRoleRepository.countActiveUserReach.mockResolvedValue(10);
 
-      const result = await service.deactivateRole('role-assigned', { confirmed: true });
+      const result = await service.deactivate('role-assigned', { confirmed: true });
 
       expect(result.role?.status).toBe(RoleStatus.INACTIVE);
       expect(mockOutboxRepository.save).toHaveBeenCalledWith(
@@ -325,7 +325,7 @@ describe('RoleApplicationService', () => {
 
       mockRoleRepository.findById.mockResolvedValue(customRole);
 
-      const result = await service.reactivateRole('role-deactivated');
+      const result = await service.reactivate('role-deactivated');
 
       expect(result.status).toBe(RoleStatus.ACTIVE);
       expect(mockOutboxRepository.save).toHaveBeenCalledWith(
@@ -351,7 +351,7 @@ describe('RoleApplicationService', () => {
       mockRoleRepository.countAssignedUserGroups.mockResolvedValueOnce(0).mockResolvedValueOnce(2);
       mockRoleRepository.countActiveUserReach.mockResolvedValueOnce(0).mockResolvedValueOnce(35);
 
-      const list = await service.listRoles();
+      const list = await service.list();
 
       expect(list).toHaveLength(2);
       expect(list[0].isUnassigned).toBe(true);
@@ -370,7 +370,7 @@ describe('RoleApplicationService', () => {
 
       mockRoleRepository.findById.mockResolvedValue(systemRole);
 
-      await expect(service.deleteRole('role-123')).rejects.toThrow(CannotDeleteSystemRoleException);
+      await expect(service.delete('role-123')).rejects.toThrow(CannotDeleteSystemRoleException);
       expect(mockRoleRepository.delete).not.toHaveBeenCalled();
     });
 
@@ -383,7 +383,7 @@ describe('RoleApplicationService', () => {
 
       mockRoleRepository.findById.mockResolvedValue(customRole);
 
-      await service.deleteRole('role-456');
+      await service.delete('role-456');
 
       expect(mockRolePermissionRepository.deleteByRoleId).toHaveBeenCalledWith('role-456');
       expect(mockRoleRepository.delete).toHaveBeenCalledWith('role-456');

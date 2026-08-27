@@ -40,14 +40,14 @@ export class RoleController {
     @Query('type') type?: string,
     @Query('status') status?: string,
   ): Promise<RoleResponseDto[]> {
-    return this.roleApplicationService.listRoles({ type, status });
+    return this.roleApplicationService.list({ type, status });
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get role details and permission capabilities by ID' })
   @ApiResponse({ status: 200, type: RoleResponseDto })
   async getRoleById(@Param('id') id: string): Promise<RoleResponseDto> {
-    return this.roleApplicationService.getRoleById(id);
+    return this.roleApplicationService.getById(id);
   }
 
   @Post()
@@ -57,7 +57,7 @@ export class RoleController {
   })
   @ApiResponse({ status: 201, type: RoleResponseDto })
   async createCustomRole(@Body() dto: CreateCustomRoleDto): Promise<RoleResponseDto> {
-    return this.roleApplicationService.createCustomRole(dto);
+    return this.roleApplicationService.createCustom(dto);
   }
 
   @Post(':id/copy')
@@ -65,7 +65,7 @@ export class RoleController {
   @ApiOperation({ summary: 'Clone an existing System or Custom role with protection reset' })
   @ApiResponse({ status: 201, type: RoleResponseDto })
   async copyRole(@Param('id') id: string, @Body() dto: CopyRoleDto): Promise<RoleResponseDto> {
-    return this.roleApplicationService.copyRole(id, dto);
+    return this.roleApplicationService.copy(id, dto);
   }
 
   @Get(':id/impact')
@@ -90,7 +90,7 @@ export class RoleController {
     affectedUserCount?: number;
     message?: string;
   }> {
-    return this.roleApplicationService.updateCustomRole(id, dto);
+    return this.roleApplicationService.updateCustom(id, dto);
   }
 
   @Post(':id/deactivate')
@@ -108,7 +108,7 @@ export class RoleController {
     affectedUserCount?: number;
     message?: string;
   }> {
-    return this.roleApplicationService.deactivateRole(id, dto);
+    return this.roleApplicationService.deactivate(id, dto);
   }
 
   @Post(':id/reactivate')
@@ -116,14 +116,14 @@ export class RoleController {
   @ApiOperation({ summary: 'Reactivate a deactivated custom role' })
   @ApiResponse({ status: 200, type: RoleResponseDto })
   async reactivateRole(@Param('id') id: string): Promise<RoleResponseDto> {
-    return this.roleApplicationService.reactivateRole(id);
+    return this.roleApplicationService.reactivate(id);
   }
 
   @Patch(':id/rename')
   @ApiOperation({ summary: 'Rename tenant-facing display label for a role' })
   @ApiResponse({ status: 200, type: RoleResponseDto })
   async renameRole(@Param('id') id: string, @Body() dto: RenameRoleDto): Promise<RoleResponseDto> {
-    return this.roleApplicationService.renameRole(id, dto);
+    return this.roleApplicationService.rename(id, dto);
   }
 
   @Patch(':id/status')
@@ -133,14 +133,14 @@ export class RoleController {
     @Param('id') id: string,
     @Body('status') status: RoleStatus,
   ): Promise<RoleResponseDto> {
-    return this.roleApplicationService.updateRoleStatus(id, status);
+    return this.roleApplicationService.updateStatus(id, status);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete custom role (system roles are blocked)' })
   @ApiResponse({ status: 200, description: 'Role deleted successfully' })
   async deleteRole(@Param('id') id: string): Promise<{ success: boolean }> {
-    await this.roleApplicationService.deleteRole(id);
+    await this.roleApplicationService.delete(id);
     return { success: true };
   }
 }

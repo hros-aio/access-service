@@ -32,4 +32,18 @@ export class Role extends BaseEntity {
 
   @OneToMany(() => RolePermission, (rolePermission) => rolePermission.role, { cascade: true })
   permissions?: RolePermission[];
+
+  static fromRequest(ctx: { tenantCode?: string; userId?: string }, dto: Partial<Role>): Role {
+    const role = new Role();
+    role.tenantCode = ctx.tenantCode ?? 'UNKNOWN';
+    role.name = dto.name ?? '';
+    role.description = dto.description;
+    role.type = dto.type ?? RoleType.CUSTOM;
+    role.status = dto.status ?? RoleStatus.ACTIVE;
+    role.systemRoleKey = dto.systemRoleKey;
+    role.version = 1;
+    role.createdBy = ctx.userId;
+    role.updatedBy = ctx.userId;
+    return role;
+  }
 }
