@@ -17,4 +17,9 @@ export enum EventType {
   ROLE_RENAMED = 'role.renamed',
   ROLE_PERMISSIONS_UPDATED = 'role.permissions-updated',
   ROLE_PROTECTED_CAPABILITY_VIOLATION = 'role.protected-capability-violation',
+  USER_GROUP_CREATED = 'user_group.created',
+  USER_GROUP_UPDATED = 'user_group.updated',
+  USER_GROUP_DEACTIVATED = 'user_group.deactivated',
+  USER_GROUP_REACTIVATED = 'user_group.reactivated',
+  AUTHORIZATION_USER_GROUP_UPDATED = 'authorization.user-group-updated',
 }

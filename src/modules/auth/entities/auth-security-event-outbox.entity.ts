@@ -4,10 +4,30 @@ import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { EventType, TableName } from '../../../enums';
 import { Role } from '../../roles/entities/role.entity';
 import { User } from '../../user/entities/user.entity';
+import { UserGroup } from '../../user-groups/entities/user-group.entity';
 
 export interface OutboxContext {
   tenantCode: string;
   userId?: string;
+}
+
+export interface UserGroupCreatedEventData {
+  userGroup: UserGroup;
+  roleIds: string[];
+}
+
+export interface UserGroupUpdatedEventData {
+  userGroup: UserGroup;
+  addedRoleIds?: string[];
+  removedRoleIds?: string[];
+}
+
+export interface UserGroupDeactivatedEventData {
+  userGroup: UserGroup;
+}
+
+export interface UserGroupReactivatedEventData {
+  userGroup: UserGroup;
 }
 
 export interface RoleCreatedEventData {
@@ -209,6 +229,118 @@ export class AuthSecurityEventOutbox extends BaseEntity {
       systemRoleKey: data.role.systemRoleKey,
       omittedProtectedCapabilities: data.omittedProtectedCapabilities,
       actorUserId: ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromUserGroupCreated(
+    ctx: OutboxContext,
+    data: UserGroupCreatedEventData,
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.USER_GROUP_CREATED;
+    outbox.sanitizedPayload = {
+      userGroupId: data.userGroup.id,
+      tenantCode: ctx.tenantCode,
+      name: data.userGroup.name,
+      scopeType: data.userGroup.scopeType,
+      scopeRefId: data.userGroup.scopeRefId,
+      status: data.userGroup.status,
+      version: data.userGroup.version,
+      roleIds: data.roleIds,
+      ruleAttributeKeys: data.userGroup.ruleAttributeKeys,
+      actorUserId: ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromUserGroupUpdated(
+    ctx: OutboxContext,
+    data: UserGroupUpdatedEventData,
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.USER_GROUP_UPDATED;
+    outbox.sanitizedPayload = {
+      userGroupId: data.userGroup.id,
+      tenantCode: ctx.tenantCode,
+      name: data.userGroup.name,
+      scopeType: data.userGroup.scopeType,
+      scopeRefId: data.userGroup.scopeRefId,
+      status: data.userGroup.status,
+      version: data.userGroup.version,
+      addedRoleIds: data.addedRoleIds ?? [],
+      removedRoleIds: data.removedRoleIds ?? [],
+      ruleAttributeKeys: data.userGroup.ruleAttributeKeys,
+      actorUserId: ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromUserGroupDeactivated(
+    ctx: OutboxContext,
+    data: UserGroupDeactivatedEventData,
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.USER_GROUP_DEACTIVATED;
+    outbox.sanitizedPayload = {
+      userGroupId: data.userGroup.id,
+      tenantCode: ctx.tenantCode,
+      name: data.userGroup.name,
+      version: data.userGroup.version,
+      status: data.userGroup.status,
+      actorUserId: ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromUserGroupReactivated(
+    ctx: OutboxContext,
+    data: UserGroupReactivatedEventData,
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.USER_GROUP_REACTIVATED;
+    outbox.sanitizedPayload = {
+      userGroupId: data.userGroup.id,
+      tenantCode: ctx.tenantCode,
+      name: data.userGroup.name,
+      version: data.userGroup.version,
+      status: data.userGroup.status,
+      actorUserId: ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromAuthorizationUserGroupUpdated(
+    ctx: OutboxContext,
+    data: { userGroup: UserGroup },
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.AUTHORIZATION_USER_GROUP_UPDATED;
+    outbox.sanitizedPayload = {
+      tenantCode: ctx.tenantCode,
+      userGroupId: data.userGroup.id,
+      version: data.userGroup.version,
+      ruleAttributeKeys: data.userGroup.ruleAttributeKeys,
       timestamp: new Date().toISOString(),
     };
     outbox.publishStatus = 'pending';
