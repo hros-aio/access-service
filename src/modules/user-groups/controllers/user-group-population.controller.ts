@@ -1,0 +1,66 @@
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { RequestContextService } from '@new-hros/libs-core';
+
+import {
+  CriteriaImpactResponseDto,
+  DynamicMatchingRuleDto,
+  MatchedMemberDto,
+  PreviewMatchingResponseDto,
+} from '../dto';
+import { UserGroupPopulationQueryService } from '../services/user-group-population-query.service';
+
+@ApiTags('Admin User Groups Population')
+@ApiBearerAuth()
+@Controller('admin/user-groups')
+export class UserGroupPopulationController {
+  constructor(private readonly populationService: UserGroupPopulationQueryService) {}
+
+  @Get(':id/members')
+  @ApiOperation({ summary: 'Get materialized members belonging to a user group' })
+  @ApiResponse({ status: 200, description: 'Paginated list of group members' })
+  async getMembers(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ): Promise<{ items: MatchedMemberDto[]; total: number; page: number; limit: number }> {
+    const tenantCode = RequestContextService.getTenantCode()!;
+    return this.populationService.getMatchingPopulation(
+      tenantCode,
+      id,
+      page ? +page : 1,
+      limit ? +limit : 20,
+    );
+  }
+
+  @Post('preview-matching')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Preview employee matching population for draft criteria' })
+  @ApiResponse({ status: 200, type: PreviewMatchingResponseDto })
+  async previewMatching(@Body() dto: DynamicMatchingRuleDto): Promise<PreviewMatchingResponseDto> {
+    const tenantCode = RequestContextService.getTenantCode()!;
+    return this.populationService.previewCriteriaPopulation(tenantCode, dto);
+  }
+
+  @Post(':id/criteria-impact')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Estimate member diff impact of a proposed matching rule change' })
+  @ApiResponse({ status: 200, type: CriteriaImpactResponseDto })
+  async estimateImpact(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: DynamicMatchingRuleDto,
+  ): Promise<CriteriaImpactResponseDto> {
+    const tenantCode = RequestContextService.getTenantCode()!;
+    return this.populationService.estimateCriteriaDiff(tenantCode, id, dto);
+  }
+}

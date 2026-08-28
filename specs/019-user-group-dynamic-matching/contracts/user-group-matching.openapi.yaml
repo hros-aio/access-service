@@ -1,0 +1,168 @@
+openapi: 3.0.3
+info:
+  title: User Group Dynamic Matching & Population API
+  version: 1.0.0
+  description: Endpoints for querying matching populations, previewing criteria evaluations, and estimating impact diffs.
+paths:
+  /api/v1/user-groups/{id}/members:
+    get:
+      summary: Get Materialized Members of User Group
+      operationId: getMatchingPopulation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of matched members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MatchedMember'
+
+  /api/v1/user-groups/preview-matching:
+    post:
+      summary: Preview Matching Employee Population for Draft Criteria
+      operationId: previewCriteriaPopulation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchingRuleDto'
+      responses:
+        '200':
+          description: Preview match results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  matchedCount:
+                    type: integer
+                  sampleEmployees:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MatchedMember'
+
+  /api/v1/user-groups/{id}/criteria-impact:
+    post:
+      summary: Estimate Impact Diff of Proposed Criteria Update
+      operationId: estimateCriteriaDiff
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchingRuleDto'
+      responses:
+        '200':
+          description: Calculated population diff
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  currentCount:
+                    type: integer
+                  proposedCount:
+                    type: integer
+                  gainingCount:
+                    type: integer
+                  losingCount:
+                    type: integer
+
+components:
+  schemas:
+    MatchingRuleDto:
+      type: object
+      required:
+        - clauses
+      properties:
+        combinator:
+          type: string
+          enum: [all]
+          default: all
+        clauses:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleClauseDto'
+
+    RuleClauseDto:
+      type: object
+      required:
+        - operator
+      properties:
+        field:
+          type: string
+          enum: [employmentStatus, companyId, locationId, departmentId, gradeId, jobTitleId, reporteesCount, hasReportees]
+        attribute:
+          type: string
+          enum: [employmentStatus, companyId, locationId, departmentId, gradeId, jobTitleId, reporteesCount, hasReportees]
+        operator:
+          type: string
+          enum: [eq, neq, in, not_in, gt, gte, lt, lte, exists, EQUALS, NOT_EQUALS, IN, NOT_IN, GREATER_THAN, LESS_THAN, IS_TRUE, IS_FALSE]
+        value:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+        values:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: number
+
+    MatchedMember:
+      type: object
+      properties:
+        employeeId:
+          type: string
+          format: uuid
+        employeeCode:
+          type: string
+        departmentId:
+          type: string
+          format: uuid
+        locationId:
+          type: string
+          format: uuid
+        employmentStatus:
+          type: string
+        reporteesCount:
+          type: integer
+        matchedAt:
+          type: string
+          format: date-time

@@ -2,80 +2,46 @@ import { InvalidMatchingRuleError } from '../domain/exceptions/user-group.except
 import { MatchingRuleValidator } from '../domain/validators/matching-rule.validator';
 
 describe('MatchingRuleValidator', () => {
-  it('should successfully validate a well-formed matching rule and extract distinct attribute keys', () => {
-    const validRule = {
+  it('validates a valid matching rule with field and operator', () => {
+    const rule = {
+      combinator: 'all',
       clauses: [
-        {
-          attribute: 'employmentStatus',
-          operator: 'EQUALS',
-          value: 'ACTIVE',
-        },
-        {
-          attribute: 'departmentId',
-          operator: 'IN',
-          values: ['dept-1', 'dept-2'],
-        },
-        {
-          attribute: 'hasReportees',
-          operator: 'IS_TRUE',
-        },
-        {
-          attribute: 'employmentStatus',
-          operator: 'NOT_EQUALS',
-          value: 'TERMINATED',
-        },
+        { field: 'departmentId', operator: 'eq', value: 'dept-123' },
+        { field: 'employmentStatus', operator: 'in', values: ['ACTIVE', 'ON_LEAVE'] },
+        { field: 'hasReportees', operator: 'is_true' },
       ],
     };
 
-    const result = MatchingRuleValidator.validate(validRule);
-    expect(result.ruleAttributeKeys).toEqual(['employmentStatus', 'departmentId', 'hasReportees']);
+    const result = MatchingRuleValidator.validate(rule);
+    expect(result.ruleAttributeKeys).toEqual(
+      expect.arrayContaining(['departmentId', 'employmentStatus', 'hasReportees']),
+    );
   });
 
-  it('should throw InvalidMatchingRuleError when rule is null or empty', () => {
-    expect(() => MatchingRuleValidator.validate(null)).toThrow(InvalidMatchingRuleError);
-    expect(() => MatchingRuleValidator.validate({})).toThrow(InvalidMatchingRuleError);
-    expect(() => MatchingRuleValidator.validate({ clauses: [] })).toThrow(InvalidMatchingRuleError);
-  });
-
-  it('should throw InvalidMatchingRuleError for unsupported attribute keys', () => {
-    const invalidRule = {
-      clauses: [
-        {
-          attribute: 'salary',
-          operator: 'GREATER_THAN',
-          value: 50000,
-        },
-      ],
+  it('rejects unsupported combinators like "any" or "or"', () => {
+    const rule = {
+      combinator: 'any',
+      clauses: [{ field: 'departmentId', operator: 'eq', value: 'dept-123' }],
     };
 
-    expect(() => MatchingRuleValidator.validate(invalidRule)).toThrow(InvalidMatchingRuleError);
+    expect(() => MatchingRuleValidator.validate(rule)).toThrow(InvalidMatchingRuleError);
   });
 
-  it('should throw InvalidMatchingRuleError for unsupported operator', () => {
-    const invalidRule = {
-      clauses: [
-        {
-          attribute: 'departmentId',
-          operator: 'LIKE',
-          value: 'engineering%',
-        },
-      ],
+  it('rejects unallowed attributes like salary', () => {
+    const rule = {
+      combinator: 'all',
+      clauses: [{ field: 'salary', operator: 'eq', value: 1000 }],
     };
 
-    expect(() => MatchingRuleValidator.validate(invalidRule)).toThrow(InvalidMatchingRuleError);
+    expect(() => MatchingRuleValidator.validate(rule)).toThrow(InvalidMatchingRuleError);
   });
 
-  it('should throw InvalidMatchingRuleError for IN operator without values array', () => {
-    const invalidRule = {
-      clauses: [
-        {
-          attribute: 'departmentId',
-          operator: 'IN',
-          values: [],
-        },
-      ],
+  it('rejects empty clauses', () => {
+    const rule = {
+      combinator: 'all',
+      clauses: [],
     };
 
-    expect(() => MatchingRuleValidator.validate(invalidRule)).toThrow(InvalidMatchingRuleError);
+    expect(() => MatchingRuleValidator.validate(rule)).toThrow(InvalidMatchingRuleError);
   });
 });

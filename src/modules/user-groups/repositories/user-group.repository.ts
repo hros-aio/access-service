@@ -32,6 +32,31 @@ export class UserGroupRepository extends BaseRepository<UserGroup> {
     });
   }
 
+  async findActiveGroups(tenantCode: string): Promise<UserGroup[]> {
+    return this.repository.find({
+      where: { tenantCode, status: UserGroupStatus.ACTIVE },
+      relations: ['groupRoles', 'groupRoles.role'],
+    });
+  }
+
+  async findByAttributeKeys(tenantCode: string, attributeKeys: string[]): Promise<UserGroup[]> {
+    if (attributeKeys.length === 0) return [];
+    return this.repository
+      .createQueryBuilder('ug')
+      .where('ug.tenant_code = :tenantCode', { tenantCode })
+      .andWhere('ug.status = :status', { status: UserGroupStatus.ACTIVE })
+      .andWhere('ug.rule_attribute_keys && :attributeKeys', { attributeKeys })
+      .getMany();
+  }
+
+  async updateProjectionVersion(
+    tenantCode: string,
+    id: string,
+    projectionVersion: number,
+  ): Promise<void> {
+    await this.repository.update({ tenantCode, id }, { projectionVersion });
+  }
+
   async listByTenant(
     tenantCode: string,
     filters?: { status?: UserGroupStatus; search?: string; page?: number; limit?: number },

@@ -16,6 +16,10 @@ export class UserGroupRoleRepository extends BaseRepository<UserGroupRole> {
     });
   }
 
+  async findRolesByGroupId(tenantCode: string, userGroupId: string): Promise<UserGroupRole[]> {
+    return this.findByGroup(tenantCode, userGroupId);
+  }
+
   async deleteByGroup(tenantCode: string, userGroupId: string): Promise<void> {
     await this.repository.delete({ tenantCode, userGroupId });
   }

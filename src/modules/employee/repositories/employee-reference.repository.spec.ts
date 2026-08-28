@@ -1,90 +1,55 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { EmployeeReferenceRepository } from './employee-reference.repository';
-import { EmployeeReference } from '../entities/employee-reference.entity';
 
 describe('EmployeeReferenceRepository', () => {
   let repository: EmployeeReferenceRepository;
-  let mockEntityManager: any;
-  let mockTypeormRepository: any;
+  let mockManager: { getRepository: jest.Mock; query: jest.Mock };
+  let mockTransactionService: jest.Mocked<TransactionService>;
+  let mockTypeormRepo: { save: jest.Mock; findOne: jest.Mock; count: jest.Mock };
 
-  beforeEach(async () => {
-    mockTypeormRepository = {
+  beforeEach(() => {
+    mockTypeormRepo = {
       save: jest.fn(),
       findOne: jest.fn(),
+      count: jest.fn(),
     };
-
-    mockEntityManager = {
-      getRepository: jest.fn().mockReturnValue(mockTypeormRepository),
+    mockManager = {
+      getRepository: jest.fn().mockReturnValue(mockTypeormRepo),
+      query: jest.fn(),
     };
-
-    const mockTransactionService = {
-      getManager: jest.fn().mockReturnValue(mockEntityManager),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        EmployeeReferenceRepository,
-        { provide: TransactionService, useValue: mockTransactionService },
-      ],
-    }).compile();
-
-    repository = module.get<EmployeeReferenceRepository>(EmployeeReferenceRepository);
+    mockTransactionService = {
+      getManager: jest.fn().mockReturnValue(mockManager),
+    } as unknown as jest.Mocked<TransactionService>;
+    repository = new EmployeeReferenceRepository(mockTransactionService);
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
+  it('upsertProjection executes raw SQL and returns true on conflict update', async () => {
+    mockManager.query.mockResolvedValueOnce([{ employee_id: 'emp-1' }]);
 
-  it('should be defined', () => {
-    expect(repository).toBeDefined();
-  });
-
-  it('should find employee reference by ID', async () => {
-    const emp = new EmployeeReference();
-    emp.tenantCode = 'TENANT_A';
-    emp.employeeId = 'emp-uuid';
-
-    mockTypeormRepository.findOne.mockResolvedValue(emp);
-
-    const result = await repository.findById('emp-uuid');
-    expect(result).toEqual(emp);
-    expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
-      where: { employeeId: 'emp-uuid' },
+    const result = await repository.upsertProjection({
+      employeeId: 'emp-1',
+      tenantCode: 'DEFAULT',
+      employeeCode: 'EMP001',
+      departmentId: 'dept-1',
+      sourceVersion: 5,
     });
-  });
 
-  it('should save employee reference', async () => {
-    const emp = new EmployeeReference();
-    mockTypeormRepository.save.mockResolvedValue(emp);
-
-    const result = await repository.save(emp);
-    expect(result).toEqual(emp);
-    expect(mockTypeormRepository.save).toHaveBeenCalledWith(emp);
-  });
-
-  it('should find employee reference by code', async () => {
-    const emp = new EmployeeReference();
-    emp.tenantCode = 'TENANT_A';
-    emp.employeeCode = 'EMP001';
-    mockTypeormRepository.findOne.mockResolvedValue(emp);
-
-    const result = await repository.findByCode('TENANT_A', 'EMP001');
-    expect(result).toEqual(emp);
-    expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
-      where: { tenantCode: 'TENANT_A', employeeCode: 'EMP001' },
-    });
-  });
-
-  it('should check if employee reference exists', async () => {
-    mockTypeormRepository.count = jest.fn().mockResolvedValue(1);
-
-    const result = await repository.exists('emp-uuid');
     expect(result).toBe(true);
-    expect(mockTypeormRepository.count).toHaveBeenCalledWith({
-      where: { employeeId: 'emp-uuid' },
-    });
+    expect(mockManager.query).toHaveBeenCalledWith(
+      expect.stringContaining('ON CONFLICT (tenant_code, employee_id) DO UPDATE'),
+      expect.arrayContaining(['emp-1', 'DEFAULT', 'EMP001', 5]),
+    );
+  });
+
+  it('updateReporteesCount updates reportees count with GREATEST(0, ...)', async () => {
+    mockManager.query.mockResolvedValueOnce([]);
+
+    await repository.updateReporteesCount('DEFAULT', 'mgr-1', 1);
+
+    expect(mockManager.query).toHaveBeenCalledWith(
+      expect.stringContaining('reportees_count = GREATEST(0, reportees_count + $1)'),
+      [1, 'DEFAULT', 'mgr-1'],
+    );
   });
 });
