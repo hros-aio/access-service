@@ -1,1 +1,3 @@
-{"feature_directory": "specs/022-user-group-scope-configuration"}
+{
+  "feature_directory": "specs/023-multi-group-cumulative-access-evaluation"
+}

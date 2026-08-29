@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: Endpoints for querying matching populations, previewing criteria evaluations, and estimating impact diffs.
 paths:
-  /api/v1/user-groups/{id}/members:
+  /user-groups/{id}/members:
     get:
       summary: Get Materialized Members of User Group
       operationId: getMatchingPopulation
@@ -44,7 +44,7 @@ paths:
                     items:
                       $ref: '#/components/schemas/MatchedMember'
 
-  /api/v1/user-groups/preview-matching:
+  /user-groups/preview-matching:
     post:
       summary: Preview Matching Employee Population for Draft Criteria
       operationId: previewCriteriaPopulation
@@ -69,7 +69,7 @@ paths:
                     items:
                       $ref: '#/components/schemas/MatchedMember'
 
-  /api/v1/user-groups/{id}/criteria-impact:
+  /user-groups/{id}/criteria-impact:
     post:
       summary: Estimate Impact Diff of Proposed Criteria Update
       operationId: estimateCriteriaDiff
@@ -127,10 +127,39 @@ components:
       properties:
         attribute:
           type: string
-          enum: [employmentStatus, companyId, locationId, departmentId, gradeId, jobTitleId, reporteesCount, hasReportees]
+          enum:
+            [
+              employmentStatus,
+              companyId,
+              locationId,
+              departmentId,
+              gradeId,
+              jobTitleId,
+              reporteesCount,
+              hasReportees,
+            ]
         operator:
           type: string
-          enum: [eq, neq, in, not_in, gt, gte, lt, lte, exists, EQUALS, NOT_EQUALS, IN, NOT_IN, GREATER_THAN, LESS_THAN, IS_TRUE, IS_FALSE]
+          enum:
+            [
+              eq,
+              neq,
+              in,
+              not_in,
+              gt,
+              gte,
+              lt,
+              lte,
+              exists,
+              EQUALS,
+              NOT_EQUALS,
+              IN,
+              NOT_IN,
+              GREATER_THAN,
+              LESS_THAN,
+              IS_TRUE,
+              IS_FALSE,
+            ]
         value:
           oneOf:
             - type: string

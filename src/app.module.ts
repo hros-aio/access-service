@@ -4,6 +4,7 @@ import { ConfigurationModule, ConfigurationService, CoreModule } from '@new-hros
 import { SqlModule } from '@new-hros/libs-sql';
 
 import { AuthModule } from './modules/auth/auth.module';
+import { AuthorizationModule } from './modules/authorization/authorization.module';
 import { EmployeeModule } from './modules/employee/employee.module';
 import { HealthModule } from './modules/health/health.module';
 import { InviteModule } from './modules/invite/invite.module';
@@ -63,6 +64,7 @@ const config = new ConfigurationService({});
     PermissionsModule,
     RoleModule,
     UserGroupModule,
+    AuthorizationModule,
     ProvisioningModule,
   ],
 })
