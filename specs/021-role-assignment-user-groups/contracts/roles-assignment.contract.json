@@ -1,0 +1,162 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "User Group Role Assignment API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/user-groups/{id}/roles": {
+      "get": {
+        "summary": "List roles assigned to a user group",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of assigned roles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignedRoleItemDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "User group not found" }
+        }
+      },
+      "put": {
+        "summary": "Update role assignments on a user group",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserGroupRolesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated assigned roles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignedRoleItemDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Validation error or invalid role IDs" },
+          "404": { "description": "User group or role not found" },
+          "409": { "description": "Optimistic concurrency conflict on version" },
+          "422": { "description": "High impact confirmation required" }
+        }
+      }
+    },
+    "/user-groups/{id}/roles/impact-estimate": {
+      "post": {
+        "summary": "Estimate blast radius / impact for proposed role assignments",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstimateRoleAssignmentImpactDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Impact estimate result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAssignmentImpactEstimateDto"
+                }
+              }
+            }
+          },
+          "404": { "description": "User group not found" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AssignedRoleItemDto": {
+        "type": "object",
+        "required": ["id", "name", "type", "capabilityCount", "createdAt"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["SYSTEM", "CUSTOM"] },
+          "description": { "type": "string" },
+          "capabilityCount": { "type": "integer" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "UpdateUserGroupRolesDto": {
+        "type": "object",
+        "required": ["roleIds", "expectedVersion"],
+        "properties": {
+          "roleIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
+          "expectedVersion": { "type": "integer" },
+          "confirmed": { "type": "boolean", "default": false }
+        }
+      },
+      "EstimateRoleAssignmentImpactDto": {
+        "type": "object",
+        "required": ["roleIds"],
+        "properties": {
+          "roleIds": {
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          }
+        }
+      },
+      "RoleAssignmentImpactEstimateDto": {
+        "type": "object",
+        "required": ["affectedUserCount", "zeroRoleUserCount", "requiresConfirmation", "threshold"],
+        "properties": {
+          "affectedUserCount": { "type": "integer" },
+          "zeroRoleUserCount": { "type": "integer" },
+          "requiresConfirmation": { "type": "boolean" },
+          "threshold": { "type": "integer" }
+        }
+      }
+    }
+  }
+}

@@ -21,5 +21,7 @@ export enum EventType {
   USER_GROUP_UPDATED = 'user_group.updated',
   USER_GROUP_DEACTIVATED = 'user_group.deactivated',
   USER_GROUP_REACTIVATED = 'user_group.reactivated',
+  USER_GROUP_ROLES_ASSIGNED = 'user_group.roles_assigned',
+  USER_GROUP_ROLE_UNASSIGNED = 'user_group.role_unassigned',
   AUTHORIZATION_USER_GROUP_UPDATED = 'authorization.user-group-updated',
 }

@@ -22,6 +22,20 @@ export interface UserGroupUpdatedEventData {
   removedRoleIds?: string[];
 }
 
+export interface UserGroupRolesAssignedEventData {
+  userGroup: UserGroup;
+  assignedRoleIds: string[];
+  addedRoleIds: string[];
+  previousRoleIds: string[];
+}
+
+export interface UserGroupRoleUnassignedEventData {
+  userGroup: UserGroup;
+  assignedRoleIds: string[];
+  removedRoleIds: string[];
+  previousRoleIds: string[];
+}
+
 export interface UserGroupDeactivatedEventData {
   userGroup: UserGroup;
 }
@@ -279,6 +293,52 @@ export class AuthSecurityEventOutbox extends BaseEntity {
       addedRoleIds: data.addedRoleIds ?? [],
       removedRoleIds: data.removedRoleIds ?? [],
       ruleAttributeKeys: data.userGroup.ruleAttributeKeys,
+      actorUserId: ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromUserGroupRolesAssigned(
+    ctx: OutboxContext,
+    data: UserGroupRolesAssignedEventData,
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.USER_GROUP_ROLES_ASSIGNED;
+    outbox.sanitizedPayload = {
+      userGroupId: data.userGroup.id,
+      tenantCode: ctx.tenantCode,
+      name: data.userGroup.name,
+      version: data.userGroup.version,
+      assignedRoleIds: data.assignedRoleIds,
+      addedRoleIds: data.addedRoleIds,
+      previousRoleIds: data.previousRoleIds,
+      actorUserId: ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromUserGroupRoleUnassigned(
+    ctx: OutboxContext,
+    data: UserGroupRoleUnassignedEventData,
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.USER_GROUP_ROLE_UNASSIGNED;
+    outbox.sanitizedPayload = {
+      userGroupId: data.userGroup.id,
+      tenantCode: ctx.tenantCode,
+      name: data.userGroup.name,
+      version: data.userGroup.version,
+      assignedRoleIds: data.assignedRoleIds,
+      removedRoleIds: data.removedRoleIds,
+      previousRoleIds: data.previousRoleIds,
       actorUserId: ctx.userId ?? 'SYSTEM',
       timestamp: new Date().toISOString(),
     };

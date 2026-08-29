@@ -37,3 +37,26 @@ export class InvalidStateTransitionError extends ConflictException {
     super(message);
   }
 }
+
+export class HighImpactConfirmationRequiredError extends BadRequestException {
+  constructor(
+    public readonly details: {
+      affectedUserCount: number;
+      zeroRoleUserCount: number;
+      threshold: number;
+    },
+  ) {
+    super({
+      statusCode: 422,
+      error: 'Unprocessable Entity',
+      message: `High-impact role assignment change affects ${details.affectedUserCount} users (threshold: ${details.threshold}). Explicit confirmation is required.`,
+      details,
+    });
+  }
+}
+
+export class InvalidRoleAssignmentError extends BadRequestException {
+  constructor(message: string) {
+    super(message);
+  }
+}
