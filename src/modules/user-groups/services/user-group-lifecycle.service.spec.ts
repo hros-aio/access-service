@@ -52,7 +52,7 @@ describe('UserGroupLifecycleService', () => {
     userGroupRoleRepository = {
       findByGroup: jest.fn(),
       deleteByGroup: jest.fn(),
-      deleteByFilter: jest.fn().mockResolvedValue(undefined),
+      batchDelete: jest.fn().mockResolvedValue(undefined),
       bulkSave: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<UserGroupRoleRepository>;
 
