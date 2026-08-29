@@ -4,6 +4,7 @@ import {
   InvalidStateTransitionError,
 } from '../exceptions/user-group.exceptions';
 import { MatchingRuleValidator } from '../validators/matching-rule.validator';
+import { UserGroupScopeValidator } from '../validators/user-group-scope.validator';
 import { MatchingRule } from '../value-objects/matching-rule.vo';
 
 export interface UserGroupProps {
@@ -162,6 +163,36 @@ export class UserGroupAggregate {
     this._version += 1;
 
     return { addedRoleIds, removedRoleIds };
+  }
+
+  public updateScope(
+    props: {
+      scopeType: ScopeType | string;
+      scopeRefId?: string | null;
+    },
+    updatedBy?: string,
+  ): {
+    previousScope: { scopeType: ScopeType; scopeRefId?: string | null };
+    newScope: { scopeType: ScopeType; scopeRefId?: string | null };
+  } {
+    const validated = UserGroupScopeValidator.validate(props.scopeType, props.scopeRefId);
+
+    const previousScope = {
+      scopeType: this._scopeType,
+      scopeRefId: this._scopeRefId ?? null,
+    };
+
+    const newScope = {
+      scopeType: validated.scopeType,
+      scopeRefId: validated.scopeRefId,
+    };
+
+    this._scopeType = validated.scopeType;
+    this._scopeRefId = validated.scopeRefId ?? undefined;
+    this._updatedBy = updatedBy;
+    this._version += 1;
+
+    return { previousScope, newScope };
   }
 
   public deactivate(updatedBy?: string): void {

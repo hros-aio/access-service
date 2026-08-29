@@ -9,3 +9,7 @@ export * from './criteria-impact.dto';
 export * from './assigned-role-item.dto';
 export * from './estimate-role-assignment-impact.dto';
 export * from './update-user-group-roles.dto';
+export * from './scope-impact-estimate.dto';
+export * from './estimate-scope-impact.dto';
+export * from './user-group-scope-details.dto';
+export * from './update-user-group-scope.dto';

@@ -17,7 +17,7 @@ import {
   RoleAssignmentImpactEstimateDto,
   UpdateUserGroupRolesDto,
 } from '../dto';
-import { RoleAssignmentImpactService } from '../services/role-assignment-impact.service';
+import { UserGroupImpactService } from '../services/user-group-impact.service';
 import { UserGroupRoleAssignmentService } from '../services/user-group-role-assignment.service';
 
 @ApiTags('Admin User Group Roles')
@@ -26,7 +26,7 @@ import { UserGroupRoleAssignmentService } from '../services/user-group-role-assi
 export class UserGroupRoleController {
   constructor(
     private readonly roleAssignmentService: UserGroupRoleAssignmentService,
-    private readonly impactService: RoleAssignmentImpactService,
+    private readonly impactService: UserGroupImpactService,
   ) {}
 
   @Get(':id/roles')
