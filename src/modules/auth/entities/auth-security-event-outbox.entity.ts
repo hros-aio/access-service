@@ -44,6 +44,18 @@ export interface UserGroupReactivatedEventData {
   userGroup: UserGroup;
 }
 
+export interface UserGroupScopeUpdatedEventData {
+  userGroup: UserGroup;
+  previousScope: {
+    scopeType: string;
+    scopeRefId?: string | null;
+  };
+  newScope: {
+    scopeType: string;
+    scopeRefId?: string | null;
+  };
+}
+
 export interface RoleCreatedEventData {
   role: Role;
   permissionCodes: string[];
@@ -381,6 +393,28 @@ export class AuthSecurityEventOutbox extends BaseEntity {
       name: data.userGroup.name,
       version: data.userGroup.version,
       status: data.userGroup.status,
+      actorUserId: ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromUserGroupScopeUpdated(
+    ctx: OutboxContext,
+    data: UserGroupScopeUpdatedEventData,
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.USER_GROUP_SCOPE_UPDATED;
+    outbox.sanitizedPayload = {
+      userGroupId: data.userGroup.id,
+      tenantCode: ctx.tenantCode,
+      name: data.userGroup.name,
+      previousScope: data.previousScope,
+      newScope: data.newScope,
+      version: data.userGroup.version,
       actorUserId: ctx.userId ?? 'SYSTEM',
       timestamp: new Date().toISOString(),
     };

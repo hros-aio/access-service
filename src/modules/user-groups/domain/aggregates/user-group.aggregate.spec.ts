@@ -69,4 +69,63 @@ describe('UserGroupAggregate (Role Assignment)', () => {
     expect(aggregate.assignedRoleIds).toEqual(['role-2', 'role-3', 'role-4']);
     expect(aggregate.version).toBe(2);
   });
+
+  describe('updateScope', () => {
+    it('should update scope to entity-anchored scope and bump version', () => {
+      const aggregate = UserGroupAggregate.create({
+        tenantCode: 'tenant-test',
+        name: 'Engineering Group',
+        scopeType: ScopeType.SELF,
+        matchingRule: baseMatchingRule,
+      });
+
+      const { previousScope, newScope } = aggregate.updateScope(
+        {
+          scopeType: ScopeType.DEPARTMENT,
+          scopeRefId: 'dept-eng-01',
+        },
+        'user-admin',
+      );
+
+      expect(previousScope).toEqual({
+        scopeType: ScopeType.SELF,
+        scopeRefId: null,
+      });
+      expect(newScope).toEqual({
+        scopeType: ScopeType.DEPARTMENT,
+        scopeRefId: 'dept-eng-01',
+      });
+      expect(aggregate.scopeType).toBe(ScopeType.DEPARTMENT);
+      expect(aggregate.scopeRefId).toBe('dept-eng-01');
+      expect(aggregate.version).toBe(2);
+      expect(aggregate.updatedBy).toBe('user-admin');
+      expect(aggregate.isPendingSync).toBe(true);
+    });
+
+    it('should normalize unanchored scope to null scopeRefId', () => {
+      const aggregate = UserGroupAggregate.create({
+        tenantCode: 'tenant-test',
+        name: 'Engineering Group',
+        scopeType: ScopeType.DEPARTMENT,
+        scopeRefId: 'dept-eng-01',
+        matchingRule: baseMatchingRule,
+      });
+
+      const { previousScope, newScope } = aggregate.updateScope({
+        scopeType: ScopeType.TENANT_WIDE,
+        scopeRefId: 'some-ignored-ref',
+      });
+
+      expect(previousScope).toEqual({
+        scopeType: ScopeType.DEPARTMENT,
+        scopeRefId: 'dept-eng-01',
+      });
+      expect(newScope).toEqual({
+        scopeType: ScopeType.TENANT_WIDE,
+        scopeRefId: null,
+      });
+      expect(aggregate.scopeType).toBe(ScopeType.TENANT_WIDE);
+      expect(aggregate.scopeRefId).toBeUndefined();
+    });
+  });
 });
