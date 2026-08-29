@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 import { Role } from '../entities/role.entity';
 import { RoleStatus, RoleType, SystemRoleKey } from '../interfaces/system-role-template.interface';
@@ -256,4 +264,19 @@ export class HighImpactConfirmationRequiredResponseDto {
 
   @ApiProperty({ example: 'This change affects 150 active users. Please confirm to proceed.' })
   readonly message: string;
+}
+
+export class FilterRoleDto {
+  @ApiPropertyOptional({ enum: RoleType, description: 'Filter by role type (SYSTEM or CUSTOM)' })
+  @IsOptional()
+  @IsEnum(RoleType)
+  readonly type?: RoleType;
+
+  @ApiPropertyOptional({
+    enum: RoleStatus,
+    description: 'Filter by role status (ACTIVE or INACTIVE)',
+  })
+  @IsOptional()
+  @IsEnum(RoleStatus)
+  readonly status?: RoleStatus;
 }

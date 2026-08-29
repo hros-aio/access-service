@@ -22,7 +22,7 @@ import { RoleRepository } from '../repositories/role.repository';
 describe('RoleApplicationService', () => {
   let service: RoleApplicationService;
   let mockRoleRepository: {
-    findAllByTenant: jest.Mock;
+    findByTenant: jest.Mock;
     findById: jest.Mock;
     findByName: jest.Mock;
     countAssignedUsers: jest.Mock;
@@ -52,7 +52,7 @@ describe('RoleApplicationService', () => {
 
   beforeEach(async () => {
     mockRoleRepository = {
-      findAllByTenant: jest.fn().mockResolvedValue([]),
+      findByTenant: jest.fn().mockResolvedValue([]),
       findById: jest.fn().mockResolvedValue(null),
       findByName: jest.fn().mockResolvedValue(null),
       countAssignedUsers: jest.fn().mockResolvedValue(0),
@@ -347,7 +347,7 @@ describe('RoleApplicationService', () => {
       role2.id = 'r2';
       role2.name = 'Assigned Role';
 
-      mockRoleRepository.findAllByTenant.mockResolvedValue([role1, role2]);
+      mockRoleRepository.findByTenant.mockResolvedValue([role1, role2]);
       mockRoleRepository.countAssignedUserGroups.mockResolvedValueOnce(0).mockResolvedValueOnce(2);
       mockRoleRepository.countActiveUserReach.mockResolvedValueOnce(0).mockResolvedValueOnce(35);
 

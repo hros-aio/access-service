@@ -33,8 +33,7 @@ export type AttributeKey =
   | 'hasReportees';
 
 export interface MatchingRuleClause {
-  attribute?: string;
-  field?: string;
+  attribute: string;
   operator: MatchingRuleOperator;
   value?: string | number | boolean;
   values?: Array<string | number>;

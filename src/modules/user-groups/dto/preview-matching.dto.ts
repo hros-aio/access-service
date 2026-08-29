@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+import { UserGroupMembership } from '../entities/user-group-membership.entity';
+
 export class MatchedMemberDto {
   @ApiProperty({ description: 'Employee ID' })
   employeeId: string;
@@ -21,6 +23,18 @@ export class MatchedMemberDto {
 
   @ApiProperty({ description: 'Matched timestamp' })
   matchedAt?: Date;
+
+  static mapFromUserGroup(membership: UserGroupMembership): MatchedMemberDto {
+    return {
+      employeeId: membership.employeeId,
+      employeeCode: membership.employee?.employeeCode || membership.employeeId,
+      departmentId: membership.employee?.departmentId || null,
+      locationId: membership.employee?.locationId || null,
+      employmentStatus: membership.employee?.employmentStatus || 'ACTIVE',
+      reporteesCount: membership.employee?.reporteesCount || 0,
+      matchedAt: membership.matchedAt,
+    };
+  }
 }
 
 export class PreviewMatchingResponseDto {

@@ -3,6 +3,7 @@ import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 import { DeepPartial, FindOneOptions, Repository } from 'typeorm';
 
+import { FilterRoleDto } from '../dto/role.dto';
 import { Role } from '../entities/role.entity';
 import { SystemRoleKey } from '../interfaces/system-role-template.interface';
 
@@ -26,7 +27,7 @@ export class RoleRepository {
   async findById(id: string, options?: FindOneOptions<Role>): Promise<Role | null> {
     const tenantCode = RequestContextService.getTenantCode();
     return this.repository.findOne({
-      where: { id, tenantCode: tenantCode ?? undefined },
+      where: { id, tenantCode },
       relations: ['permissions'],
       ...options,
     });
@@ -88,25 +89,17 @@ export class RoleRepository {
     return parseInt(result[0]?.count ?? '0', 10);
   }
 
-  async findAllByTenant(
-    tenantCode?: string,
-    filters?: { type?: string; status?: string },
-  ): Promise<Role[]> {
-    const tenant = tenantCode ?? RequestContextService.getTenantCode();
-    const query = this.repository
-      .createQueryBuilder('role')
-      .leftJoinAndSelect('role.permissions', 'permissions')
-      .where('role.tenantCode = :tenantCode', { tenantCode: tenant });
-
-    if (filters?.type) {
-      query.andWhere('role.type = :type', { type: filters.type });
-    }
-    if (filters?.status) {
-      query.andWhere('role.status = :status', { status: filters.status });
-    }
-
-    query.orderBy('role.createdAt', 'ASC');
-    return query.getMany();
+  async findByTenant(tenantCode: string, filters?: FilterRoleDto): Promise<Role[]> {
+    return this.repository.find({
+      where: {
+        tenantCode,
+        ...filters,
+      },
+      relations: ['permissions'],
+      order: {
+        createdAt: 'ASC',
+      },
+    });
   }
 
   async delete(id: string): Promise<void> {

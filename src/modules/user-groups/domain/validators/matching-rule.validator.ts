@@ -77,11 +77,11 @@ export class MatchingRuleValidator {
     }
 
     const c = clause as MatchingRuleClause;
-    const attribute = c.field || c.attribute;
+    const attribute = c.attribute;
 
     if (!attribute || typeof attribute !== 'string') {
       throw new InvalidMatchingRuleError(
-        `Clause at index ${index} is missing a valid 'field' or 'attribute' property`,
+        `Clause at index ${index} is missing a valid 'attribute' property`,
       );
     }
 

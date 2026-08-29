@@ -76,7 +76,7 @@ describe('AuthSecurityEventOutboxRepository', () => {
   });
 
   it('should throw an error in findByUserId when tenant code is missing', async () => {
-    jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue(null);
+    jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue(null as any);
     await expect(repository.findByUserId('user-uuid')).rejects.toThrow(
       'Tenant code is missing from active RequestContext',
     );

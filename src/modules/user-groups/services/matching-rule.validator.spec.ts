@@ -2,13 +2,13 @@ import { InvalidMatchingRuleError } from '../domain/exceptions/user-group.except
 import { MatchingRuleValidator } from '../domain/validators/matching-rule.validator';
 
 describe('MatchingRuleValidator', () => {
-  it('validates a valid matching rule with field and operator', () => {
+  it('validates a valid matching rule with attribute and operator', () => {
     const rule = {
       combinator: 'all',
       clauses: [
-        { field: 'departmentId', operator: 'eq', value: 'dept-123' },
-        { field: 'employmentStatus', operator: 'in', values: ['ACTIVE', 'ON_LEAVE'] },
-        { field: 'hasReportees', operator: 'is_true' },
+        { attribute: 'departmentId', operator: 'eq', value: 'dept-123' },
+        { attribute: 'employmentStatus', operator: 'in', values: ['ACTIVE', 'ON_LEAVE'] },
+        { attribute: 'hasReportees', operator: 'is_true' },
       ],
     };
 
@@ -21,7 +21,7 @@ describe('MatchingRuleValidator', () => {
   it('rejects unsupported combinators like "any" or "or"', () => {
     const rule = {
       combinator: 'any',
-      clauses: [{ field: 'departmentId', operator: 'eq', value: 'dept-123' }],
+      clauses: [{ attribute: 'departmentId', operator: 'eq', value: 'dept-123' }],
     };
 
     expect(() => MatchingRuleValidator.validate(rule)).toThrow(InvalidMatchingRuleError);
@@ -30,7 +30,7 @@ describe('MatchingRuleValidator', () => {
   it('rejects unallowed attributes like salary', () => {
     const rule = {
       combinator: 'all',
-      clauses: [{ field: 'salary', operator: 'eq', value: 1000 }],
+      clauses: [{ attribute: 'salary', operator: 'eq', value: 1000 }],
     };
 
     expect(() => MatchingRuleValidator.validate(rule)).toThrow(InvalidMatchingRuleError);

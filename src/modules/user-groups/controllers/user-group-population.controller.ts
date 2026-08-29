@@ -22,7 +22,7 @@ import { UserGroupPopulationQueryService } from '../services/user-group-populati
 
 @ApiTags('Admin User Groups Population')
 @ApiBearerAuth()
-@Controller('admin/user-groups')
+@Controller('user-groups')
 export class UserGroupPopulationController {
   constructor(private readonly populationService: UserGroupPopulationQueryService) {}
 

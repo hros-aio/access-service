@@ -14,9 +14,9 @@ describe('UserGroupMatching (Integration)', () => {
     const rawRule: MatchingRule = {
       combinator: 'all',
       clauses: [
-        { field: 'departmentId', operator: 'eq', value: 'dept-eng' },
-        { field: 'employmentStatus', operator: 'in', values: ['ACTIVE', 'ON_LEAVE'] },
-        { field: 'hasReportees', operator: 'is_true' },
+        { attribute: 'departmentId', operator: 'eq', value: 'dept-eng' },
+        { attribute: 'employmentStatus', operator: 'in', values: ['ACTIVE', 'ON_LEAVE'] },
+        { attribute: 'hasReportees', operator: 'is_true' },
       ],
     };
 

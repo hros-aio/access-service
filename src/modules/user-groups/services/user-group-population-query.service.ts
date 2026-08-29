@@ -39,16 +39,7 @@ export class UserGroupPopulationQueryService {
       limit,
     );
 
-    const items: MatchedMemberDto[] = members.map((m) => ({
-      employeeId: m.employeeId,
-      employeeCode: m.employee?.employeeCode || m.employeeId,
-      departmentId: m.employee?.departmentId || null,
-      locationId: m.employee?.locationId || null,
-      employmentStatus: m.employee?.employmentStatus || 'ACTIVE',
-      reporteesCount: m.employee?.reporteesCount || 0,
-      matchedAt: m.matchedAt,
-    }));
-
+    const items = members.map((m) => MatchedMemberDto.mapFromUserGroup(m));
     return { items, total, page, limit };
   }
 

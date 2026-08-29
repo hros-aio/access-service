@@ -23,7 +23,7 @@ describe('UserGroupPopulationController', () => {
 
     const ruleDto: DynamicMatchingRuleDto = {
       combinator: 'all',
-      clauses: [{ field: 'departmentId', operator: 'eq', value: 'dept-1' }],
+      clauses: [{ attribute: 'departmentId', operator: 'eq', value: 'dept-1' }],
     };
 
     const res = await controller.previewMatching(ruleDto);

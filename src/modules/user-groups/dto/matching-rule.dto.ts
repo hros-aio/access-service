@@ -5,15 +5,10 @@ import { IsArray, IsIn, IsNotEmpty, IsOptional, IsString, ValidateNested } from 
 import { MatchingRuleOperator } from '../domain/value-objects/matching-rule.vo';
 
 export class RuleClausePayloadDto {
-  @ApiPropertyOptional({ description: 'Attribute name (alias for field)' })
-  @IsOptional()
+  @ApiProperty({ description: 'Target employee attribute to evaluate' })
+  @IsNotEmpty()
   @IsString()
-  attribute?: string;
-
-  @ApiPropertyOptional({ description: 'Field name to evaluate against employee' })
-  @IsOptional()
-  @IsString()
-  field?: string;
+  attribute: string;
 
   @ApiProperty({ description: 'Comparison operator' })
   @IsNotEmpty()

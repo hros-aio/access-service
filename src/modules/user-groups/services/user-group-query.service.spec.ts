@@ -42,7 +42,7 @@ describe('UserGroupQueryService', () => {
 
     userGroupRepository.findByTenantAndId.mockResolvedValue(mockGroup);
 
-    const result = await service.getUserGroupById('group-1');
+    const result = await service.findById('group-1');
 
     expect(result.id).toEqual('group-1');
     expect(result.isPendingSync).toBe(true);
@@ -53,7 +53,7 @@ describe('UserGroupQueryService', () => {
   it('should throw UserGroupNotFoundError when group is not found', async () => {
     userGroupRepository.findByTenantAndId.mockResolvedValue(null);
 
-    await expect(service.getUserGroupById('non-existent')).rejects.toThrow(UserGroupNotFoundError);
+    await expect(service.findById('non-existent')).rejects.toThrow(UserGroupNotFoundError);
   });
 
   it('should list paginated user groups with search and status filters', async () => {
@@ -82,7 +82,7 @@ describe('UserGroupQueryService', () => {
 
     userGroupRepository.listByTenant.mockResolvedValue({ items: mockGroups, total: 1 });
 
-    const result = await service.listUserGroups({ page: 1, limit: 20, search: 'Engineering' });
+    const result = await service.list({ page: 1, limit: 20, search: 'Engineering' });
 
     expect(result.total).toBe(1);
     expect(result.items.length).toBe(1);
