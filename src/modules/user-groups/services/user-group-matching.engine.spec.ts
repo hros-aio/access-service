@@ -22,9 +22,9 @@ describe('UserGroupMatchingEngine', () => {
     const rule: MatchingRule = {
       combinator: 'all',
       clauses: [
-        { field: 'departmentId', operator: 'eq', value: 'dept-100' },
-        { field: 'employmentStatus', operator: 'eq', value: 'ACTIVE' },
-        { field: 'hasReportees', operator: 'is_true' },
+        { attribute: 'departmentId', operator: 'eq', value: 'dept-100' },
+        { attribute: 'employmentStatus', operator: 'eq', value: 'ACTIVE' },
+        { attribute: 'hasReportees', operator: 'is_true' },
       ],
     };
 
@@ -35,8 +35,8 @@ describe('UserGroupMatchingEngine', () => {
     const rule: MatchingRule = {
       combinator: 'all',
       clauses: [
-        { field: 'departmentId', operator: 'eq', value: 'dept-100' },
-        { field: 'employmentStatus', operator: 'eq', value: 'INACTIVE' },
+        { attribute: 'departmentId', operator: 'eq', value: 'dept-100' },
+        { attribute: 'employmentStatus', operator: 'eq', value: 'INACTIVE' },
       ],
     };
 
@@ -47,8 +47,8 @@ describe('UserGroupMatchingEngine', () => {
     const rule: MatchingRule = {
       combinator: 'all',
       clauses: [
-        { field: 'departmentId', operator: 'eq', value: 'dept-100' },
-        { field: 'hasReportees', operator: 'is_true' },
+        { attribute: 'departmentId', operator: 'eq', value: 'dept-100' },
+        { attribute: 'hasReportees', operator: 'is_true' },
       ],
     };
 

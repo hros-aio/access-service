@@ -1,15 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionService } from '@new-hros/libs-sql';
-import { Repository } from 'typeorm';
+import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
+import { In } from 'typeorm';
 
 import { UserGroupMembership } from '../entities/user-group-membership.entity';
 
 @Injectable()
-export class UserGroupMembershipRepository {
-  constructor(private readonly transactionService: TransactionService) {}
-
-  private get repository(): Repository<UserGroupMembership> {
-    return this.transactionService.getManager().getRepository(UserGroupMembership);
+export class UserGroupMembershipRepository extends BaseRepository<UserGroupMembership> {
+  constructor(transactionService: TransactionService) {
+    super(UserGroupMembership, transactionService);
   }
 
   async findMembershipsByEmployee(
@@ -48,32 +46,26 @@ export class UserGroupMembershipRepository {
   async batchInsert(tenantCode: string, groupId: string, employeeIds: string[]): Promise<void> {
     if (employeeIds.length === 0) return;
 
-    const manager = this.transactionService.getManager();
-    const values = employeeIds
-      .map((_, idx) => `(gen_random_uuid(), $1, $2, $${idx + 3}, NOW(), NOW())`)
-      .join(', ');
-
-    await manager.query(
-      `
-      INSERT INTO user_group_memberships (id, tenant_code, group_id, employee_id, matched_at, created_at)
-      VALUES ${values}
-      ON CONFLICT (tenant_code, group_id, employee_id) DO NOTHING;
-      `,
-      [tenantCode, groupId, ...employeeIds],
+    const entities = employeeIds.map((employeeId) =>
+      this.repository.create({
+        tenantCode,
+        groupId,
+        employeeId,
+        matchedAt: new Date(),
+      }),
     );
+
+    await this.repository.save(entities);
   }
 
   async batchDelete(tenantCode: string, groupId: string, employeeIds: string[]): Promise<void> {
     if (employeeIds.length === 0) return;
 
-    const manager = this.transactionService.getManager();
-    await manager.query(
-      `
-      DELETE FROM user_group_memberships
-      WHERE tenant_code = $1 AND group_id = $2 AND employee_id = ANY($3::uuid[]);
-      `,
-      [tenantCode, groupId, employeeIds],
-    );
+    await this.repository.delete({
+      tenantCode,
+      groupId,
+      employeeId: In(employeeIds),
+    });
   }
 
   async deleteSingleMembership(
@@ -89,14 +81,13 @@ export class UserGroupMembershipRepository {
     employeeId: string,
     groupId: string,
   ): Promise<void> {
-    const manager = this.transactionService.getManager();
-    await manager.query(
-      `
-      INSERT INTO user_group_memberships (id, tenant_code, group_id, employee_id, matched_at, created_at)
-      VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
-      ON CONFLICT (tenant_code, group_id, employee_id) DO NOTHING;
-      `,
-      [tenantCode, groupId, employeeId],
-    );
+    const entity = this.repository.create({
+      tenantCode,
+      groupId,
+      employeeId,
+      matchedAt: new Date(),
+    });
+
+    await this.repository.save(entity);
   }
 }

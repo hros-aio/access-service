@@ -122,11 +122,9 @@ components:
     RuleClauseDto:
       type: object
       required:
+        - attribute
         - operator
       properties:
-        field:
-          type: string
-          enum: [employmentStatus, companyId, locationId, departmentId, gradeId, jobTitleId, reporteesCount, hasReportees]
         attribute:
           type: string
           enum: [employmentStatus, companyId, locationId, departmentId, gradeId, jobTitleId, reporteesCount, hasReportees]

@@ -11,12 +11,13 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import {
   CopyRoleDto,
   CreateCustomRoleDto,
   DeactivateRoleDto,
+  FilterRoleDto,
   HighImpactConfirmationRequiredResponseDto,
   RenameRoleDto,
   RoleImpactResponseDto,
@@ -33,14 +34,9 @@ export class RoleController {
 
   @Get()
   @ApiOperation({ summary: 'List all roles in current tenant with metrics and unassigned badges' })
-  @ApiQuery({ name: 'type', required: false, enum: ['SYSTEM', 'CUSTOM'] })
-  @ApiQuery({ name: 'status', required: false, enum: ['ACTIVE', 'INACTIVE'] })
   @ApiResponse({ status: 200, type: [RoleResponseDto] })
-  async listRoles(
-    @Query('type') type?: string,
-    @Query('status') status?: string,
-  ): Promise<RoleResponseDto[]> {
-    return this.roleApplicationService.list({ type, status });
+  async listRoles(@Query() query: FilterRoleDto): Promise<RoleResponseDto[]> {
+    return this.roleApplicationService.list(query);
   }
 
   @Get(':id')

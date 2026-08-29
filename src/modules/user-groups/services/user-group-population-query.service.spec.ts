@@ -59,7 +59,7 @@ describe('UserGroupPopulationQueryService', () => {
 
     const rule: MatchingRule = {
       combinator: 'all',
-      clauses: [{ field: 'departmentId', operator: 'eq', value: 'dept-1' }],
+      clauses: [{ attribute: 'departmentId', operator: 'eq', value: 'dept-1' }],
     };
 
     const res = await service.previewCriteriaPopulation('DEFAULT', rule);
@@ -78,7 +78,7 @@ describe('UserGroupPopulationQueryService', () => {
 
     const rule: MatchingRule = {
       combinator: 'all',
-      clauses: [{ field: 'departmentId', operator: 'eq', value: 'dept-2' }],
+      clauses: [{ attribute: 'departmentId', operator: 'eq', value: 'dept-2' }],
     };
 
     const res = await service.estimateCriteriaDiff('DEFAULT', 'grp-1', rule);

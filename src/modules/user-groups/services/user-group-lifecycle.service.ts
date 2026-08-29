@@ -28,17 +28,9 @@ export class UserGroupLifecycleService {
     private readonly outboxRepository: AuthSecurityEventOutboxRepository,
   ) {}
 
-  private getActiveTenantCode(): string {
-    return RequestContextService.getTenantCode() || '';
-  }
-
-  private getActiveUserId(): string {
-    return RequestContextService.getUser()?.userId ?? 'SYSTEM';
-  }
-
   async createUserGroup(dto: CreateUserGroupDto): Promise<UserGroup> {
-    const tenantCode = this.getActiveTenantCode();
-    const userId = this.getActiveUserId();
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
 
     const existing = await this.userGroupRepository.findByTenantAndName(
       tenantCode,
@@ -107,13 +99,13 @@ export class UserGroupLifecycleService {
     });
   }
 
-  async updateUserGroup(
+  async updateById(
     id: string,
     dto: UpdateUserGroupDto,
     expectedVersion: number,
   ): Promise<UserGroup> {
-    const tenantCode = this.getActiveTenantCode();
-    const userId = this.getActiveUserId();
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
 
     const existing = await this.userGroupRepository.findByTenantAndId(tenantCode, id);
     if (!existing) {
@@ -156,18 +148,7 @@ export class UserGroupLifecycleService {
       const removedRoleIds = currentRoleIds.filter((r) => !newRoleIds.includes(r));
 
       if (removedRoleIds.length > 0) {
-        await this.userGroupRoleRepository['repository']
-          .createQueryBuilder()
-          .delete()
-          .where(
-            'tenantCode = :tenantCode AND userGroupId = :userGroupId AND roleId IN (:...roleIds)',
-            {
-              tenantCode,
-              userGroupId: id,
-              roleIds: removedRoleIds,
-            },
-          )
-          .execute();
+        await this.userGroupRoleRepository.batchDelete(tenantCode, id, removedRoleIds);
       }
 
       if (addedRoleIds.length > 0) {
@@ -195,13 +176,13 @@ export class UserGroupLifecycleService {
       await this.outboxRepository.save(updatedOutbox);
       await this.outboxRepository.save(syncOutbox);
 
-      return (await this.userGroupRepository.findByTenantAndId(tenantCode, id))!;
+      return existing;
     });
   }
 
-  async deactivateUserGroup(id: string, expectedVersion: number): Promise<UserGroup> {
-    const tenantCode = this.getActiveTenantCode();
-    const userId = this.getActiveUserId();
+  async deactivate(id: string, expectedVersion: number): Promise<UserGroup> {
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
 
     const existing = await this.userGroupRepository.findByTenantAndId(tenantCode, id);
     if (!existing) {
@@ -250,9 +231,9 @@ export class UserGroupLifecycleService {
     });
   }
 
-  async reactivateUserGroup(id: string, expectedVersion: number): Promise<UserGroup> {
-    const tenantCode = this.getActiveTenantCode();
-    const userId = this.getActiveUserId();
+  async reactivate(id: string, expectedVersion: number): Promise<UserGroup> {
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
 
     const existing = await this.userGroupRepository.findByTenantAndId(tenantCode, id);
     if (!existing) {

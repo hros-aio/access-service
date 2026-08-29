@@ -25,7 +25,7 @@ import { UserGroupQueryService } from '../services/user-group-query.service';
 
 @ApiTags('Admin User Groups')
 @ApiBearerAuth()
-@Controller('admin/user-groups')
+@Controller('user-groups')
 export class UserGroupAdminController {
   constructor(
     private readonly userGroupLifecycleService: UserGroupLifecycleService,
@@ -36,7 +36,7 @@ export class UserGroupAdminController {
   @ApiOperation({ summary: 'List user groups for the authenticated tenant' })
   @ApiResponse({ status: 200, type: PaginatedUserGroupDto })
   async listUserGroups(@Query() query: UserGroupQueryDto): Promise<PaginatedUserGroupDto> {
-    return this.userGroupQueryService.listUserGroups(query);
+    return this.userGroupQueryService.list(query);
   }
 
   @Post()
@@ -46,7 +46,7 @@ export class UserGroupAdminController {
   @ApiResponse({ status: 409, description: 'Duplicate user group name in tenant' })
   async createUserGroup(@Body() dto: CreateUserGroupDto): Promise<UserGroupDetailsDto> {
     const group = await this.userGroupLifecycleService.createUserGroup(dto);
-    return this.userGroupQueryService.getUserGroupById(group.id);
+    return this.userGroupQueryService.findById(group.id);
   }
 
   @Get(':id')
@@ -55,7 +55,7 @@ export class UserGroupAdminController {
   @ApiResponse({ status: 200, type: UserGroupDetailsDto })
   @ApiResponse({ status: 404, description: 'User group not found' })
   async getUserGroupById(@Param('id', ParseUUIDPipe) id: string): Promise<UserGroupDetailsDto> {
-    return this.userGroupQueryService.getUserGroupById(id);
+    return this.userGroupQueryService.findById(id);
   }
 
   @Put(':id')
@@ -69,8 +69,8 @@ export class UserGroupAdminController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateUserGroupDto,
   ): Promise<UserGroupDetailsDto> {
-    const group = await this.userGroupLifecycleService.updateUserGroup(id, dto, dto.version);
-    return this.userGroupQueryService.getUserGroupById(group.id);
+    const group = await this.userGroupLifecycleService.updateById(id, dto, dto.version);
+    return this.userGroupQueryService.findById(group.id);
   }
 
   @Post(':id/deactivate')
@@ -84,8 +84,8 @@ export class UserGroupAdminController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: LifecycleTransitionDto,
   ): Promise<UserGroupDetailsDto> {
-    const group = await this.userGroupLifecycleService.deactivateUserGroup(id, dto.version);
-    return this.userGroupQueryService.getUserGroupById(group.id);
+    const group = await this.userGroupLifecycleService.deactivate(id, dto.version);
+    return this.userGroupQueryService.findById(group.id);
   }
 
   @Post(':id/reactivate')
@@ -99,7 +99,7 @@ export class UserGroupAdminController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: LifecycleTransitionDto,
   ): Promise<UserGroupDetailsDto> {
-    const group = await this.userGroupLifecycleService.reactivateUserGroup(id, dto.version);
-    return this.userGroupQueryService.getUserGroupById(group.id);
+    const group = await this.userGroupLifecycleService.reactivate(id, dto.version);
+    return this.userGroupQueryService.findById(group.id);
   }
 }

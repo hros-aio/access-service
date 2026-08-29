@@ -10,6 +10,7 @@ import {
   CopyRoleDto,
   CreateCustomRoleDto,
   DeactivateRoleDto,
+  FilterRoleDto,
   RenameRoleDto,
   RoleImpactResponseDto,
   RoleResponseDto,
@@ -43,17 +44,9 @@ export class RoleApplicationService {
     private readonly outboxRepository: AuthSecurityEventOutboxRepository,
   ) {}
 
-  private getActiveTenantCode(): string {
-    return RequestContextService.getTenantCode() || '';
-  }
-
-  private getActiveUserId(): string {
-    return RequestContextService.getUser()?.userId ?? 'SYSTEM';
-  }
-
-  async list(filters?: { type?: string; status?: string }): Promise<RoleResponseDto[]> {
-    const tenantCode = this.getActiveTenantCode();
-    const roles = await this.roleRepository.findAllByTenant(tenantCode, filters);
+  async list(filters?: FilterRoleDto): Promise<RoleResponseDto[]> {
+    const tenantCode = RequestContextService.getTenantCode();
+    const roles = await this.roleRepository.findByTenant(tenantCode, filters);
     const results: RoleResponseDto[] = [];
 
     for (const role of roles) {
@@ -78,7 +71,7 @@ export class RoleApplicationService {
   }
 
   async getById(roleId: string): Promise<RoleResponseDto> {
-    const tenantCode = this.getActiveTenantCode();
+    const tenantCode = RequestContextService.getTenantCode();
     const role = await this.roleRepository.findById(roleId);
     if (!role) {
       this.logger.error(`Role not found: ${roleId} for tenant: ${tenantCode}`);
@@ -102,8 +95,8 @@ export class RoleApplicationService {
   }
 
   async createCustom(dto: CreateCustomRoleDto): Promise<RoleResponseDto> {
-    const tenantCode = this.getActiveTenantCode();
-    const userId = this.getActiveUserId();
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
 
     // 1. Validate permissions against DAG dependency engine
     const validation = this.permissionDependencyService.validatePermissionSet(dto.permissionCodes);
@@ -160,8 +153,8 @@ export class RoleApplicationService {
   }
 
   async copy(sourceRoleId: string, dto: CopyRoleDto): Promise<RoleResponseDto> {
-    const tenantCode = this.getActiveTenantCode();
-    const userId = this.getActiveUserId();
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
 
     const sourceRole = await this.roleRepository.findById(sourceRoleId);
     if (!sourceRole) {
@@ -220,7 +213,7 @@ export class RoleApplicationService {
   }
 
   async estimateImpact(roleId: string): Promise<RoleImpactResponseDto> {
-    const tenantCode = this.getActiveTenantCode();
+    const tenantCode = RequestContextService.getTenantCode();
     const role = await this.roleRepository.findById(roleId);
     if (!role) {
       this.logger.error(`Role not found for impact estimation: ${roleId}`);
@@ -253,8 +246,8 @@ export class RoleApplicationService {
     affectedUserCount?: number;
     message?: string;
   }> {
-    const tenantCode = this.getActiveTenantCode();
-    const userId = this.getActiveUserId();
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
 
     const role = await this.roleRepository.findById(id);
     if (!role) {
@@ -378,8 +371,8 @@ export class RoleApplicationService {
     affectedUserCount?: number;
     message?: string;
   }> {
-    const tenantCode = this.getActiveTenantCode();
-    const userId = this.getActiveUserId();
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
 
     const role = await this.roleRepository.findById(id);
     if (!role) {
@@ -461,8 +454,8 @@ export class RoleApplicationService {
   }
 
   async reactivate(id: string): Promise<RoleResponseDto> {
-    const tenantCode = this.getActiveTenantCode();
-    const userId = this.getActiveUserId();
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
 
     const role = await this.roleRepository.findById(id);
     if (!role) {
@@ -513,8 +506,8 @@ export class RoleApplicationService {
   }
 
   async rename(roleId: string, dto: RenameRoleDto): Promise<RoleResponseDto> {
-    const tenantCode = this.getActiveTenantCode();
-    const userId = this.getActiveUserId();
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
 
     const updatedRole = await this.transactionService.runInTransaction(async () => {
       const role = await this.roleRepository.findById(roleId, {
@@ -558,7 +551,7 @@ export class RoleApplicationService {
   }
 
   async updateStatus(roleId: string, status: RoleStatus): Promise<RoleResponseDto> {
-    const userId = this.getActiveUserId();
+    const userId = RequestContextService.getUser().userId;
 
     const updatedRole = await this.transactionService.runInTransaction(async () => {
       const role = await this.roleRepository.findById(roleId, {
@@ -604,7 +597,7 @@ export class RoleApplicationService {
       await this.roleRepository.delete(role.id);
     });
 
-    const tenantCode = this.getActiveTenantCode();
+    const tenantCode = RequestContextService.getTenantCode();
     await this.roleCacheService.invalidateRole(tenantCode, roleId);
   }
 }

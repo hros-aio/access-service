@@ -18,10 +18,10 @@ export class UserGroupMatchingEngine {
   }
 
   private evaluateClause(clause: MatchingRuleClause, employee: EmployeeReference): boolean {
-    const attribute = clause.field || clause.attribute;
+    const attribute = clause.attribute;
     if (!attribute) return false;
 
-    const op = (clause.operator || '').toLowerCase();
+    const op = clause.operator.toLowerCase();
 
     // Special virtual/derived attribute: hasReportees
     if (attribute === 'hasReportees') {
@@ -123,11 +123,11 @@ export class UserGroupMatchingEngine {
     const conditions: string[] = ['tenant_code = $1'];
 
     for (const clause of rule.clauses || []) {
-      const attribute = clause.field || clause.attribute;
+      const attribute = clause.attribute;
       if (!attribute) continue;
 
       const column = this.mapAttributeToColumn(attribute);
-      const op = (clause.operator || '').toLowerCase();
+      const op = clause.operator.toLowerCase();
 
       if (attribute === 'hasReportees') {
         if (op === 'is_true' || (op === 'eq' && clause.value === true)) {

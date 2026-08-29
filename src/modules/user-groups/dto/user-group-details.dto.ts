@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { ScopeType, UserGroupStatus } from '../domain/enums';
 import { MatchingRule } from '../domain/value-objects/matching-rule.vo';
+import { UserGroup } from '../entities/user-group.entity';
 
 export class AssignedRoleSummaryDto {
   @ApiProperty({ example: '3fa85f64-5717-4562-b3fc-2c963f66afa6' })
@@ -62,6 +63,35 @@ export class UserGroupDetailsDto {
 
   @ApiProperty()
   updatedAt: Date;
+
+  static mapToDetailsDto(group: UserGroup): UserGroupDetailsDto {
+    const assignedRoles = (group.groupRoles ?? [])
+      .filter((gr) => !!gr.role)
+      .map((gr) => ({
+        id: gr.role!.id,
+        name: gr.role!.name,
+        roleType: gr.role!.type,
+      }));
+
+    return {
+      id: group.id,
+      tenantCode: group.tenantCode,
+      name: group.name,
+      description: group.description,
+      status: group.status,
+      scopeType: group.scopeType,
+      scopeRefId: group.scopeRefId,
+      matchingRule: group.matchingRule,
+      ruleAttributeKeys: group.ruleAttributeKeys ?? [],
+      version: group.version,
+      projectionVersion: group.projectionVersion,
+      isPendingSync: group.version > group.projectionVersion,
+      hasNoAssignedRoles: assignedRoles.length === 0,
+      assignedRoles,
+      createdAt: group.createdAt,
+      updatedAt: group.updatedAt,
+    };
+  }
 }
 
 export class PaginatedUserGroupDto {

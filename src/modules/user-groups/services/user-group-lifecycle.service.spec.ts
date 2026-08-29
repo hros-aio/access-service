@@ -52,14 +52,8 @@ describe('UserGroupLifecycleService', () => {
     userGroupRoleRepository = {
       findByGroup: jest.fn(),
       deleteByGroup: jest.fn(),
+      deleteByFilter: jest.fn().mockResolvedValue(undefined),
       bulkSave: jest.fn().mockResolvedValue([]),
-      repository: {
-        createQueryBuilder: jest.fn().mockReturnValue({
-          delete: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({ affected: 1, raw: {} }),
-        }),
-      },
     } as unknown as jest.Mocked<UserGroupRoleRepository>;
 
     outboxRepository = {
@@ -158,7 +152,7 @@ describe('UserGroupLifecycleService', () => {
       userGroupRepository.findByTenantAndId.mockResolvedValue(existingGroup);
       userGroupRepository.findByTenantAndName.mockResolvedValue(null);
 
-      await service.updateUserGroup('group-uuid-1', updateDto, 1);
+      await service.updateById('group-uuid-1', updateDto, 1);
 
       expect(existingGroup.version).toEqual(2);
       expect(outboxRepository.save).toHaveBeenCalled();
@@ -171,7 +165,7 @@ describe('UserGroupLifecycleService', () => {
         version: 2,
       } as UserGroup);
 
-      await expect(service.updateUserGroup('group-uuid-1', updateDto, 1)).rejects.toThrow(
+      await expect(service.updateById('group-uuid-1', updateDto, 1)).rejects.toThrow(
         ConcurrentModificationError,
       );
     });
@@ -179,7 +173,7 @@ describe('UserGroupLifecycleService', () => {
     it('should throw UserGroupNotFoundError if group does not exist', async () => {
       userGroupRepository.findByTenantAndId.mockResolvedValue(null);
 
-      await expect(service.updateUserGroup('group-uuid-1', updateDto, 1)).rejects.toThrow(
+      await expect(service.updateById('group-uuid-1', updateDto, 1)).rejects.toThrow(
         UserGroupNotFoundError,
       );
     });
@@ -202,7 +196,7 @@ describe('UserGroupLifecycleService', () => {
 
       userGroupRepository.findByTenantAndId.mockResolvedValue(existingGroup);
 
-      await service.deactivateUserGroup('group-uuid-1', 2);
+      await service.deactivate('group-uuid-1', 2);
 
       expect(existingGroup.status).toEqual(UserGroupStatus.INACTIVE);
       expect(existingGroup.version).toEqual(3);
@@ -218,7 +212,7 @@ describe('UserGroupLifecycleService', () => {
 
       userGroupRepository.findByTenantAndId.mockResolvedValue(existingGroup);
 
-      await expect(service.deactivateUserGroup('group-uuid-1', 1)).rejects.toThrow(
+      await expect(service.deactivate('group-uuid-1', 1)).rejects.toThrow(
         InvalidStateTransitionError,
       );
     });
@@ -239,7 +233,7 @@ describe('UserGroupLifecycleService', () => {
 
       userGroupRepository.findByTenantAndId.mockResolvedValue(existingGroup);
 
-      await service.reactivateUserGroup('group-uuid-1', 3);
+      await service.reactivate('group-uuid-1', 3);
 
       expect(existingGroup.status).toEqual(UserGroupStatus.ACTIVE);
       expect(existingGroup.version).toEqual(4);
