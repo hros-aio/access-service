@@ -6,3 +6,6 @@ export * from './user-group-query.dto';
 export * from './matching-rule.dto';
 export * from './preview-matching.dto';
 export * from './criteria-impact.dto';
+export * from './assigned-role-item.dto';
+export * from './estimate-role-assignment-impact.dto';
+export * from './update-user-group-roles.dto';

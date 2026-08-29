@@ -43,6 +43,48 @@ export class UserGroupMembershipRepository extends BaseRepository<UserGroupMembe
     return rows.map((r) => r.employeeId);
   }
 
+  async countZeroRoleMembersAfterUnassign(
+    tenantCode: string,
+    groupId: string,
+    targetRoleCount: number,
+  ): Promise<number> {
+    const manager = this.transactionService.getManager();
+    const queryResult = await manager
+      .query(
+        `
+        WITH member_employees AS (
+          SELECT employee_id
+          FROM user_group_memberships
+          WHERE tenant_code = $1 AND group_id = $2
+        ),
+        other_group_roles AS (
+          SELECT ugm.employee_id, COUNT(ugr.role_id) AS other_role_count
+          FROM user_group_memberships ugm
+          INNER JOIN user_groups ug
+            ON ug.id = ugm.group_id
+            AND ug.tenant_code = ugm.tenant_code
+            AND ug.status = 'ACTIVE'
+          INNER JOIN user_group_roles ugr
+            ON ugr.user_group_id = ug.id
+            AND ugr.tenant_code = ug.tenant_code
+          WHERE ugm.tenant_code = $1
+            AND ugm.group_id != $2
+            AND ugm.employee_id IN (SELECT employee_id FROM member_employees)
+          GROUP BY ugm.employee_id
+        )
+        SELECT me.employee_id
+        FROM member_employees me
+        LEFT JOIN other_group_roles ogr ON ogr.employee_id = me.employee_id
+        WHERE COALESCE(ogr.other_role_count, 0) = 0
+          AND $3 = 0;
+        `,
+        [tenantCode, groupId, targetRoleCount],
+      )
+      .catch(() => []);
+
+    return queryResult.length;
+  }
+
   async batchInsert(tenantCode: string, groupId: string, employeeIds: string[]): Promise<void> {
     if (employeeIds.length === 0) return;
 

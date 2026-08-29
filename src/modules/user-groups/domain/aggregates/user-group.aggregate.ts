@@ -124,6 +124,46 @@ export class UserGroupAggregate {
     this._version += 1;
   }
 
+  public assignRoles(roleIds: string[], updatedBy?: string): { addedRoleIds: string[] } {
+    const uniqueIncoming = Array.from(new Set(roleIds));
+    const addedRoleIds = uniqueIncoming.filter((id) => !this._assignedRoleIds.includes(id));
+    if (addedRoleIds.length > 0) {
+      this._assignedRoleIds = [...this._assignedRoleIds, ...addedRoleIds];
+      this._updatedBy = updatedBy;
+      this._version += 1;
+    }
+    return { addedRoleIds };
+  }
+
+  public unassignRoles(roleIds: string[], updatedBy?: string): { removedRoleIds: string[] } {
+    const toRemove = new Set(roleIds);
+    const removedRoleIds = this._assignedRoleIds.filter((id) => toRemove.has(id));
+    if (removedRoleIds.length > 0) {
+      this._assignedRoleIds = this._assignedRoleIds.filter((id) => !toRemove.has(id));
+      this._updatedBy = updatedBy;
+      this._version += 1;
+    }
+    return { removedRoleIds };
+  }
+
+  public replaceRoles(
+    targetRoleIds: string[],
+    updatedBy?: string,
+  ): { addedRoleIds: string[]; removedRoleIds: string[] } {
+    const uniqueTarget = Array.from(new Set(targetRoleIds));
+    const currentSet = new Set(this._assignedRoleIds);
+    const targetSet = new Set(uniqueTarget);
+
+    const addedRoleIds = uniqueTarget.filter((id) => !currentSet.has(id));
+    const removedRoleIds = this._assignedRoleIds.filter((id) => !targetSet.has(id));
+
+    this._assignedRoleIds = uniqueTarget;
+    this._updatedBy = updatedBy;
+    this._version += 1;
+
+    return { addedRoleIds, removedRoleIds };
+  }
+
   public deactivate(updatedBy?: string): void {
     if (this._status === UserGroupStatus.INACTIVE) {
       throw new InvalidStateTransitionError('User Group is already inactive');
