@@ -1,0 +1,201 @@
+openapi: 3.0.3
+info:
+  title: User Group Matching Population & Preview Visibility API
+  version: 1.0.0
+  description: Endpoints providing visibility into materialized group members and real-time draft criteria preview.
+paths:
+  /user-groups/{id}/members:
+    get:
+      summary: Get materialized members belonging to a user group
+      operationId: getGroupMaterializedMembers
+      tags:
+        - Admin User Groups Population
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: User Group UUID
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          required: false
+          description: Page number (min 1)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          description: Items per page (min 1, max 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Paginated list of materialized group members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMatchedMemberResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Requires user_group.view capability
+        '404':
+          description: User group not found in tenant
+
+  /user-groups/preview-matching:
+    post:
+      summary: Preview employee matching population for draft criteria
+      operationId: previewMatchingCriteria
+      tags:
+        - Admin User Groups Population
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DynamicMatchingRuleDto'
+      responses:
+        '200':
+          description: Estimated matching count and sample matching employee records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewMatchingResponseDto'
+        '400':
+          description: Invalid matching rule structure, unsupported attribute, or unknown operator
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Requires user_group.view capability
+
+components:
+  schemas:
+    MatchingRuleClause:
+      type: object
+      required:
+        - attribute
+        - operator
+      properties:
+        attribute:
+          type: string
+          enum:
+            - employmentStatus
+            - companyId
+            - locationId
+            - departmentId
+            - gradeId
+            - jobTitleId
+            - reporteesCount
+            - hasReportees
+        operator:
+          type: string
+          enum:
+            - eq
+            - equals
+            - neq
+            - not_equals
+            - in
+            - not_in
+            - gt
+            - greater_than
+            - gte
+            - greater_than_or_equal
+            - lt
+            - less_than
+            - lte
+            - less_than_or_equal
+            - exists
+            - is_true
+            - is_false
+        value:
+          type:
+            - string
+            - number
+            - boolean
+        values:
+          type: array
+          items:
+            type: string
+
+    DynamicMatchingRuleDto:
+      type: object
+      required:
+        - clauses
+      properties:
+        combinator:
+          type: string
+          enum: [all]
+          default: all
+        clauses:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchingRuleClause'
+
+    MatchedMemberDto:
+      type: object
+      required:
+        - employeeId
+        - employeeCode
+        - employmentStatus
+        - reporteesCount
+      properties:
+        employeeId:
+          type: string
+          format: uuid
+        employeeCode:
+          type: string
+        departmentId:
+          type: string
+          format: uuid
+          nullable: true
+        locationId:
+          type: string
+          format: uuid
+          nullable: true
+        employmentStatus:
+          type: string
+        reporteesCount:
+          type: integer
+        matchedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    PaginatedMatchedMemberResponse:
+      type: object
+      required:
+        - items
+        - total
+        - page
+        - limit
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchedMemberDto'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    PreviewMatchingResponseDto:
+      type: object
+      required:
+        - matchedCount
+        - sampleEmployees
+      properties:
+        matchedCount:
+          type: integer
+        sampleEmployees:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchedMemberDto'
