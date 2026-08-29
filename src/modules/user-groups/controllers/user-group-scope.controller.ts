@@ -17,7 +17,7 @@ import {
   UpdateUserGroupScopeDto,
   UserGroupScopeDetailsDto,
 } from '../dto';
-import { UserGroupScopeImpactService } from '../services/user-group-scope-impact.service';
+import { UserGroupImpactService } from '../services/user-group-impact.service';
 import { UserGroupScopeService } from '../services/user-group-scope.service';
 
 @ApiTags('Admin User Group Scope')
@@ -26,7 +26,7 @@ import { UserGroupScopeService } from '../services/user-group-scope.service';
 export class UserGroupScopeController {
   constructor(
     private readonly scopeService: UserGroupScopeService,
-    private readonly impactService: UserGroupScopeImpactService,
+    private readonly impactService: UserGroupImpactService,
   ) {}
 
   @Get(':id/scope')

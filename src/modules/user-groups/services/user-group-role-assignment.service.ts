@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
-import { RoleAssignmentImpactService } from './role-assignment-impact.service';
+import { UserGroupImpactService } from './user-group-impact.service';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { RoleRepository } from '../../roles/repositories/role.repository';
@@ -29,7 +29,7 @@ export class UserGroupRoleAssignmentService {
     private readonly userGroupRoleRepository: UserGroupRoleRepository,
     private readonly roleRepository: RoleRepository,
     private readonly outboxRepository: AuthSecurityEventOutboxRepository,
-    private readonly impactService: RoleAssignmentImpactService,
+    private readonly impactService: UserGroupImpactService,
   ) {}
 
   async getAssignedRoles(userGroupId: string): Promise<AssignedRoleItemDto[]> {

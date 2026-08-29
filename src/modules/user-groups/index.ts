@@ -23,4 +23,4 @@ export * from './services/user-group-matching.engine';
 export * from './services/user-group-population-query.service';
 export * from './services/user-group-role-assignment.service';
 export * from './services/user-group-scope.service';
-export * from './services/user-group-scope-impact.service';
+export * from './services/user-group-impact.service';

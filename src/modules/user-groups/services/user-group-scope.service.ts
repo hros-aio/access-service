@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
-import { UserGroupScopeImpactService } from './user-group-scope-impact.service';
+import { UserGroupImpactService } from './user-group-impact.service';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { UserGroupAggregate } from '../domain/aggregates/user-group.aggregate';
@@ -23,7 +23,7 @@ export class UserGroupScopeService {
     private readonly transactionService: TransactionService,
     private readonly userGroupRepository: UserGroupRepository,
     private readonly outboxRepository: AuthSecurityEventOutboxRepository,
-    private readonly impactService: UserGroupScopeImpactService,
+    private readonly impactService: UserGroupImpactService,
   ) {}
 
   async getScope(userGroupId: string): Promise<UserGroupScopeDetailsDto> {

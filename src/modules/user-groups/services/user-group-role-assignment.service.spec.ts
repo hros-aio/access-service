@@ -1,6 +1,6 @@
 import { TransactionService } from '@new-hros/libs-sql';
 
-import { RoleAssignmentImpactService } from './role-assignment-impact.service';
+import { UserGroupImpactService } from './user-group-impact.service';
 import { UserGroupRoleAssignmentService } from './user-group-role-assignment.service';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { RoleRepository } from '../../roles/repositories/role.repository';
@@ -19,7 +19,7 @@ describe('UserGroupRoleAssignmentService', () => {
   let mockUserGroupRoleRepo: jest.Mocked<UserGroupRoleRepository>;
   let mockRoleRepo: jest.Mocked<RoleRepository>;
   let mockOutboxRepo: jest.Mocked<AuthSecurityEventOutboxRepository>;
-  let mockImpactService: jest.Mocked<RoleAssignmentImpactService>;
+  let mockImpactService: jest.Mocked<UserGroupImpactService>;
 
   beforeEach(() => {
     mockTransactionService = {
@@ -47,7 +47,7 @@ describe('UserGroupRoleAssignmentService', () => {
 
     mockImpactService = {
       estimateRoleAssignmentImpact: jest.fn(),
-    } as unknown as jest.Mocked<RoleAssignmentImpactService>;
+    } as unknown as jest.Mocked<UserGroupImpactService>;
 
     service = new UserGroupRoleAssignmentService(
       mockTransactionService,

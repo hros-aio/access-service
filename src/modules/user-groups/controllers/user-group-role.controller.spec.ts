@@ -1,11 +1,11 @@
 import { UserGroupRoleController } from './user-group-role.controller';
-import { RoleAssignmentImpactService } from '../services/role-assignment-impact.service';
+import { UserGroupImpactService } from '../services/user-group-impact.service';
 import { UserGroupRoleAssignmentService } from '../services/user-group-role-assignment.service';
 
 describe('UserGroupRoleController', () => {
   let controller: UserGroupRoleController;
   let mockRoleAssignmentService: jest.Mocked<UserGroupRoleAssignmentService>;
-  let mockImpactService: jest.Mocked<RoleAssignmentImpactService>;
+  let mockImpactService: jest.Mocked<UserGroupImpactService>;
 
   beforeEach(() => {
     mockRoleAssignmentService = {
@@ -15,7 +15,7 @@ describe('UserGroupRoleController', () => {
 
     mockImpactService = {
       estimateRoleAssignmentImpact: jest.fn(),
-    } as unknown as jest.Mocked<RoleAssignmentImpactService>;
+    } as unknown as jest.Mocked<UserGroupImpactService>;
 
     controller = new UserGroupRoleController(mockRoleAssignmentService, mockImpactService);
   });

@@ -2,13 +2,13 @@ import { UserGroupScopeController } from './user-group-scope.controller';
 import { ScopeType } from '../domain/enums/scope-type.enum';
 import { ScopeImpactEstimateDto } from '../dto/scope-impact-estimate.dto';
 import { UserGroupScopeDetailsDto } from '../dto/user-group-scope-details.dto';
-import { UserGroupScopeImpactService } from '../services/user-group-scope-impact.service';
+import { UserGroupImpactService } from '../services/user-group-impact.service';
 import { UserGroupScopeService } from '../services/user-group-scope.service';
 
 describe('UserGroupScopeController', () => {
   let controller: UserGroupScopeController;
   let scopeService: jest.Mocked<UserGroupScopeService>;
-  let impactService: jest.Mocked<UserGroupScopeImpactService>;
+  let impactService: jest.Mocked<UserGroupImpactService>;
 
   const userGroupId = '11111111-1111-1111-1111-111111111111';
 
@@ -20,7 +20,7 @@ describe('UserGroupScopeController', () => {
 
     impactService = {
       estimateScopeImpact: jest.fn(),
-    } as unknown as jest.Mocked<UserGroupScopeImpactService>;
+    } as unknown as jest.Mocked<UserGroupImpactService>;
 
     controller = new UserGroupScopeController(scopeService, impactService);
   });

@@ -11,8 +11,9 @@ import {
 } from './domain/exceptions/user-group.exceptions';
 import { UserGroup } from './entities/user-group.entity';
 import { UserGroupMembershipRepository } from './repositories/user-group-membership.repository';
+import { UserGroupRoleRepository } from './repositories/user-group-role.repository';
 import { UserGroupRepository } from './repositories/user-group.repository';
-import { UserGroupScopeImpactService } from './services/user-group-scope-impact.service';
+import { UserGroupImpactService } from './services/user-group-impact.service';
 import { UserGroupScopeService } from './services/user-group-scope.service';
 import { AuthSecurityEventOutbox } from '../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../auth/repositories/auth-security-event-outbox.repository';
@@ -20,9 +21,10 @@ import { AuthSecurityEventOutboxRepository } from '../auth/repositories/auth-sec
 describe('UserGroupScope Integration / Security Isolation', () => {
   let controller: UserGroupScopeController;
   let scopeService: UserGroupScopeService;
-  let impactService: UserGroupScopeImpactService;
+  let impactService: UserGroupImpactService;
 
   let userGroupRepo: jest.Mocked<UserGroupRepository>;
+  let userGroupRoleRepo: jest.Mocked<UserGroupRoleRepository>;
   let membershipRepo: jest.Mocked<UserGroupMembershipRepository>;
   let outboxRepo: jest.Mocked<AuthSecurityEventOutboxRepository>;
   let transactionService: jest.Mocked<TransactionService>;
@@ -45,8 +47,14 @@ describe('UserGroupScope Integration / Security Isolation', () => {
       save: jest.fn((entity) => Promise.resolve(entity)),
     } as unknown as jest.Mocked<UserGroupRepository>;
 
+    userGroupRoleRepo = {
+      findByGroup: jest.fn().mockResolvedValue([]),
+    } as unknown as jest.Mocked<UserGroupRoleRepository>;
+
     membershipRepo = {
       countByGroup: jest.fn(),
+      findMemberEmployeeIdsByGroup: jest.fn(),
+      countZeroRoleMembersAfterUnassign: jest.fn(),
     } as unknown as jest.Mocked<UserGroupMembershipRepository>;
 
     outboxRepo = {
@@ -57,7 +65,7 @@ describe('UserGroupScope Integration / Security Isolation', () => {
       runInTransaction: jest.fn((cb) => cb()),
     } as unknown as jest.Mocked<TransactionService>;
 
-    impactService = new UserGroupScopeImpactService(userGroupRepo, membershipRepo);
+    impactService = new UserGroupImpactService(userGroupRepo, userGroupRoleRepo, membershipRepo);
     scopeService = new UserGroupScopeService(
       transactionService,
       userGroupRepo,

@@ -1,15 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { RequestContextService } from '@new-hros/libs-core';
 
+import { ScopeType } from '../domain/enums/scope-type.enum';
+import { UserGroupNotFoundError } from '../domain/exceptions/user-group.exceptions';
+import { UserGroupScopeValidator } from '../domain/validators/user-group-scope.validator';
 import { RoleAssignmentImpactEstimateDto } from '../dto/estimate-role-assignment-impact.dto';
+import { ScopeImpactEstimateDto } from '../dto/scope-impact-estimate.dto';
 import { UserGroupMembershipRepository } from '../repositories/user-group-membership.repository';
 import { UserGroupRoleRepository } from '../repositories/user-group-role.repository';
 import { UserGroupRepository } from '../repositories/user-group.repository';
 
 export const HIGH_IMPACT_ROLE_ASSIGNMENT_THRESHOLD = 100;
+export const HIGH_IMPACT_SCOPE_THRESHOLD = 100;
 
 @Injectable()
-export class RoleAssignmentImpactService {
+export class UserGroupImpactService {
+  private readonly logger = new Logger(UserGroupImpactService.name);
+
   constructor(
     private readonly userGroupRepository: UserGroupRepository,
     private readonly userGroupRoleRepository: UserGroupRoleRepository,
@@ -77,6 +84,44 @@ export class RoleAssignmentImpactService {
       zeroRoleUserCount,
       requiresConfirmation,
       threshold,
+    };
+  }
+
+  async estimateScopeImpact(
+    userGroupId: string,
+    proposedScopeType: ScopeType | string,
+    proposedScopeRefId?: string | null,
+    threshold = HIGH_IMPACT_SCOPE_THRESHOLD,
+  ): Promise<ScopeImpactEstimateDto> {
+    const tenantCode = RequestContextService.getTenantCode();
+
+    const group = await this.userGroupRepository.findByTenantAndId(tenantCode, userGroupId);
+    if (!group) {
+      throw new UserGroupNotFoundError(userGroupId);
+    }
+
+    // Validate proposed scope parameters
+    const validated = UserGroupScopeValidator.validate(proposedScopeType, proposedScopeRefId);
+
+    const affectedUserCount = await this.userGroupMembershipRepository.countByGroup(
+      tenantCode,
+      userGroupId,
+    );
+    const requiresConfirmation = affectedUserCount >= threshold;
+
+    return {
+      userGroupId,
+      affectedUserCount,
+      threshold,
+      requiresConfirmation,
+      currentScope: {
+        scopeType: group.scopeType,
+        scopeRefId: group.scopeRefId ?? null,
+      },
+      proposedScope: {
+        scopeType: validated.scopeType,
+        scopeRefId: validated.scopeRefId,
+      },
     };
   }
 }

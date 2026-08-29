@@ -1,7 +1,7 @@
 import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
-import { UserGroupScopeImpactService } from './user-group-scope-impact.service';
+import { UserGroupImpactService } from './user-group-impact.service';
 import { UserGroupScopeService } from './user-group-scope.service';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
@@ -19,7 +19,7 @@ describe('UserGroupScopeService', () => {
   let transactionService: jest.Mocked<TransactionService>;
   let userGroupRepo: jest.Mocked<UserGroupRepository>;
   let outboxRepo: jest.Mocked<AuthSecurityEventOutboxRepository>;
-  let impactService: jest.Mocked<UserGroupScopeImpactService>;
+  let impactService: jest.Mocked<UserGroupImpactService>;
 
   const tenantCode = 'tenant-test';
   const userGroupId = '11111111-1111-1111-1111-111111111111';
@@ -46,7 +46,7 @@ describe('UserGroupScopeService', () => {
 
     impactService = {
       estimateScopeImpact: jest.fn(),
-    } as unknown as jest.Mocked<UserGroupScopeImpactService>;
+    } as unknown as jest.Mocked<UserGroupImpactService>;
 
     service = new UserGroupScopeService(
       transactionService,
