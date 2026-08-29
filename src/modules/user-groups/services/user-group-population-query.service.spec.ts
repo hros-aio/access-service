@@ -4,8 +4,8 @@ import { TransactionService } from '@new-hros/libs-sql';
 import { UserGroupMatchingEngine } from './user-group-matching.engine';
 import { UserGroupPopulationQueryService } from './user-group-population-query.service';
 import { MatchingRule } from '../domain/value-objects/matching-rule.vo';
-import { UserGroup } from '../entities/user-group.entity';
 import { UserGroupMembership } from '../entities/user-group-membership.entity';
+import { UserGroup } from '../entities/user-group.entity';
 import { UserGroupMembershipRepository } from '../repositories/user-group-membership.repository';
 import { UserGroupRepository } from '../repositories/user-group.repository';
 
