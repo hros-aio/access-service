@@ -5,7 +5,6 @@ import { MfaController } from './mfa.controller';
 import { MfaFactorType } from '../dto/enroll_mfa.dto';
 import { MfaApplicationService } from '../services/mfa_application.service';
 
-
 describe('MfaController', () => {
   let controller: MfaController;
   let service: jest.Mocked<MfaApplicationService>;

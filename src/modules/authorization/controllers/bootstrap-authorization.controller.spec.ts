@@ -41,15 +41,10 @@ describe('BootstrapAuthorizationController', () => {
 
     expect(response.success).toBe(true);
     expect(response.data.authorizationVersion).toBe(7);
-    expect(response.data.permissions).toEqual([
-      'employee.view',
-      'leave.apply',
-      'leave.approve',
-    ]);
+    expect(response.data.permissions).toEqual(['employee.view', 'leave.apply', 'leave.approve']);
     expect(mockBootstrapService.getBootstrapCapabilities).toHaveBeenCalledWith(
       'tenant-test',
       'user-test',
     );
   });
 });
-
