@@ -102,53 +102,31 @@ describe('AuthorizationReconciliationWorker', () => {
   });
 
   describe('processNextJob', () => {
-    it('should return false if no pending job exists', async () => {
+    it('should return false if no pending job exists for tenant', async () => {
+      (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(true);
       (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(null);
 
-      const result = await worker.processNextJob();
+      const result = await worker.processNextJob('TEST_TENANT');
 
       expect(result).toBe(false);
-      expect(mockLockAdapter.acquireLock).not.toHaveBeenCalled();
-      expect(mockEmployeeRepo.countEmployeesByTenant).not.toHaveBeenCalled();
-      expect(mockLockAdapter.releaseLock).not.toHaveBeenCalled();
-    });
-
-    it('should acquire lock for tenant directly and claim tenant job when tenantCode is provided', async () => {
-      const job = {
-        id: 'job-tenant-1',
-        tenantCode: 'TENANT_DIRECT',
-        sourceType: SyncSourceType.ROLE,
-        sourceId: 'role-1',
-        sourceVersion: 1,
-        triggerType: SyncTriggerType.SCHEDULED,
-        status: SyncJobStatus.PROCESSING,
-        createdBy: 'SYSTEM',
-      } as AuthorizationSyncJob;
-
-      (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(true);
-      (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
-      (mockEmployeeRepo.countEmployeesByTenant as jest.Mock).mockResolvedValue(0);
-
-      const result = await worker.processNextJob('TENANT_DIRECT');
-
-      expect(result).toBe(true);
       expect(mockLockAdapter.acquireLock).toHaveBeenCalledWith(
-        'authz:reconciliation-worker:lock:TENANT_DIRECT',
+        'authz:reconciliation-worker:lock:TEST_TENANT',
       );
-      expect(mockSyncJobRepo.claimNextPendingJob).toHaveBeenCalledWith('TENANT_DIRECT');
+      expect(mockSyncJobRepo.claimNextPendingJob).toHaveBeenCalledWith('TEST_TENANT');
+      expect(mockEmployeeRepo.countEmployeesByTenant).not.toHaveBeenCalled();
       expect(mockLockAdapter.releaseLock).toHaveBeenCalledWith(
-        'authz:reconciliation-worker:lock:TENANT_DIRECT',
+        'authz:reconciliation-worker:lock:TEST_TENANT',
       );
     });
 
-    it('should return false if distributed lock is contended when tenantCode is provided', async () => {
+    it('should return false if distributed lock is contended for tenant', async () => {
       (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(false);
 
-      const result = await worker.processNextJob('TENANT_DIRECT');
+      const result = await worker.processNextJob('TEST_TENANT');
 
       expect(result).toBe(false);
       expect(mockLockAdapter.acquireLock).toHaveBeenCalledWith(
-        'authz:reconciliation-worker:lock:TENANT_DIRECT',
+        'authz:reconciliation-worker:lock:TEST_TENANT',
       );
       expect(mockSyncJobRepo.claimNextPendingJob).not.toHaveBeenCalled();
       expect(mockLockAdapter.releaseLock).not.toHaveBeenCalled();
@@ -166,6 +144,7 @@ describe('AuthorizationReconciliationWorker', () => {
         createdBy: 'user-admin',
       } as AuthorizationSyncJob;
 
+      (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(true);
       (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
       (mockEmployeeRepo.countEmployeesByTenant as jest.Mock).mockResolvedValue(2);
       (mockEmployeeRepo.findEmployeesBatch as jest.Mock).mockResolvedValue([
@@ -173,7 +152,7 @@ describe('AuthorizationReconciliationWorker', () => {
         { employeeId: 'emp-2' },
       ]);
 
-      const result = await worker.processNextJob();
+      const result = await worker.processNextJob('TEST_TENANT');
 
       expect(result).toBe(true);
       expect(mockMembershipReconciler.reconcileGroupPopulation).toHaveBeenCalled();
@@ -187,6 +166,9 @@ describe('AuthorizationReconciliationWorker', () => {
       );
       expect(mockSyncJobRepo.markCompleted).toHaveBeenCalledWith('job-1', 2);
       expect(mockOutboxRepo.create).toHaveBeenCalled();
+      expect(mockLockAdapter.releaseLock).toHaveBeenCalledWith(
+        'authz:reconciliation-worker:lock:TEST_TENANT',
+      );
     });
 
     it('should execute reconciliation for Role job and update role projection version', async () => {
@@ -201,13 +183,14 @@ describe('AuthorizationReconciliationWorker', () => {
         createdBy: 'user-admin',
       } as AuthorizationSyncJob;
 
+      (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(true);
       (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
       (mockEmployeeRepo.countEmployeesByTenant as jest.Mock).mockResolvedValue(1);
       (mockEmployeeRepo.findEmployeesBatch as jest.Mock).mockResolvedValue([
         { employeeId: 'emp-1' },
       ]);
 
-      const result = await worker.processNextJob();
+      const result = await worker.processNextJob('TEST_TENANT');
 
       expect(result).toBe(true);
       expect(mockMembershipReconciler.reconcileGroupPopulation).not.toHaveBeenCalled();
@@ -218,6 +201,9 @@ describe('AuthorizationReconciliationWorker', () => {
       expect(mockRoleRepo.updateProjectionVersion).toHaveBeenCalledWith('TEST_TENANT', 'role-1', 2);
       expect(mockSyncJobRepo.markCompleted).toHaveBeenCalledWith('job-role-1', 1);
       expect(mockOutboxRepo.create).toHaveBeenCalled();
+      expect(mockLockAdapter.releaseLock).toHaveBeenCalledWith(
+        'authz:reconciliation-worker:lock:TEST_TENANT',
+      );
     });
 
     it('should handle failure by marking job failed and emitting outbox event', async () => {
@@ -232,12 +218,13 @@ describe('AuthorizationReconciliationWorker', () => {
         createdBy: 'user-admin',
       } as AuthorizationSyncJob;
 
+      (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(true);
       (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
       (mockEmployeeRepo.countEmployeesByTenant as jest.Mock).mockRejectedValue(
         new Error('DB Connection Failed'),
       );
 
-      const result = await worker.processNextJob();
+      const result = await worker.processNextJob('TEST_TENANT');
 
       expect(result).toBe(true);
       expect(mockSyncJobRepo.markFailed).toHaveBeenCalledWith(
@@ -245,6 +232,9 @@ describe('AuthorizationReconciliationWorker', () => {
         expect.objectContaining({ message: 'DB Connection Failed' }),
       );
       expect(mockOutboxRepo.create).toHaveBeenCalled();
+      expect(mockLockAdapter.releaseLock).toHaveBeenCalledWith(
+        'authz:reconciliation-worker:lock:TEST_TENANT',
+      );
     });
   });
 });

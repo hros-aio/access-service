@@ -104,24 +104,28 @@ describe('AuthorizationSyncJobRepository', () => {
     it('should return null if no pending jobs are available', async () => {
       (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(null);
 
-      const result = await repository.claimNextPendingJob();
+      const result = await repository.claimNextPendingJob('TENANT_A');
 
       expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
-        where: { status: SyncJobStatus.PENDING },
+        where: { tenantCode: 'TENANT_A', status: SyncJobStatus.PENDING },
         order: { createdAt: 'ASC' },
       });
       expect(result).toBeNull();
     });
 
     it('should claim and return job if available', async () => {
-      const pendingJob = { id: 'job-1', status: SyncJobStatus.PENDING } as AuthorizationSyncJob;
+      const pendingJob = {
+        id: 'job-1',
+        tenantCode: 'TENANT_A',
+        status: SyncJobStatus.PENDING,
+      } as AuthorizationSyncJob;
       (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(pendingJob);
       (mockTypeormRepo.update as jest.Mock).mockResolvedValue({ affected: 1 });
 
-      const result = await repository.claimNextPendingJob();
+      const result = await repository.claimNextPendingJob('TENANT_A');
 
       expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
-        where: { status: SyncJobStatus.PENDING },
+        where: { tenantCode: 'TENANT_A', status: SyncJobStatus.PENDING },
         order: { createdAt: 'ASC' },
       });
       expect(mockTypeormRepo.update).toHaveBeenCalledWith(
