@@ -33,7 +33,7 @@ import { RoleRepository } from '../repositories/role.repository';
 @Injectable()
 export class RoleApplicationService {
   private readonly logger = new Logger(RoleApplicationService.name);
-  private readonly HIGH_IMPACT_THRESHOLD = 50;
+  private readonly HIGH_IMPACT_THRESHOLD = 100;
 
   constructor(
     private readonly transactionService: TransactionService,
@@ -287,7 +287,8 @@ export class RoleApplicationService {
 
     // 4. High-impact blast radius check
     const affectedUserCount = await this.roleRepository.countActiveUserReach(id, tenantCode);
-    if (affectedUserCount >= this.HIGH_IMPACT_THRESHOLD && !dto.confirmedHighImpact) {
+    const isConfirmed = dto.confirmedHighImpact === true || dto.confirmed === true;
+    if (affectedUserCount >= this.HIGH_IMPACT_THRESHOLD && !isConfirmed) {
       return {
         confirmationRequired: true,
         affectedUserCount,

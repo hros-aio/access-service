@@ -8,24 +8,30 @@ import { UserGroupAggregate } from '../domain/aggregates/user-group.aggregate';
 import {
   ConcurrentModificationError,
   DuplicateUserGroupNameError,
+  HighImpactConfirmationRequiredError,
   UserGroupNotFoundError,
 } from '../domain/exceptions/user-group.exceptions';
 import { MatchingRuleValidator } from '../domain/validators/matching-rule.validator';
 import { CreateUserGroupDto, UpdateUserGroupDto } from '../dto';
+import { UserGroupImpactService } from './user-group-impact.service';
 import { UserGroupRole } from '../entities/user-group-role.entity';
 import { UserGroup } from '../entities/user-group.entity';
+import { UserGroupMembershipRepository } from '../repositories/user-group-membership.repository';
 import { UserGroupRoleRepository } from '../repositories/user-group-role.repository';
 import { UserGroupRepository } from '../repositories/user-group.repository';
 
 @Injectable()
 export class UserGroupLifecycleService {
   private readonly logger = new Logger(UserGroupLifecycleService.name);
+  private readonly HIGH_IMPACT_THRESHOLD = 100;
 
   constructor(
     private readonly transactionService: TransactionService,
     private readonly userGroupRepository: UserGroupRepository,
     private readonly userGroupRoleRepository: UserGroupRoleRepository,
+    private readonly userGroupMembershipRepository: UserGroupMembershipRepository,
     private readonly outboxRepository: AuthSecurityEventOutboxRepository,
+    private readonly userGroupImpactService: UserGroupImpactService,
   ) {}
 
   async createUserGroup(dto: CreateUserGroupDto): Promise<UserGroup> {
@@ -128,6 +134,18 @@ export class UserGroupLifecycleService {
 
     const { ruleAttributeKeys } = MatchingRuleValidator.validate(dto.matchingRule);
 
+    // Impact blast radius check
+    const currentMemberCount = await this.userGroupMembershipRepository.countByGroup(
+      tenantCode,
+      id,
+    );
+    if (currentMemberCount >= this.HIGH_IMPACT_THRESHOLD && dto.confirmed !== true) {
+      throw new HighImpactConfirmationRequiredError({
+        affectedUserCount: currentMemberCount,
+        threshold: this.HIGH_IMPACT_THRESHOLD,
+      });
+    }
+
     return this.transactionService.runInTransaction(async () => {
       existing.name = dto.name.trim();
       existing.description = dto.description?.trim();
@@ -180,7 +198,7 @@ export class UserGroupLifecycleService {
     });
   }
 
-  async deactivate(id: string, expectedVersion: number): Promise<UserGroup> {
+  async deactivate(id: string, expectedVersion: number, confirmed = false): Promise<UserGroup> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
@@ -191,6 +209,14 @@ export class UserGroupLifecycleService {
 
     if (existing.version !== expectedVersion) {
       throw new ConcurrentModificationError();
+    }
+
+    const memberCount = await this.userGroupMembershipRepository.countByGroup(tenantCode, id);
+    if (memberCount >= this.HIGH_IMPACT_THRESHOLD && !confirmed) {
+      throw new HighImpactConfirmationRequiredError({
+        affectedUserCount: memberCount,
+        threshold: this.HIGH_IMPACT_THRESHOLD,
+      });
     }
 
     const aggregate = UserGroupAggregate.reconstruct({

@@ -5,7 +5,7 @@ import { DeepPartial, FindOneOptions, Repository } from 'typeorm';
 
 import { FilterRoleDto } from '../dto/role.dto';
 import { Role } from '../entities/role.entity';
-import { SystemRoleKey } from '../interfaces/system-role-template.interface';
+import { RoleStatus, SystemRoleKey } from '../interfaces/system-role-template.interface';
 
 @Injectable()
 export class RoleRepository {
@@ -49,6 +49,16 @@ export class RoleRepository {
     return this.repository.findOne({
       where: { tenantCode, systemRoleKey },
       relations: ['permissions'],
+    });
+  }
+
+  async findActiveBuiltInAdminRoles(tenantCode: string): Promise<Role[]> {
+    return this.repository.find({
+      where: {
+        tenantCode,
+        systemRoleKey: SystemRoleKey.ADMINISTRATOR,
+        status: RoleStatus.ACTIVE,
+      },
     });
   }
 

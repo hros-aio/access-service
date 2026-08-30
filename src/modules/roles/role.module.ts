@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { AuthModule } from '../auth/auth.module';
 import { AuthSecurityEventOutbox } from '../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../auth/repositories/auth-security-event-outbox.repository';
 import { PermissionsModule } from '../permissions';
@@ -16,6 +17,7 @@ import { RoleApplicationService } from './services/role.application.service';
   imports: [
     TypeOrmModule.forFeature([Role, RolePermission, AuthSecurityEventOutbox]),
     PermissionsModule,
+    forwardRef(() => AuthModule),
   ],
   controllers: [RoleController],
   providers: [

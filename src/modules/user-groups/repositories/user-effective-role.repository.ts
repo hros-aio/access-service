@@ -30,6 +30,33 @@ export class UserEffectiveRoleRepository {
     });
   }
 
+  async countActiveHoldersByRoleId(tenantCode: string, roleId: string): Promise<number> {
+    const result = await this.repository
+      .createQueryBuilder('uer')
+      .select('COUNT(DISTINCT uer.employeeId)', 'count')
+      .where('uer.tenantCode = :tenantCode', { tenantCode })
+      .andWhere('uer.roleId = :roleId', { roleId })
+      .getRawOne<{ count: string }>();
+
+    return parseInt(result?.count ?? '0', 10);
+  }
+
+  async countActiveHoldersExcludingSourceGroup(
+    tenantCode: string,
+    roleId: string,
+    excludedSourceGroupId: string,
+  ): Promise<number> {
+    const result = await this.repository
+      .createQueryBuilder('uer')
+      .select('COUNT(DISTINCT uer.employeeId)', 'count')
+      .where('uer.tenantCode = :tenantCode', { tenantCode })
+      .andWhere('uer.roleId = :roleId', { roleId })
+      .andWhere('uer.sourceGroupId != :excludedSourceGroupId', { excludedSourceGroupId })
+      .getRawOne<{ count: string }>();
+
+    return parseInt(result?.count ?? '0', 10);
+  }
+
   async deleteByTenantAndIds(tenantCode: string, ids: string[]): Promise<void> {
     if (!ids || ids.length === 0) return;
 
