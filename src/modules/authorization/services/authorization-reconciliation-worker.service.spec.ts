@@ -179,7 +179,9 @@ describe('AuthorizationReconciliationWorker', () => {
 
       (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
       (mockEmployeeRepo.countEmployeesByTenant as jest.Mock).mockResolvedValue(1);
-      (mockEmployeeRepo.findEmployeesBatch as jest.Mock).mockResolvedValue([{ employeeId: 'emp-1' }]);
+      (mockEmployeeRepo.findEmployeesBatch as jest.Mock).mockResolvedValue([
+        { employeeId: 'emp-1' },
+      ]);
 
       const result = await worker.processNextJob();
 
@@ -189,11 +191,7 @@ describe('AuthorizationReconciliationWorker', () => {
         'TEST_TENANT',
         'emp-1',
       );
-      expect(mockRoleRepo.updateProjectionVersion).toHaveBeenCalledWith(
-        'TEST_TENANT',
-        'role-1',
-        2,
-      );
+      expect(mockRoleRepo.updateProjectionVersion).toHaveBeenCalledWith('TEST_TENANT', 'role-1', 2);
       expect(mockSyncJobRepo.markCompleted).toHaveBeenCalledWith('job-role-1', 1);
       expect(mockOutboxRepo.create).toHaveBeenCalled();
     });

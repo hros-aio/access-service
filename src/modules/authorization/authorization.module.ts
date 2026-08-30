@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { AuthorizationConsumer } from '../../kafka/consumers/authorization.consumer';
 import { AuthModule } from '../auth/auth.module';
 import { EmployeeModule } from '../employee/employee.module';
 import { PermissionsModule } from '../permissions';
 import { RoleModule } from '../roles/role.module';
 import { UserGroupModule } from '../user-groups';
-import { AuthorizationConsumer } from '../../kafka/consumers/authorization.consumer';
 import { AuthorizationSyncController } from './controllers/authorization-sync.controller';
 import { BootstrapAuthorizationController } from './controllers/bootstrap-authorization.controller';
 import { AuthorizationSyncJob } from './entities/authorization-sync-job.entity';

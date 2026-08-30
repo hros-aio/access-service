@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RequestContextService } from '@new-hros/libs-core';
-import { EventEnvelope } from '@new-hros/libs-events';
 
 import { AuthorizationConsumer } from './authorization.consumer';
 import { EventType } from '../../enums';
