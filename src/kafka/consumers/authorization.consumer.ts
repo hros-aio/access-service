@@ -23,7 +23,7 @@ export class AuthorizationConsumer {
 
   constructor(private readonly reconciliationWorker: AuthorizationReconciliationWorker) {}
 
-  @EventPattern('authorization.sync-requested')
+  @EventPattern(EventType.AUTHORIZATION_SYNC_REQUESTED)
   async handleAuthorizationSyncRequested(
     @Payload()
     envelope: EventEnvelope<AuthorizationSyncRequestedPayload> & { eventType?: string },
