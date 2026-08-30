@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { AuthorizationSyncService } from './authorization-sync.service';
-import { DistributedLockAdapter } from './distributed-lock.adapter';
 import { RoleRepository } from '../../roles/repositories/role.repository';
 import { UserGroupRepository } from '../../user-groups/repositories/user-group.repository';
 import { SyncSourceType, SyncTriggerType } from '../entities/authorization-sync-job.entity';
@@ -10,10 +9,8 @@ import { ScheduledReconciliationMetrics } from '../telemetry/scheduled-reconcili
 @Injectable()
 export class ScheduledReconciliationScanner {
   private readonly logger = new Logger(ScheduledReconciliationScanner.name);
-  private static readonly LOCK_KEY = 'authz:scheduled_reconciliation:scanner';
 
   constructor(
-    private readonly lockAdapter: DistributedLockAdapter,
     private readonly userGroupRepo: UserGroupRepository,
     private readonly roleRepo: RoleRepository,
     private readonly syncService: AuthorizationSyncService,
@@ -33,25 +30,7 @@ export class ScheduledReconciliationScanner {
     durationMs: number;
   }> {
     const startTime = Date.now();
-    const lockAcquired = await this.lockAdapter.acquireLock(
-      ScheduledReconciliationScanner.LOCK_KEY,
-    );
-
-    if (!lockAcquired) {
-      this.metrics.incrementLockAcquisitions('contended_skipped');
-      this.logger.log('Scheduled reconciliation skipped: lock currently held by another replica.');
-      return {
-        lockAcquired: false,
-        tenantsScanned: 0,
-        dirtyGroupsFound: 0,
-        dirtyRolesFound: 0,
-        jobsEnqueued: 0,
-        durationMs: Date.now() - startTime,
-      };
-    }
-
-    this.metrics.incrementLockAcquisitions('acquired');
-    this.logger.log('Acquired scheduler lock. Starting dirty authorization entity sweep.');
+    this.logger.log('Starting dirty authorization entity sweep.');
 
     let tenantsScanned = 0;
     let dirtyGroupsFound = 0;
@@ -101,7 +80,6 @@ export class ScheduledReconciliationScanner {
           dirtyGroupsFound,
           dirtyRolesFound,
           jobsEnqueued,
-          lockStatus: 'acquired',
         }),
       );
 
@@ -116,8 +94,6 @@ export class ScheduledReconciliationScanner {
     } catch (error) {
       this.logger.error('Unexpected error during scheduled reconciliation sweep', error);
       throw error;
-    } finally {
-      await this.lockAdapter.releaseLock(ScheduledReconciliationScanner.LOCK_KEY);
     }
   }
 
