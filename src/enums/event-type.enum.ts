@@ -25,4 +25,7 @@ export enum EventType {
   USER_GROUP_ROLE_UNASSIGNED = 'user_group.role_unassigned',
   USER_GROUP_SCOPE_UPDATED = 'user_group.scope_updated',
   AUTHORIZATION_USER_GROUP_UPDATED = 'authorization.user-group-updated',
+  AUTHORIZATION_SYNC_REQUESTED = 'authorization.sync-requested',
+  AUTHORIZATION_SYNC_COMPLETED = 'authorization.sync-completed',
+  AUTHORIZATION_SYNC_FAILED = 'authorization.sync-failed',
 }

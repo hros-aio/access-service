@@ -440,4 +440,101 @@ export class AuthSecurityEventOutbox extends BaseEntity {
     outbox.publishStatus = 'pending';
     return outbox;
   }
+
+  static fromAuthorizationSyncRequested(
+    ctx: OutboxContext,
+    data: {
+      jobId: string;
+      sourceType: string;
+      sourceId: string;
+      sourceVersion: number;
+      triggerType: string;
+      initiatedBy?: string | null;
+    },
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.AUTHORIZATION_SYNC_REQUESTED;
+    outbox.sanitizedPayload = {
+      jobId: data.jobId,
+      tenantCode: ctx.tenantCode,
+      sourceType: data.sourceType,
+      sourceId: data.sourceId,
+      sourceVersion: data.sourceVersion,
+      triggerType: data.triggerType,
+      initiatedBy: data.initiatedBy ?? ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromAuthorizationSyncCompleted(
+    ctx: OutboxContext,
+    data: {
+      jobId: string;
+      sourceType: string;
+      sourceId: string;
+      sourceVersion: number;
+      triggerType: string;
+      totalUsers?: number | null;
+      processedUsers: number;
+      initiatedBy?: string | null;
+    },
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.AUTHORIZATION_SYNC_COMPLETED;
+    outbox.sanitizedPayload = {
+      jobId: data.jobId,
+      tenantCode: ctx.tenantCode,
+      sourceType: data.sourceType,
+      sourceId: data.sourceId,
+      sourceVersion: data.sourceVersion,
+      triggerType: data.triggerType,
+      totalUsers: data.totalUsers ?? data.processedUsers,
+      processedUsers: data.processedUsers,
+      initiatedBy: data.initiatedBy ?? ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
+
+  static fromAuthorizationSyncFailed(
+    ctx: OutboxContext,
+    data: {
+      jobId: string;
+      sourceType: string;
+      sourceId: string;
+      sourceVersion: number;
+      triggerType: string;
+      totalUsers?: number | null;
+      processedUsers: number;
+      errorDetails?: Record<string, unknown> | null;
+      initiatedBy?: string | null;
+    },
+  ): AuthSecurityEventOutbox {
+    const outbox = new AuthSecurityEventOutbox();
+    outbox.tenantCode = ctx.tenantCode;
+    outbox.userId = ctx.userId;
+    outbox.eventType = EventType.AUTHORIZATION_SYNC_FAILED;
+    outbox.sanitizedPayload = {
+      jobId: data.jobId,
+      tenantCode: ctx.tenantCode,
+      sourceType: data.sourceType,
+      sourceId: data.sourceId,
+      sourceVersion: data.sourceVersion,
+      triggerType: data.triggerType,
+      totalUsers: data.totalUsers,
+      processedUsers: data.processedUsers,
+      errorDetails: data.errorDetails ?? null,
+      initiatedBy: data.initiatedBy ?? ctx.userId ?? 'SYSTEM',
+      timestamp: new Date().toISOString(),
+    };
+    outbox.publishStatus = 'pending';
+    return outbox;
+  }
 }

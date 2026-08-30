@@ -102,6 +102,23 @@ export class EmployeeReferenceRepository {
     return Array.isArray(result) && result.length > 0;
   }
 
+  async countEmployeesByTenant(tenantCode: string): Promise<number> {
+    return this.repository.count({ where: { tenantCode, status: 'ACTIVE' } });
+  }
+
+  async findEmployeesBatch(
+    tenantCode: string,
+    skip: number,
+    take: number,
+  ): Promise<EmployeeReference[]> {
+    return this.repository.find({
+      where: { tenantCode, status: 'ACTIVE' },
+      skip,
+      take,
+      order: { synchronizedAt: 'ASC' },
+    });
+  }
+
   /**
    * Atomically updates reportees_count for a manager (with delta +1 or -1).
    * Ensures reportees_count never drops below 0.
