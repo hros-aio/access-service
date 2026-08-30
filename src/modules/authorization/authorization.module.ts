@@ -6,6 +6,7 @@ import { EmployeeModule } from '../employee/employee.module';
 import { PermissionsModule } from '../permissions';
 import { RoleModule } from '../roles/role.module';
 import { UserGroupModule } from '../user-groups';
+import { AuthorizationConsumer } from '../../kafka/consumers/authorization.consumer';
 import { AuthorizationSyncController } from './controllers/authorization-sync.controller';
 import { BootstrapAuthorizationController } from './controllers/bootstrap-authorization.controller';
 import { AuthorizationSyncJob } from './entities/authorization-sync-job.entity';
@@ -30,7 +31,11 @@ import { UserAuthorizationCacheService } from './services/user-authorization-cac
     PermissionsModule,
     AuthModule,
   ],
-  controllers: [BootstrapAuthorizationController, AuthorizationSyncController],
+  controllers: [
+    BootstrapAuthorizationController,
+    AuthorizationSyncController,
+    AuthorizationConsumer,
+  ],
   providers: [
     UserEffectiveRoleRepository,
     AuthorizationSyncJobRepository,

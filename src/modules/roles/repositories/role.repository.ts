@@ -112,6 +112,21 @@ export class RoleRepository {
     });
   }
 
+  async update(
+    criteria: { id: string; tenantCode?: string },
+    partialEntity: DeepPartial<Role> | Record<string, unknown>,
+  ): Promise<void> {
+    await this.repository.update(criteria, partialEntity);
+  }
+
+  async updateProjectionVersion(
+    tenantCode: string,
+    id: string,
+    projectionVersion: number,
+  ): Promise<void> {
+    await this.repository.update({ tenantCode, id }, { projectionVersion } as DeepPartial<Role>);
+  }
+
   async delete(id: string): Promise<void> {
     await this.repository.delete(id);
   }

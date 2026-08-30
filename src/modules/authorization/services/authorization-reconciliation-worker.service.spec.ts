@@ -1,3 +1,4 @@
+import { RedisCacheProvider } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { AuthorizationReconciliationWorker } from './authorization-reconciliation-worker.service';
@@ -27,6 +28,11 @@ describe('AuthorizationReconciliationWorker', () => {
   let mockEffectiveRoleProjectionService: Partial<EffectiveRoleProjectionService>;
   let mockOutboxRepo: Partial<AuthSecurityEventOutboxRepository>;
   let mockTransactionService: Partial<TransactionService>;
+  let mockRedisClient: {
+    set: jest.Mock;
+    eval: jest.Mock;
+  };
+  let mockRedisCacheProvider: Partial<RedisCacheProvider>;
 
   beforeEach(() => {
     mockSyncJobRepo = {
@@ -44,7 +50,9 @@ describe('AuthorizationReconciliationWorker', () => {
       updateProjectionVersion: jest.fn(),
     };
 
-    mockRoleRepo = {};
+    mockRoleRepo = {
+      updateProjectionVersion: jest.fn().mockResolvedValue(undefined),
+    };
 
     mockEmployeeRepo = {
       countEmployeesByTenant: jest.fn(),
@@ -74,6 +82,15 @@ describe('AuthorizationReconciliationWorker', () => {
       }),
     };
 
+    mockRedisClient = {
+      set: jest.fn().mockResolvedValue('OK'),
+      eval: jest.fn().mockResolvedValue(1),
+    };
+
+    mockRedisCacheProvider = {
+      getClient: jest.fn().mockReturnValue(mockRedisClient),
+    } as unknown as Partial<RedisCacheProvider>;
+
     worker = new AuthorizationReconciliationWorker(
       mockSyncJobRepo as unknown as AuthorizationSyncJobRepository,
       mockUserGroupRepo as unknown as UserGroupRepository,
@@ -84,6 +101,7 @@ describe('AuthorizationReconciliationWorker', () => {
       mockEffectiveRoleProjectionService as unknown as EffectiveRoleProjectionService,
       mockOutboxRepo as unknown as AuthSecurityEventOutboxRepository,
       mockTransactionService as unknown as TransactionService,
+      mockRedisCacheProvider as unknown as RedisCacheProvider,
     );
   });
 
@@ -92,6 +110,16 @@ describe('AuthorizationReconciliationWorker', () => {
   });
 
   describe('processNextJob', () => {
+    it('should return false if distributed lock could not be acquired (another pod running)', async () => {
+      mockRedisClient.set.mockResolvedValue(null);
+
+      const result = await worker.processNextJob();
+
+      expect(result).toBe(false);
+      expect(mockSyncJobRepo.claimNextPendingJob).not.toHaveBeenCalled();
+      expect(mockRedisClient.eval).not.toHaveBeenCalled();
+    });
+
     it('should return false if no pending job exists', async () => {
       (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(null);
 
@@ -99,6 +127,7 @@ describe('AuthorizationReconciliationWorker', () => {
 
       expect(result).toBe(false);
       expect(mockEmployeeRepo.countEmployeesByTenant).not.toHaveBeenCalled();
+      expect(mockRedisClient.eval).toHaveBeenCalled();
     });
 
     it('should execute reconciliation for UserGroup job and mark completed', async () => {
@@ -133,6 +162,39 @@ describe('AuthorizationReconciliationWorker', () => {
         3,
       );
       expect(mockSyncJobRepo.markCompleted).toHaveBeenCalledWith('job-1', 2);
+      expect(mockOutboxRepo.create).toHaveBeenCalled();
+    });
+
+    it('should execute reconciliation for Role job and update role projection version', async () => {
+      const job = {
+        id: 'job-role-1',
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.ROLE,
+        sourceId: 'role-1',
+        sourceVersion: 2,
+        triggerType: SyncTriggerType.MANUAL,
+        status: SyncJobStatus.PROCESSING,
+        createdBy: 'user-admin',
+      } as AuthorizationSyncJob;
+
+      (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
+      (mockEmployeeRepo.countEmployeesByTenant as jest.Mock).mockResolvedValue(1);
+      (mockEmployeeRepo.findEmployeesBatch as jest.Mock).mockResolvedValue([{ employeeId: 'emp-1' }]);
+
+      const result = await worker.processNextJob();
+
+      expect(result).toBe(true);
+      expect(mockMembershipReconciler.reconcileGroupPopulation).not.toHaveBeenCalled();
+      expect(mockEffectiveRoleProjectionService.recomputeUserEffectiveRoles).toHaveBeenCalledWith(
+        'TEST_TENANT',
+        'emp-1',
+      );
+      expect(mockRoleRepo.updateProjectionVersion).toHaveBeenCalledWith(
+        'TEST_TENANT',
+        'role-1',
+        2,
+      );
+      expect(mockSyncJobRepo.markCompleted).toHaveBeenCalledWith('job-role-1', 1);
       expect(mockOutboxRepo.create).toHaveBeenCalled();
     });
 
