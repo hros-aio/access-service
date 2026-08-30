@@ -20,12 +20,12 @@
 
 **Purpose**: Database schema expansion and baseline projection models
 
-- [X] T001 [P] Create TypeORM database migration adding columns (`company_id`, `location_id`, `department_id`, `grade_id`, `job_title_id`, `employment_status`, `manager_employee_id`, `reportees_count`, `source_version`) to `employee_references` in `src/migrations/1724880000000-extend-employee-references-projection.ts`
-- [X] T002 [P] Create TypeORM database migration for `user_group_memberships` and `user_effective_roles` tables with indexes and unique constraints in `src/migrations/1724880001000-create-group-memberships-and-effective-roles.ts`
-- [X] T003 Update `EmployeeReference` TypeORM entity with extended columns in `src/modules/employee/entities/employee-reference.entity.ts`
-- [X] T004 [P] Create `UserGroupMembership` TypeORM entity in `src/modules/user-groups/entities/user-group-membership.entity.ts`
-- [X] T005 [P] Create `UserEffectiveRole` TypeORM entity in `src/modules/user-groups/entities/user-effective-role.entity.ts`
-- [X] T006 Export new entities and update `UserGroupModule` & `EmployeeModule` entity registrations in `src/modules/user-groups/entities/index.ts` and `src/modules/user-groups/user-group.module.ts`
+- [x] T001 [P] Create TypeORM database migration adding columns (`company_id`, `location_id`, `department_id`, `grade_id`, `job_title_id`, `employment_status`, `manager_employee_id`, `reportees_count`, `source_version`) to `employee_references` in `src/migrations/1724880000000-extend-employee-references-projection.ts`
+- [x] T002 [P] Create TypeORM database migration for `user_group_memberships` and `user_effective_roles` tables with indexes and unique constraints in `src/migrations/1724880001000-create-group-memberships-and-effective-roles.ts`
+- [x] T003 Update `EmployeeReference` TypeORM entity with extended columns in `src/modules/employee/entities/employee-reference.entity.ts`
+- [x] T004 [P] Create `UserGroupMembership` TypeORM entity in `src/modules/user-groups/entities/user-group-membership.entity.ts`
+- [x] T005 [P] Create `UserEffectiveRole` TypeORM entity in `src/modules/user-groups/entities/user-effective-role.entity.ts`
+- [x] T006 Export new entities and update `UserGroupModule` & `EmployeeModule` entity registrations in `src/modules/user-groups/entities/index.ts` and `src/modules/user-groups/user-group.module.ts`
 
 ---
 
@@ -33,11 +33,11 @@
 
 **Purpose**: Data access layer and repositories supporting atomic projection updates, conditional version upserts, and member lookups
 
-- [X] T007 Implement `EmployeeReferenceRepository` extended methods (`upsertProjection`, `updateReporteesCount`, `findByEmployeeId`, `findCandidateEmployees`) in `src/modules/employee/repositories/employee-reference.repository.ts`
-- [X] T008 [P] Implement `UserGroupMembershipRepository` for batch insert/delete and membership lookups in `src/modules/user-groups/repositories/user-group-membership.repository.ts`
-- [X] T009 [P] Implement `UserEffectiveRoleRepository` for minimal diff updates and role evaluations in `src/modules/user-groups/repositories/user-effective-role.repository.ts`
-- [X] T010 Unit tests for `EmployeeReferenceRepository` in `src/modules/employee/repositories/employee-reference.repository.spec.ts`
-- [X] T011 [P] Unit tests for `UserGroupMembershipRepository` in `src/modules/user-groups/repositories/user-group-membership.repository.spec.ts`
+- [x] T007 Implement `EmployeeReferenceRepository` extended methods (`upsertProjection`, `updateReporteesCount`, `findByEmployeeId`, `findCandidateEmployees`) in `src/modules/employee/repositories/employee-reference.repository.ts`
+- [x] T008 [P] Implement `UserGroupMembershipRepository` for batch insert/delete and membership lookups in `src/modules/user-groups/repositories/user-group-membership.repository.ts`
+- [x] T009 [P] Implement `UserEffectiveRoleRepository` for minimal diff updates and role evaluations in `src/modules/user-groups/repositories/user-effective-role.repository.ts`
+- [x] T010 Unit tests for `EmployeeReferenceRepository` in `src/modules/employee/repositories/employee-reference.repository.spec.ts`
+- [x] T011 [P] Unit tests for `UserGroupMembershipRepository` in `src/modules/user-groups/repositories/user-group-membership.repository.spec.ts`
 
 **Checkpoint**: Foundation ready - projection schema, repositories, and data access methods fully tested.
 
@@ -51,13 +51,13 @@
 
 ### Tests for User Story 1
 
-- [X] T012 [P] [US1] Unit tests for `MatchingRuleValidator` and domain models in `src/modules/user-groups/domain/validators/matching-rule.validator.spec.ts`
+- [x] T012 [P] [US1] Unit tests for `MatchingRuleValidator` and domain models in `src/modules/user-groups/domain/validators/matching-rule.validator.spec.ts`
 
 ### Implementation for User Story 1
 
-- [X] T013 [US1] Update `MatchingRule` and `RuleClause` value objects and types (supporting both `field`/`attribute` and extended operator vocabulary) in `src/modules/user-groups/domain/value-objects/matching-rule.vo.ts`
-- [X] T014 [US1] Enhance `MatchingRuleValidator` to enforce `combinator: 'all'`, closed attribute allow-list (`employmentStatus`, `companyId`, `locationId`, `departmentId`, `gradeId`, `jobTitleId`, `reporteesCount`, `hasReportees`), and operator validation in `src/modules/user-groups/domain/validators/matching-rule.validator.ts`
-- [X] T015 [US1] Ensure `UserGroupLifecycleService` and `UserGroupAggregate` invoke the updated validator and populate `rule_attribute_keys` in `src/modules/user-groups/services/user-group-lifecycle.service.ts`
+- [x] T013 [US1] Update `MatchingRule` and `RuleClause` value objects and types (supporting both `field`/`attribute` and extended operator vocabulary) in `src/modules/user-groups/domain/value-objects/matching-rule.vo.ts`
+- [x] T014 [US1] Enhance `MatchingRuleValidator` to enforce `combinator: 'all'`, closed attribute allow-list (`employmentStatus`, `companyId`, `locationId`, `departmentId`, `gradeId`, `jobTitleId`, `reporteesCount`, `hasReportees`), and operator validation in `src/modules/user-groups/domain/validators/matching-rule.validator.ts`
+- [x] T015 [US1] Ensure `UserGroupLifecycleService` and `UserGroupAggregate` invoke the updated validator and populate `rule_attribute_keys` in `src/modules/user-groups/services/user-group-lifecycle.service.ts`
 
 **Checkpoint**: User Story 1 complete - matching rules can be authored, validated against the closed vocabulary, and persisted with indexed attribute keys.
 
@@ -71,16 +71,16 @@
 
 ### Tests for User Story 2
 
-- [X] T016 [P] [US2] Unit tests for `UserGroupMatchingEngine` (in-memory evaluation & SQL builder) in `src/modules/user-groups/services/user-group-matching.engine.spec.ts`
-- [X] T017 [P] [US2] Unit tests for `MembershipReconciler` in `src/modules/user-groups/services/membership-reconciler.service.spec.ts`
-- [X] T018 [P] [US2] Unit tests for `EmployeeAttributePropagationService` in `src/modules/user-groups/services/employee-attribute-propagation.service.spec.ts`
+- [x] T016 [P] [US2] Unit tests for `UserGroupMatchingEngine` (in-memory evaluation & SQL builder) in `src/modules/user-groups/services/user-group-matching.engine.spec.ts`
+- [x] T017 [P] [US2] Unit tests for `MembershipReconciler` in `src/modules/user-groups/services/membership-reconciler.service.spec.ts`
+- [x] T018 [P] [US2] Unit tests for `EmployeeAttributePropagationService` in `src/modules/user-groups/services/employee-attribute-propagation.service.spec.ts`
 
 ### Implementation for User Story 2
 
-- [X] T019 [US2] Implement `UserGroupMatchingEngine` with pure in-memory `evaluate()` and parameterized `buildMatchingQuery()` in `src/modules/user-groups/services/user-group-matching.engine.ts`
-- [X] T020 [US2] Implement `MembershipReconciler` (`reconcileSingleEmployee`, `reconcileGroupPopulation`) with atomic diffing and outbox audit logging in `src/modules/user-groups/services/membership-reconciler.service.ts`
-- [X] T021 [US2] Implement `EmployeeAttributePropagationService` using array-overlap group candidate queries (`rule_attribute_keys && $changedKeys`) in `src/modules/user-groups/services/employee-attribute-propagation.service.ts`
-- [X] T022 [US2] Export and register new services in `src/modules/user-groups/user-group.module.ts`
+- [x] T019 [US2] Implement `UserGroupMatchingEngine` with pure in-memory `evaluate()` and parameterized `buildMatchingQuery()` in `src/modules/user-groups/services/user-group-matching.engine.ts`
+- [x] T020 [US2] Implement `MembershipReconciler` (`reconcileSingleEmployee`, `reconcileGroupPopulation`) with atomic diffing and outbox audit logging in `src/modules/user-groups/services/membership-reconciler.service.ts`
+- [x] T021 [US2] Implement `EmployeeAttributePropagationService` using array-overlap group candidate queries (`rule_attribute_keys && $changedKeys`) in `src/modules/user-groups/services/employee-attribute-propagation.service.ts`
+- [x] T022 [US2] Export and register new services in `src/modules/user-groups/user-group.module.ts`
 
 **Checkpoint**: User Story 2 complete - single-employee attribute modifications evaluate criteria in-memory and reconcile memberships and effective roles atomically.
 
@@ -94,12 +94,12 @@
 
 ### Tests for User Story 3
 
-- [X] T023 [P] [US3] Unit and integration tests for `EmployeeLifecycleConsumer` reporting-line and lifecycle events in `src/kafka/consumers/employee-lifecycle.consumer.spec.ts`
+- [x] T023 [P] [US3] Unit and integration tests for `EmployeeLifecycleConsumer` reporting-line and lifecycle events in `src/kafka/consumers/employee-lifecycle.consumer.spec.ts`
 
 ### Implementation for User Story 3
 
-- [X] T024 [US3] Update `EmployeeLifecyclePayload` interface and event patterns for directory events (`employee.created`, `employee.updated`, `employee.department-changed`, `employee.location-changed`, `employee.reporting-line-changed`) in `src/kafka/interfaces/employee-lifecycle.interface.ts`
-- [X] T025 [US3] Extend `EmployeeLifecycleConsumer` to handle reporting-line changes, update projection rows with `source_version` check, adjust derived `reportees_count`, and invoke `EmployeeAttributePropagationService` in `src/kafka/consumers/employee-lifecycle.consumer.ts`
+- [x] T024 [US3] Update `EmployeeLifecyclePayload` interface and event patterns for directory events (`employee.created`, `employee.updated`, `employee.department-changed`, `employee.location-changed`, `employee.reporting-line-changed`) in `src/kafka/interfaces/employee-lifecycle.interface.ts`
+- [x] T025 [US3] Extend `EmployeeLifecycleConsumer` to handle reporting-line changes, update projection rows with `source_version` check, adjust derived `reportees_count`, and invoke `EmployeeAttributePropagationService` in `src/kafka/consumers/employee-lifecycle.consumer.ts`
 
 **Checkpoint**: User Story 3 complete - workforce reporting-line transitions and directory lifecycle events drive manager criteria evaluation automatically.
 
@@ -113,14 +113,14 @@
 
 ### Tests for User Story 4
 
-- [X] T026 [P] [US4] Contract and unit tests for `UserGroupPopulationController` and `UserGroupPopulationQueryService` in `src/modules/user-groups/controllers/user-group-population.controller.spec.ts` and `src/modules/user-groups/services/user-group-population-query.service.spec.ts`
+- [x] T026 [P] [US4] Contract and unit tests for `UserGroupPopulationController` and `UserGroupPopulationQueryService` in `src/modules/user-groups/controllers/user-group-population.controller.spec.ts` and `src/modules/user-groups/services/user-group-population-query.service.spec.ts`
 
 ### Implementation for User Story 4
 
-- [X] T027 [P] [US4] Create DTOs (`PreviewMatchingDto`, `CriteriaImpactDto`, `MatchedMemberDto`, `MatchingRuleDto`) in `src/modules/user-groups/dto/`
-- [X] T028 [US4] Implement `UserGroupPopulationQueryService` (`getMatchingPopulation`, `previewCriteriaPopulation`, `estimateCriteriaDiff`) in `src/modules/user-groups/services/user-group-population-query.service.ts`
-- [X] T029 [US4] Implement `UserGroupPopulationController` exposing `GET /api/v1/user-groups/:id/members`, `POST /api/v1/user-groups/preview-matching`, and `POST /api/v1/user-groups/:id/criteria-impact` in `src/modules/user-groups/controllers/user-group-population.controller.ts`
-- [X] T030 [US4] Register controller and service in `src/modules/user-groups/user-group.module.ts`
+- [x] T027 [P] [US4] Create DTOs (`PreviewMatchingDto`, `CriteriaImpactDto`, `MatchedMemberDto`, `MatchingRuleDto`) in `src/modules/user-groups/dto/`
+- [x] T028 [US4] Implement `UserGroupPopulationQueryService` (`getMatchingPopulation`, `previewCriteriaPopulation`, `estimateCriteriaDiff`) in `src/modules/user-groups/services/user-group-population-query.service.ts`
+- [x] T029 [US4] Implement `UserGroupPopulationController` exposing `GET /user-groups/:id/members`, `POST /user-groups/preview-matching`, and `POST /user-groups/:id/criteria-impact` in `src/modules/user-groups/controllers/user-group-population.controller.ts`
+- [x] T030 [US4] Register controller and service in `src/modules/user-groups/user-group.module.ts`
 
 **Checkpoint**: User Story 4 complete - administrators can preview matching populations and inspect diff impacts with zero side effects.
 
@@ -130,9 +130,9 @@
 
 **Purpose**: End-to-end verification, performance validation, and security audit hardening
 
-- [X] T031 [P] End-to-end integration test covering criteria authoring, Kafka event ingestion, matching re-evaluation, and effective role materialization in `src/modules/user-groups/user-group-matching.integration.spec.ts`
-- [X] T032 [P] Swagger and OpenAPI schema validation against `specs/019-user-group-dynamic-matching/contracts/user-group-matching.openapi.yaml`
-- [X] T033 Execute quickstart validation scenarios defined in `specs/019-user-group-dynamic-matching/quickstart.md`
+- [x] T031 [P] End-to-end integration test covering criteria authoring, Kafka event ingestion, matching re-evaluation, and effective role materialization in `src/modules/user-groups/user-group-matching.integration.spec.ts`
+- [x] T032 [P] Swagger and OpenAPI schema validation against `specs/019-user-group-dynamic-matching/contracts/user-group-matching.openapi.yaml`
+- [x] T033 Execute quickstart validation scenarios defined in `specs/019-user-group-dynamic-matching/quickstart.md`
 
 ---
 

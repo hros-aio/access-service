@@ -38,7 +38,7 @@ pnpm test:e2e test/permissions/permission-catalog.e2e-spec.ts
 1. Start the service with a valid `permission-catalog.yaml`.
 2. Authenticate as an administrator and issue:
    ```bash
-   curl -X GET http://localhost:3000/api/v1/permissions/catalog \
+   curl -X GET http://localhost:3000/permissions/catalog \
      -H "Authorization: Bearer <ADMIN_JWT>" \
      -H "x-tenant-code: TENANT_ALPHA"
    ```
