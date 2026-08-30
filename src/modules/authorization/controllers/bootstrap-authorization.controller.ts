@@ -1,20 +1,9 @@
 import { Controller, Get, Req, UnauthorizedException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
+import { RequestContext } from '@new-hros/libs-core';
 
 import { BootstrapCapabilitiesResponseDto } from '../dto/bootstrap-capabilities-response.dto';
 import { BootstrapAuthorizationService } from '../services/bootstrap-authorization.service';
-
-interface AuthenticatedRequest extends Request {
-  tenantCode?: string;
-  user?: {
-    id?: string;
-    userId?: string;
-    sub?: string;
-    employeeId?: string;
-    tenantCode?: string;
-  };
-}
 
 @ApiTags('Authorization')
 @Controller('auth/bootstrap')
@@ -36,17 +25,10 @@ export class BootstrapAuthorizationController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 503, description: 'Authorization store unavailable' })
   async getCapabilities(
-    @Req() request: AuthenticatedRequest,
+    @Req() request: RequestContext,
   ): Promise<{ success: boolean; data: BootstrapCapabilitiesResponseDto }> {
-    const tenantCode =
-      request.tenantCode ||
-      (request.headers['x-tenant-code'] as string) ||
-      request.user?.tenantCode;
-    const userId =
-      request.user?.id ||
-      request.user?.userId ||
-      request.user?.sub ||
-      (request.headers['x-user-id'] as string);
+    const tenantCode = request.tenantCode;
+    const userId = request.user?.userId;
 
     if (!tenantCode || !userId) {
       throw new UnauthorizedException('Authentication context is missing or invalid.');

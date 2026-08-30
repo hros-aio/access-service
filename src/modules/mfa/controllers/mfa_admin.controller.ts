@@ -9,17 +9,9 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '@new-hros/libs-apis';
-import { Request as ExpressRequest } from 'express';
+import { RequestContext } from '@new-hros/libs-core';
 
 import { MfaAdminApplicationService } from '../services/mfa_admin_application.service';
-
-interface AuthenticatedRequest extends ExpressRequest {
-  user?: {
-    tenantCode?: string;
-    id?: string;
-    userId?: string;
-  };
-}
 
 @Public()
 @ApiTags('MFA')
@@ -31,7 +23,7 @@ export class MfaAdminController {
   @HttpCode(HttpStatus.OK)
   public async resetUserMfa(
     @Param('userId', new ParseUUIDPipe()) targetUserId: string,
-    @Request() req: AuthenticatedRequest,
+    @Request() req: RequestContext,
   ): Promise<{
     success: boolean;
     targetUserId: string;
@@ -39,7 +31,7 @@ export class MfaAdminController {
     revokedSessionsCount: number;
   }> {
     const tenantCode = req.user?.tenantCode ?? 'tenant-001';
-    const adminUserId = req.user?.id ?? req.user?.userId ?? '00000000-0000-0000-0000-000000000000';
+    const adminUserId = req.user?.userId ?? '00000000-0000-0000-0000-000000000000';
     return this.mfaAdminApplicationService.resetUserMfa(tenantCode, targetUserId, adminUserId);
   }
 }

@@ -9,20 +9,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '@new-hros/libs-apis';
-import { Request as ExpressRequest } from 'express';
+import { RequestContext } from '@new-hros/libs-core';
 
 import { EnrollMfaDto } from '../dto/enroll_mfa.dto';
 import { VerifyChallengeDto } from '../dto/verify_challenge.dto';
 import { VerifyEnrollmentDto } from '../dto/verify_enrollment.dto';
 import { MfaApplicationService } from '../services/mfa_application.service';
-
-export interface AuthenticatedRequest extends ExpressRequest {
-  user?: {
-    tenantCode?: string;
-    id?: string;
-    userId?: string;
-  };
-}
 
 @Public()
 @ApiTags('MFA')
@@ -34,10 +26,10 @@ export class MfaController {
   @HttpCode(HttpStatus.CREATED)
   public async initiateEnrollment(
     @Body(new ValidationPipe({ transform: true })) dto: EnrollMfaDto,
-    @Request() req: AuthenticatedRequest,
+    @Request() req: RequestContext,
   ): Promise<Record<string, unknown>> {
     const tenantCode = req.user?.tenantCode ?? 'tenant-001';
-    const userId = req.user?.id ?? req.user?.userId ?? '00000000-0000-0000-0000-000000000001';
+    const userId = req.user?.userId ?? '00000000-0000-0000-0000-000000000001';
     return this.mfaApplicationService.initiateEnrollment(tenantCode, userId, dto);
   }
 
@@ -45,10 +37,10 @@ export class MfaController {
   @HttpCode(HttpStatus.OK)
   public async verifyEnrollment(
     @Body(new ValidationPipe({ transform: true })) dto: VerifyEnrollmentDto,
-    @Request() req: AuthenticatedRequest,
+    @Request() req: RequestContext,
   ): Promise<Record<string, unknown>> {
     const tenantCode = req.user?.tenantCode ?? 'tenant-001';
-    const userId = req.user?.id ?? req.user?.userId ?? '00000000-0000-0000-0000-000000000001';
+    const userId = req.user?.userId ?? '00000000-0000-0000-0000-000000000001';
     return this.mfaApplicationService.verifyAndActivateFactor(tenantCode, userId, dto);
   }
 
@@ -56,10 +48,10 @@ export class MfaController {
   @HttpCode(HttpStatus.OK)
   public async verifyChallenge(
     @Body(new ValidationPipe({ transform: true })) dto: VerifyChallengeDto,
-    @Request() req: AuthenticatedRequest,
+    @Request() req: RequestContext,
   ): Promise<Record<string, unknown>> {
     const tenantCode = req.user?.tenantCode ?? 'tenant-001';
-    const userId = req.user?.id ?? req.user?.userId ?? '00000000-0000-0000-0000-000000000001';
+    const userId = req.user?.userId ?? '00000000-0000-0000-0000-000000000001';
     return this.mfaApplicationService.verifyLoginChallenge(tenantCode, userId, dto);
   }
 }

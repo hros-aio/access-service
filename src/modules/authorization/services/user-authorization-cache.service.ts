@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisCacheProvider } from '@new-hros/libs-core';
 
+import { GenerateUserAuthzCacheKey, GenerateUserAuthzVersionKey } from '../../../constants';
 import {
   EffectiveUserRole,
   UserAuthorizationProfile,
@@ -28,14 +29,6 @@ export class UserAuthorizationCacheService {
     return (this.redisCacheProvider as unknown as { client?: RedisClientInterface }).client;
   }
 
-  private getUserCacheKey(tenantCode: string, userId: string): string {
-    return `authz:user:${tenantCode}:${userId}`;
-  }
-
-  private getVersionKey(tenantCode: string, userId: string): string {
-    return `authz:version:${tenantCode}:${userId}`;
-  }
-
   async syncUserCache(
     tenantCode: string,
     userId: string,
@@ -57,7 +50,7 @@ export class UserAuthorizationCacheService {
     let version = 1;
     if (this.client) {
       try {
-        version = await this.client.incr(this.getVersionKey(tenantCode, userId));
+        version = await this.client.incr(GenerateUserAuthzVersionKey(tenantCode, userId));
       } catch (err) {
         this.logger.warn(
           `Failed to increment version for user ${userId}: ${(err as Error).message}`,
@@ -72,7 +65,7 @@ export class UserAuthorizationCacheService {
 
     if (this.client) {
       try {
-        const key = this.getUserCacheKey(tenantCode, userId);
+        const key = GenerateUserAuthzCacheKey(tenantCode, userId);
         await this.client.set(key, JSON.stringify(payload), 'EX', this.TTL_SECONDS);
       } catch (err) {
         this.logger.error(
@@ -90,7 +83,7 @@ export class UserAuthorizationCacheService {
   ): Promise<UserAuthorizationProfile> {
     if (this.client) {
       try {
-        const key = this.getUserCacheKey(tenantCode, userId);
+        const key = GenerateUserAuthzCacheKey(tenantCode, userId);
         const data = await this.client.get(key);
         if (data) {
           return JSON.parse(data) as UserAuthorizationProfile;
@@ -116,7 +109,7 @@ export class UserAuthorizationCacheService {
   async invalidateUserCache(tenantCode: string, userId: string): Promise<void> {
     if (!this.client) return;
     try {
-      const key = this.getUserCacheKey(tenantCode, userId);
+      const key = GenerateUserAuthzCacheKey(tenantCode, userId);
       await this.client.del(key);
     } catch (err) {
       this.logger.warn(`Failed to invalidate cache for user ${userId}: ${(err as Error).message}`);
