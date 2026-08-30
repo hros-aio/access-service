@@ -113,31 +113,44 @@ describe('AuthorizationReconciliationWorker', () => {
       expect(mockLockAdapter.releaseLock).not.toHaveBeenCalled();
     });
 
-    it('should return false and reclaim job to PENDING if distributed lock could not be acquired for tenant', async () => {
+    it('should acquire lock for tenant directly and claim tenant job when tenantCode is provided', async () => {
       const job = {
-        id: 'job-1',
-        tenantCode: 'TEST_TENANT',
-        sourceType: SyncSourceType.USER_GROUP,
-        sourceId: 'ug-1',
-        sourceVersion: 3,
-        triggerType: SyncTriggerType.MANUAL,
+        id: 'job-tenant-1',
+        tenantCode: 'TENANT_DIRECT',
+        sourceType: SyncSourceType.ROLE,
+        sourceId: 'role-1',
+        sourceVersion: 1,
+        triggerType: SyncTriggerType.SCHEDULED,
         status: SyncJobStatus.PROCESSING,
-        retryCount: 0,
-        createdBy: 'user-admin',
+        createdBy: 'SYSTEM',
       } as AuthorizationSyncJob;
 
+      (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(true);
       (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
-      (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(false);
-      mockSyncJobRepo.reclaimStuckJob = jest.fn().mockResolvedValue(undefined);
+      (mockEmployeeRepo.countEmployeesByTenant as jest.Mock).mockResolvedValue(0);
 
-      const result = await worker.processNextJob();
+      const result = await worker.processNextJob('TENANT_DIRECT');
+
+      expect(result).toBe(true);
+      expect(mockLockAdapter.acquireLock).toHaveBeenCalledWith(
+        'authz:reconciliation-worker:lock:TENANT_DIRECT',
+      );
+      expect(mockSyncJobRepo.claimNextPendingJob).toHaveBeenCalledWith('TENANT_DIRECT');
+      expect(mockLockAdapter.releaseLock).toHaveBeenCalledWith(
+        'authz:reconciliation-worker:lock:TENANT_DIRECT',
+      );
+    });
+
+    it('should return false if distributed lock is contended when tenantCode is provided', async () => {
+      (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(false);
+
+      const result = await worker.processNextJob('TENANT_DIRECT');
 
       expect(result).toBe(false);
       expect(mockLockAdapter.acquireLock).toHaveBeenCalledWith(
-        'authz:reconciliation-worker:lock:TEST_TENANT',
+        'authz:reconciliation-worker:lock:TENANT_DIRECT',
       );
-      expect(mockSyncJobRepo.reclaimStuckJob).toHaveBeenCalledWith('job-1', 0);
-      expect(mockEmployeeRepo.countEmployeesByTenant).not.toHaveBeenCalled();
+      expect(mockSyncJobRepo.claimNextPendingJob).not.toHaveBeenCalled();
       expect(mockLockAdapter.releaseLock).not.toHaveBeenCalled();
     });
 

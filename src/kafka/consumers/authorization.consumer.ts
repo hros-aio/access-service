@@ -64,7 +64,7 @@ export class AuthorizationConsumer {
       this.logger.log(
         `Processing authorization sync requested event for tenant ${payload.tenantCode}, job ${payload.jobId || 'N/A'}`,
       );
-      await this.reconciliationWorker.processNextJob();
+      await this.reconciliationWorker.processNextJob(payload.tenantCode);
     });
   }
 }

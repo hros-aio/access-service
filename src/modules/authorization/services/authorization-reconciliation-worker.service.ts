@@ -32,7 +32,39 @@ export class AuthorizationReconciliationWorker {
     private readonly lockAdapter: DistributedLockAdapter,
   ) {}
 
-  async processNextJob(): Promise<boolean> {
+  async processNextJob(tenantCode?: string): Promise<boolean> {
+    // If tenantCode is specified upfront (e.g. from Kafka consumer or tenant sweep), lock directly
+    if (tenantCode) {
+      const lockKey = GenerateAuthzWorkerLockKey(tenantCode);
+      const acquired = await this.lockAdapter.acquireLock(lockKey);
+      if (!acquired) {
+        this.logger.debug(
+          `Another worker is currently processing jobs for tenant ${tenantCode}. Skipping cycle.`,
+        );
+        return false;
+      }
+
+      try {
+        const job = await this.syncJobRepo.claimNextPendingJob(tenantCode);
+        if (!job) {
+          return false;
+        }
+
+        try {
+          await this.executeJob(job);
+        } catch (error: unknown) {
+          const err = error instanceof Error ? error : new Error(String(error));
+          this.logger.error(`Error processing sync job ${job.id}: ${err.message}`, err.stack);
+          await this.handleJobFailure(job, err);
+        }
+
+        return true;
+      } finally {
+        await this.lockAdapter.releaseLock(lockKey);
+      }
+    }
+
+    // Otherwise claim next pending job across all tenants and lock on its tenantCode
     const job = await this.syncJobRepo.claimNextPendingJob();
     if (!job) {
       return false;
@@ -44,7 +76,6 @@ export class AuthorizationReconciliationWorker {
       this.logger.debug(
         `Another worker is currently processing jobs for tenant ${job.tenantCode}. Reclaiming job ${job.id} to PENDING.`,
       );
-      // Revert status back to PENDING so other cycles / workers can pick it up
       await this.syncJobRepo.reclaimStuckJob(job.id, job.retryCount ?? 0);
       return false;
     }

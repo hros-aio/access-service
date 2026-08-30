@@ -42,9 +42,14 @@ export class AuthorizationSyncJobRepository extends BaseRepository<Authorization
     });
   }
 
-  async claimNextPendingJob(): Promise<AuthorizationSyncJob | null> {
+  async claimNextPendingJob(tenantCode?: string): Promise<AuthorizationSyncJob | null> {
+    const whereClause: Record<string, unknown> = { status: SyncJobStatus.PENDING };
+    if (tenantCode) {
+      whereClause.tenantCode = tenantCode;
+    }
+
     const pendingJob = await this.repository.findOne({
-      where: { status: SyncJobStatus.PENDING },
+      where: whereClause,
       order: { createdAt: 'ASC' },
     });
 
