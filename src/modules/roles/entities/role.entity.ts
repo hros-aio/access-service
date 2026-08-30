@@ -24,6 +24,9 @@ export class Role extends BaseEntity {
   @Column({ name: 'system_role_key', type: 'varchar', length: 100, nullable: true })
   systemRoleKey?: SystemRoleKey;
 
+  @Column({ name: 'projection_version', type: 'int', default: 0 })
+  projectionVersion: number;
+
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
   createdBy?: string;
 

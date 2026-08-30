@@ -91,6 +91,7 @@ export class AuthorizationSyncService {
           throw new NotFoundException(`Role with id ${sourceId} not found`);
         }
         sourceVersion = role.version;
+        projectionVersion = role.projectionVersion ?? 0;
       }
     }
 
