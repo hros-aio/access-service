@@ -123,6 +123,7 @@ describe('ScheduledReconciliationScanner', () => {
       sourceVersion: 3,
       triggerType: SyncTriggerType.SCHEDULED,
       createdBy: 'SYSTEM',
+      ignoreValidateSource: true,
     });
 
     expect(mockSyncService.enqueueSyncJob).toHaveBeenCalledWith({
@@ -132,6 +133,7 @@ describe('ScheduledReconciliationScanner', () => {
       sourceVersion: 4,
       triggerType: SyncTriggerType.SCHEDULED,
       createdBy: 'SYSTEM',
+      ignoreValidateSource: true,
     });
 
     expect(mockLockAdapter.releaseLock).toHaveBeenCalledWith(
@@ -169,5 +171,58 @@ describe('ScheduledReconciliationScanner', () => {
 
     expect(result.jobsEnqueued).toBe(1);
     expect(mockLockAdapter.releaseLock).toHaveBeenCalled();
+  });
+
+  it('should process dirty groups and roles via handleByTenant', async () => {
+    mockSyncService.enqueueSyncJob.mockResolvedValueOnce({
+      jobId: 'job-ug',
+      tenantCode: 'TENANT_TEST',
+      sourceType: SyncSourceType.USER_GROUP,
+      sourceId: 'ug-1',
+      sourceVersion: 1,
+      triggerType: SyncTriggerType.SCHEDULED,
+      status: SyncJobStatus.PENDING,
+      processedUsers: 0,
+      totalUsers: 0,
+      isNoOp: false,
+    } as SyncJobResponseDto);
+
+    mockSyncService.enqueueSyncJob.mockResolvedValueOnce({
+      jobId: 'job-role',
+      tenantCode: 'TENANT_TEST',
+      sourceType: SyncSourceType.ROLE,
+      sourceId: 'role-1',
+      sourceVersion: 1,
+      triggerType: SyncTriggerType.SCHEDULED,
+      status: SyncJobStatus.PENDING,
+      processedUsers: 0,
+      totalUsers: 0,
+      isNoOp: false,
+    } as SyncJobResponseDto);
+
+    const enqueued = await scanner.handleByTenant('TENANT_TEST', {
+      groups: [{ id: 'ug-1', version: 1 }],
+      roles: [{ id: 'role-1', version: 1 }],
+    });
+
+    expect(enqueued).toBe(2);
+    expect(mockSyncService.enqueueSyncJob).toHaveBeenCalledWith({
+      tenantCode: 'TENANT_TEST',
+      sourceType: SyncSourceType.USER_GROUP,
+      sourceId: 'ug-1',
+      sourceVersion: 1,
+      triggerType: SyncTriggerType.SCHEDULED,
+      createdBy: 'SYSTEM',
+      ignoreValidateSource: true,
+    });
+    expect(mockSyncService.enqueueSyncJob).toHaveBeenCalledWith({
+      tenantCode: 'TENANT_TEST',
+      sourceType: SyncSourceType.ROLE,
+      sourceId: 'role-1',
+      sourceVersion: 1,
+      triggerType: SyncTriggerType.SCHEDULED,
+      createdBy: 'SYSTEM',
+      ignoreValidateSource: true,
+    });
   });
 });

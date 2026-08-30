@@ -267,5 +267,37 @@ describe('AuthorizationSyncService', () => {
         }),
       );
     });
+
+    it('should bypass repository source validation when ignoreValidateSource is true', async () => {
+      (mockSyncJobRepo.findInFlightJob as jest.Mock).mockResolvedValue(null);
+
+      const createdJob = {
+        id: 'job-sched-bypass',
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.USER_GROUP,
+        sourceId: 'ug-3',
+        sourceVersion: 2,
+        triggerType: SyncTriggerType.SCHEDULED,
+        status: SyncJobStatus.PENDING,
+        processedUsers: 0,
+        createdBy: 'SYSTEM',
+      } as AuthorizationSyncJob;
+
+      (mockSyncJobRepo.create as jest.Mock).mockResolvedValue(createdJob);
+
+      const result = await service.enqueueSyncJob({
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.USER_GROUP,
+        sourceId: 'ug-3',
+        sourceVersion: 2,
+        triggerType: SyncTriggerType.SCHEDULED,
+        createdBy: 'SYSTEM',
+        ignoreValidateSource: true,
+      });
+
+      expect(result.jobId).toBe('job-sched-bypass');
+      expect(mockUserGroupRepo.findByTenantAndId).not.toHaveBeenCalled();
+      expect(mockRoleRepo.findByIdAndTenant).not.toHaveBeenCalled();
+    });
   });
 });

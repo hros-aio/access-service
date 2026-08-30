@@ -63,6 +63,7 @@ export class AuthorizationSyncService {
     sourceVersion?: number;
     triggerType?: SyncTriggerType;
     createdBy?: string | null;
+    ignoreValidateSource?: boolean;
   }): Promise<SyncJobResponseDto> {
     const {
       tenantCode,
@@ -70,42 +71,38 @@ export class AuthorizationSyncService {
       sourceId,
       triggerType = SyncTriggerType.SCHEDULED,
       createdBy = 'SYSTEM',
+      ignoreValidateSource = false,
     } = params;
 
     let sourceVersion = params.sourceVersion ?? 1;
     let projectionVersion = 0;
 
-    if (sourceType === SyncSourceType.USER_GROUP) {
-      const group = await this.userGroupRepo.findByTenantAndId(tenantCode, sourceId);
-      if (!group) {
-        throw new NotFoundException(`User Group with id ${sourceId} not found`);
+    if (!ignoreValidateSource) {
+      if (sourceType === SyncSourceType.USER_GROUP) {
+        const group = await this.userGroupRepo.findByTenantAndId(tenantCode, sourceId);
+        if (!group) {
+          throw new NotFoundException(`User Group with id ${sourceId} not found`);
+        }
+        sourceVersion = group.version;
+        projectionVersion = group.projectionVersion ?? 0;
+      } else if (sourceType === SyncSourceType.ROLE) {
+        const role = await this.roleRepo.findByIdAndTenant(sourceId, tenantCode);
+        if (!role) {
+          throw new NotFoundException(`Role with id ${sourceId} not found`);
+        }
+        sourceVersion = role.version;
       }
-      sourceVersion = group.version;
-      projectionVersion = group.projectionVersion ?? 0;
-    } else if (sourceType === SyncSourceType.ROLE) {
-      const role = await this.roleRepo.findByIdAndTenant(sourceId, tenantCode);
-      if (!role) {
-        throw new NotFoundException(`Role with id ${sourceId} not found`);
-      }
-      sourceVersion = role.version;
-      projectionVersion = 'projectionVersion' in role ? Number(role['projectionVersion']) || 0 : 0;
     }
 
     // 1. Idempotent No-Op check: already synchronized
     if (sourceVersion <= projectionVersion) {
-      return {
-        jobId: null,
+      return SyncJobResponseDto.completedValue({
         tenantCode,
         sourceType,
         sourceId,
         sourceVersion,
         triggerType,
-        status: SyncJobStatus.COMPLETED,
-        processedUsers: 0,
-        totalUsers: 0,
-        isNoOp: true,
-        message: 'Configuration is already fully synchronized',
-      };
+      });
     }
 
     // 2. Check for in-flight job

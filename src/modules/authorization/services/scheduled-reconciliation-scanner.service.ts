@@ -79,48 +79,15 @@ export class ScheduledReconciliationScanner {
       tenantsScanned = tenantSet.size;
       this.metrics.incrementTenantsScanned(tenantsScanned);
 
-      // 3. Process groups per tenant batch
-      for (const group of dirtyGroups) {
-        try {
-          const response = await this.syncService.enqueueSyncJob({
-            tenantCode: group.tenantCode,
-            sourceType: SyncSourceType.USER_GROUP,
-            sourceId: group.id,
-            sourceVersion: group.version,
-            triggerType: SyncTriggerType.SCHEDULED,
-            createdBy: 'SYSTEM',
-          });
-          if (response.jobId) {
-            jobsEnqueued++;
-          }
-        } catch (err) {
-          this.logger.error(
-            `Failed to enqueue scheduled sync for user group ${group.id} in tenant ${group.tenantCode}`,
-            err,
-          );
-        }
-      }
-
-      // 4. Process roles per tenant batch
-      for (const role of dirtyRoles) {
-        try {
-          const response = await this.syncService.enqueueSyncJob({
-            tenantCode: role.tenantCode,
-            sourceType: SyncSourceType.ROLE,
-            sourceId: role.id,
-            sourceVersion: role.version,
-            triggerType: SyncTriggerType.SCHEDULED,
-            createdBy: 'SYSTEM',
-          });
-          if (response.jobId) {
-            jobsEnqueued++;
-          }
-        } catch (err) {
-          this.logger.error(
-            `Failed to enqueue scheduled sync for role ${role.id} in tenant ${role.tenantCode}`,
-            err,
-          );
-        }
+      // 3. Process per tenant
+      for (const tenantCode of tenantSet) {
+        const tenantGroups = dirtyGroups.filter((g) => g.tenantCode === tenantCode);
+        const tenantRoles = dirtyRoles.filter((r) => r.tenantCode === tenantCode);
+        const enqueued = await this.handleByTenant(tenantCode, {
+          groups: tenantGroups,
+          roles: tenantRoles,
+        });
+        jobsEnqueued += enqueued;
       }
 
       const durationMs = Date.now() - startTime;
@@ -152,5 +119,69 @@ export class ScheduledReconciliationScanner {
     } finally {
       await this.lockAdapter.releaseLock(ScheduledReconciliationScanner.LOCK_KEY);
     }
+  }
+
+  /**
+   * Process dirty entities for a single tenant.
+   * Isolates failures and returns number of enqueued jobs.
+   */
+  async handleByTenant(
+    tenantCode: string,
+    dirty: {
+      groups?: { id: string; version: number }[];
+      roles?: { id: string; version: number }[];
+    },
+  ): Promise<number> {
+    let jobsEnqueued = 0;
+
+    if (dirty.groups && dirty.groups.length > 0) {
+      for (const group of dirty.groups) {
+        try {
+          const response = await this.syncService.enqueueSyncJob({
+            tenantCode,
+            sourceType: SyncSourceType.USER_GROUP,
+            sourceId: group.id,
+            sourceVersion: group.version,
+            triggerType: SyncTriggerType.SCHEDULED,
+            createdBy: 'SYSTEM',
+            ignoreValidateSource: true,
+          });
+          if (response.jobId) {
+            jobsEnqueued++;
+          }
+        } catch (err) {
+          this.logger.error(
+            `Failed to enqueue scheduled sync for user group ${group.id} in tenant ${tenantCode}`,
+            err,
+          );
+        }
+      }
+    }
+
+    if (dirty.roles && dirty.roles.length > 0) {
+      for (const role of dirty.roles) {
+        try {
+          const response = await this.syncService.enqueueSyncJob({
+            tenantCode,
+            sourceType: SyncSourceType.ROLE,
+            sourceId: role.id,
+            sourceVersion: role.version,
+            triggerType: SyncTriggerType.SCHEDULED,
+            createdBy: 'SYSTEM',
+            ignoreValidateSource: true,
+          });
+          if (response.jobId) {
+            jobsEnqueued++;
+          }
+        } catch (err) {
+          this.logger.error(
+            `Failed to enqueue scheduled sync for role ${role.id} in tenant ${tenantCode}`,
+            err,
+          );
+        }
+      }
+    }
+
+    return jobsEnqueued;
   }
 }
