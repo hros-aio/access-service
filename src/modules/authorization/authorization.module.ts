@@ -23,7 +23,6 @@ import { EffectiveRoleProjectionService } from './services/effective-role-projec
 import { ScheduledReconciliationScanner } from './services/scheduled-reconciliation-scanner.service';
 import { SyncJobWatchdogService } from './services/sync-job-watchdog.service';
 import { UserAuthorizationCacheService } from './services/user-authorization-cache.service';
-import { ScheduledReconciliationMetrics } from './telemetry/scheduled-reconciliation.metrics';
 
 @Module({
   imports: [
@@ -51,7 +50,6 @@ import { ScheduledReconciliationMetrics } from './telemetry/scheduled-reconcilia
     SyncJobWatchdogService,
     DistributedLockAdapter,
     ScheduledReconciliationScanner,
-    ScheduledReconciliationMetrics,
     AuthorizationGuard,
   ],
   exports: [
@@ -66,7 +64,6 @@ import { ScheduledReconciliationMetrics } from './telemetry/scheduled-reconcilia
     SyncJobWatchdogService,
     DistributedLockAdapter,
     ScheduledReconciliationScanner,
-    ScheduledReconciliationMetrics,
     AuthorizationGuard,
   ],
 })

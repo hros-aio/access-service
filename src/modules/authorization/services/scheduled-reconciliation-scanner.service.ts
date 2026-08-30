@@ -4,7 +4,6 @@ import { AuthorizationSyncService } from './authorization-sync.service';
 import { RoleRepository } from '../../roles/repositories/role.repository';
 import { UserGroupRepository } from '../../user-groups/repositories/user-group.repository';
 import { SyncSourceType, SyncTriggerType } from '../entities/authorization-sync-job.entity';
-import { ScheduledReconciliationMetrics } from '../telemetry/scheduled-reconciliation.metrics';
 
 @Injectable()
 export class ScheduledReconciliationScanner {
@@ -14,21 +13,13 @@ export class ScheduledReconciliationScanner {
     private readonly userGroupRepo: UserGroupRepository,
     private readonly roleRepo: RoleRepository,
     private readonly syncService: AuthorizationSyncService,
-    private readonly metrics: ScheduledReconciliationMetrics,
   ) {}
 
   /**
    * Main scheduled execution entry point.
    * Can be wired to NestJS @Cron or invoked directly by tests/runners.
    */
-  async handleCron(): Promise<{
-    lockAcquired: boolean;
-    tenantsScanned: number;
-    dirtyGroupsFound: number;
-    dirtyRolesFound: number;
-    jobsEnqueued: number;
-    durationMs: number;
-  }> {
+  async handleCron(): Promise<void> {
     const startTime = Date.now();
     this.logger.log('Starting dirty authorization entity sweep.');
 
@@ -41,22 +32,15 @@ export class ScheduledReconciliationScanner {
       // 1. Discover dirty entities across tenants
       const dirtyGroups = await this.userGroupRepo.findDirtyUserGroups();
       dirtyGroupsFound = dirtyGroups.length;
-      if (dirtyGroupsFound > 0) {
-        this.metrics.incrementDirtyEntitiesDiscovered('USER_GROUP', dirtyGroupsFound);
-      }
 
       const dirtyRoles = await this.roleRepo.findDirtyRoles();
       dirtyRolesFound = dirtyRoles.length;
-      if (dirtyRolesFound > 0) {
-        this.metrics.incrementDirtyEntitiesDiscovered('ROLE', dirtyRolesFound);
-      }
 
       // 2. Aggregate unique tenants
       const tenantSet = new Set<string>();
       dirtyGroups.forEach((g) => tenantSet.add(g.tenantCode));
       dirtyRoles.forEach((r) => tenantSet.add(r.tenantCode));
       tenantsScanned = tenantSet.size;
-      this.metrics.incrementTenantsScanned(tenantsScanned);
 
       // 3. Process per tenant
       for (const tenantCode of tenantSet) {
@@ -70,7 +54,6 @@ export class ScheduledReconciliationScanner {
       }
 
       const durationMs = Date.now() - startTime;
-      this.metrics.recordSweepDuration(durationMs / 1000);
 
       this.logger.log(
         JSON.stringify({
@@ -82,15 +65,6 @@ export class ScheduledReconciliationScanner {
           jobsEnqueued,
         }),
       );
-
-      return {
-        lockAcquired: true,
-        tenantsScanned,
-        dirtyGroupsFound,
-        dirtyRolesFound,
-        jobsEnqueued,
-        durationMs,
-      };
     } catch (error) {
       this.logger.error('Unexpected error during scheduled reconciliation sweep', error);
       throw error;

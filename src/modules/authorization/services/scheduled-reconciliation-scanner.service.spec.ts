@@ -10,14 +10,12 @@ import {
   SyncSourceType,
   SyncTriggerType,
 } from '../entities/authorization-sync-job.entity';
-import { ScheduledReconciliationMetrics } from '../telemetry/scheduled-reconciliation.metrics';
 
 describe('ScheduledReconciliationScanner', () => {
   let scanner: ScheduledReconciliationScanner;
   let mockUserGroupRepo: jest.Mocked<UserGroupRepository>;
   let mockRoleRepo: jest.Mocked<RoleRepository>;
   let mockSyncService: jest.Mocked<AuthorizationSyncService>;
-  let metrics: ScheduledReconciliationMetrics;
 
   beforeEach(async () => {
     mockUserGroupRepo = {
@@ -31,8 +29,6 @@ describe('ScheduledReconciliationScanner', () => {
     mockSyncService = {
       enqueueSyncJob: jest.fn(),
     } as unknown as jest.Mocked<AuthorizationSyncService>;
-
-    metrics = new ScheduledReconciliationMetrics();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -48,10 +44,6 @@ describe('ScheduledReconciliationScanner', () => {
         {
           provide: AuthorizationSyncService,
           useValue: mockSyncService,
-        },
-        {
-          provide: ScheduledReconciliationMetrics,
-          useValue: metrics,
         },
       ],
     }).compile();
@@ -82,13 +74,7 @@ describe('ScheduledReconciliationScanner', () => {
       isNoOp: false,
     } as SyncJobResponseDto);
 
-    const result = await scanner.handleCron();
-
-    expect(result.lockAcquired).toBe(true);
-    expect(result.tenantsScanned).toBe(2);
-    expect(result.dirtyGroupsFound).toBe(2);
-    expect(result.dirtyRolesFound).toBe(1);
-    expect(result.jobsEnqueued).toBe(3);
+    await scanner.handleCron();
 
     expect(mockSyncService.enqueueSyncJob).toHaveBeenCalledWith({
       tenantCode: 'TENANT_A',
@@ -133,9 +119,9 @@ describe('ScheduledReconciliationScanner', () => {
         isNoOp: false,
       } as SyncJobResponseDto);
 
-    const result = await scanner.handleCron();
+    await scanner.handleCron();
 
-    expect(result.jobsEnqueued).toBe(1);
+    expect(mockSyncService.enqueueSyncJob).toHaveBeenCalledTimes(2);
   });
 
   it('should process dirty groups and roles via handleByTenant', async () => {

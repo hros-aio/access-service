@@ -12,7 +12,6 @@ import { AuthorizationSyncJobRepository } from '../../src/modules/authorization/
 import { AuthorizationSyncService } from '../../src/modules/authorization/services/authorization-sync.service';
 import { DistributedLockAdapter } from '../../src/modules/authorization/services/distributed-lock.adapter';
 import { ScheduledReconciliationScanner } from '../../src/modules/authorization/services/scheduled-reconciliation-scanner.service';
-import { ScheduledReconciliationMetrics } from '../../src/modules/authorization/telemetry/scheduled-reconciliation.metrics';
 import { RoleRepository } from '../../src/modules/roles/repositories/role.repository';
 import { UserGroupRepository } from '../../src/modules/user-groups/repositories/user-group.repository';
 
@@ -72,7 +71,6 @@ describe('Scheduled Authorization Reconciliation (E2E Integration Flow)', () => 
       providers: [
         ScheduledReconciliationScanner,
         AuthorizationSyncService,
-        ScheduledReconciliationMetrics,
         { provide: DistributedLockAdapter, useValue: mockLockAdapter },
         { provide: UserGroupRepository, useValue: mockUserGroupRepo },
         { provide: RoleRepository, useValue: mockRoleRepo },
@@ -90,12 +88,7 @@ describe('Scheduled Authorization Reconciliation (E2E Integration Flow)', () => 
   });
 
   it('should run end-to-end scheduled reconciliation sweep and isolate tenant batches', async () => {
-    const sweepResult = await scanner.handleCron();
-
-    expect(sweepResult.lockAcquired).toBe(true);
-    expect(sweepResult.tenantsScanned).toBe(2);
-    expect(sweepResult.dirtyGroupsFound).toBe(2);
-    expect(sweepResult.jobsEnqueued).toBe(2);
+    await scanner.handleCron();
 
     expect(mockSyncJobRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({

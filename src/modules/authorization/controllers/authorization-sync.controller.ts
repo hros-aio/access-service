@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
-import { ScheduledSweepResponseDto } from '../dto/scheduled-sweep-response.dto';
 import { SyncJobResponseDto } from '../dto/sync-job-response.dto';
 import { TriggerSyncNowDto } from '../dto/trigger-sync-now.dto';
 import { AuthorizationGuard, RequirePermissions } from '../guards/authorization.guard';
@@ -48,16 +47,12 @@ export class AuthorizationSyncController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Sweep execution result or lock contention skip',
-    type: ScheduledSweepResponseDto,
+    description: 'Sweep execution completed',
   })
-  async triggerScheduledSweep(): Promise<ScheduledSweepResponseDto> {
-    const result = await this.scanner.handleCron();
+  async triggerScheduledSweep(): Promise<{ message: string }> {
+    await this.scanner.handleCron();
     return {
-      ...result,
-      message: result.lockAcquired
-        ? 'Scheduled authorization reconciliation sweep executed successfully'
-        : 'Scheduled reconciliation skipped: lock currently held by another replica',
+      message: 'Scheduled authorization reconciliation sweep executed successfully',
     };
   }
 }

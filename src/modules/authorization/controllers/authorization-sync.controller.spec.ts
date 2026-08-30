@@ -108,22 +108,12 @@ describe('AuthorizationSyncController', () => {
 
   describe('POST /authz/scheduled-sweep', () => {
     it('should trigger scheduled reconciliation scanner sweep and return response', async () => {
-      const sweepSummary = {
-        lockAcquired: true,
-        tenantsScanned: 3,
-        dirtyGroupsFound: 4,
-        dirtyRolesFound: 1,
-        jobsEnqueued: 5,
-        durationMs: 320,
-      };
-
-      (mockScanner.handleCron as jest.Mock).mockResolvedValue(sweepSummary);
+      (mockScanner.handleCron as jest.Mock).mockResolvedValue(undefined);
 
       const result = await controller.triggerScheduledSweep();
 
       expect(mockScanner.handleCron).toHaveBeenCalled();
       expect(result).toEqual({
-        ...sweepSummary,
         message: 'Scheduled authorization reconciliation sweep executed successfully',
       });
     });
