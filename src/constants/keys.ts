@@ -29,3 +29,7 @@ export function GenerateUserAuthzCacheKey(tenantCode: string, userId: string): s
 export function GenerateUserAuthzVersionKey(tenantCode: string, userId: string): string {
   return `authz:version:${tenantCode}:${userId}`;
 }
+
+export function GenerateAuthzWorkerLockKey(): string {
+  return 'authz:reconciliation-worker:lock';
+}
