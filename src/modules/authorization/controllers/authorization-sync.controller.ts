@@ -1,17 +1,22 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
+import { ScheduledSweepResponseDto } from '../dto/scheduled-sweep-response.dto';
 import { SyncJobResponseDto } from '../dto/sync-job-response.dto';
 import { TriggerSyncNowDto } from '../dto/trigger-sync-now.dto';
 import { AuthorizationGuard, RequirePermissions } from '../guards/authorization.guard';
 import { AuthorizationSyncService } from '../services/authorization-sync.service';
+import { ScheduledReconciliationScanner } from '../services/scheduled-reconciliation-scanner.service';
 
 @ApiTags('Authorization Sync')
 @ApiBearerAuth()
 @UseGuards(AuthorizationGuard)
 @Controller('authz')
 export class AuthorizationSyncController {
-  constructor(private readonly syncService: AuthorizationSyncService) {}
+  constructor(
+    private readonly syncService: AuthorizationSyncService,
+    private readonly scanner: ScheduledReconciliationScanner,
+  ) {}
 
   @Post('sync-now')
   @RequirePermissions('user_group.sync', 'role.sync')
@@ -35,5 +40,24 @@ export class AuthorizationSyncController {
   })
   async getSyncJobStatus(@Param('jobId') jobId: string): Promise<SyncJobResponseDto> {
     return this.syncService.getJobStatus(jobId);
+  }
+
+  @Post('scheduled-sweep')
+  @ApiOperation({
+    summary: 'Trigger scheduled authorization reconciliation sweep (System / K8s CronJob only)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Sweep execution result or lock contention skip',
+    type: ScheduledSweepResponseDto,
+  })
+  async triggerScheduledSweep(): Promise<ScheduledSweepResponseDto> {
+    const result = await this.scanner.handleCron();
+    return {
+      ...result,
+      message: result.lockAcquired
+        ? 'Scheduled authorization reconciliation sweep executed successfully'
+        : 'Scheduled reconciliation skipped: lock currently held by another replica',
+    };
   }
 }

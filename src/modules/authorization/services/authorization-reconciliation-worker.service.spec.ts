@@ -1,7 +1,7 @@
-import { RedisCacheProvider } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { AuthorizationReconciliationWorker } from './authorization-reconciliation-worker.service';
+import { DistributedLockAdapter } from './distributed-lock.adapter';
 import { EffectiveRoleProjectionService } from './effective-role-projection.service';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { EmployeeReferenceRepository } from '../../employee/repositories/employee-reference.repository';
@@ -28,11 +28,7 @@ describe('AuthorizationReconciliationWorker', () => {
   let mockEffectiveRoleProjectionService: Partial<EffectiveRoleProjectionService>;
   let mockOutboxRepo: Partial<AuthSecurityEventOutboxRepository>;
   let mockTransactionService: Partial<TransactionService>;
-  let mockRedisClient: {
-    set: jest.Mock;
-    eval: jest.Mock;
-  };
-  let mockRedisCacheProvider: Partial<RedisCacheProvider>;
+  let mockLockAdapter: Partial<DistributedLockAdapter>;
 
   beforeEach(() => {
     mockSyncJobRepo = {
@@ -82,14 +78,10 @@ describe('AuthorizationReconciliationWorker', () => {
       }),
     };
 
-    mockRedisClient = {
-      set: jest.fn().mockResolvedValue('OK'),
-      eval: jest.fn().mockResolvedValue(1),
+    mockLockAdapter = {
+      acquireLock: jest.fn().mockResolvedValue(true),
+      releaseLock: jest.fn().mockResolvedValue(true),
     };
-
-    mockRedisCacheProvider = {
-      getClient: jest.fn().mockReturnValue(mockRedisClient),
-    } as unknown as Partial<RedisCacheProvider>;
 
     worker = new AuthorizationReconciliationWorker(
       mockSyncJobRepo as unknown as AuthorizationSyncJobRepository,
@@ -101,7 +93,7 @@ describe('AuthorizationReconciliationWorker', () => {
       mockEffectiveRoleProjectionService as unknown as EffectiveRoleProjectionService,
       mockOutboxRepo as unknown as AuthSecurityEventOutboxRepository,
       mockTransactionService as unknown as TransactionService,
-      mockRedisCacheProvider as unknown as RedisCacheProvider,
+      mockLockAdapter as unknown as DistributedLockAdapter,
     );
   });
 
@@ -111,13 +103,13 @@ describe('AuthorizationReconciliationWorker', () => {
 
   describe('processNextJob', () => {
     it('should return false if distributed lock could not be acquired (another pod running)', async () => {
-      mockRedisClient.set.mockResolvedValue(null);
+      (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(false);
 
       const result = await worker.processNextJob();
 
       expect(result).toBe(false);
       expect(mockSyncJobRepo.claimNextPendingJob).not.toHaveBeenCalled();
-      expect(mockRedisClient.eval).not.toHaveBeenCalled();
+      expect(mockLockAdapter.releaseLock).not.toHaveBeenCalled();
     });
 
     it('should return false if no pending job exists', async () => {
@@ -127,7 +119,7 @@ describe('AuthorizationReconciliationWorker', () => {
 
       expect(result).toBe(false);
       expect(mockEmployeeRepo.countEmployeesByTenant).not.toHaveBeenCalled();
-      expect(mockRedisClient.eval).toHaveBeenCalled();
+      expect(mockLockAdapter.releaseLock).toHaveBeenCalled();
     });
 
     it('should execute reconciliation for UserGroup job and mark completed', async () => {

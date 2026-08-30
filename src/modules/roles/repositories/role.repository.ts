@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
-import { DeepPartial, FindOneOptions, Repository } from 'typeorm';
+import { DeepPartial, FindOneOptions, Raw, Repository } from 'typeorm';
 
 import { FilterRoleDto } from '../dto/role.dto';
 import { Role } from '../entities/role.entity';
@@ -129,5 +129,20 @@ export class RoleRepository {
 
   async delete(id: string): Promise<void> {
     await this.repository.delete(id);
+  }
+
+  async findDirtyRoles(): Promise<{ tenantCode: string; id: string; version: number }[]> {
+    const roles = await this.repository.find({
+      select: ['tenantCode', 'id', 'version'],
+      where: {
+        version: Raw((alias) => `${alias} <> COALESCE(projection_version, 0)`),
+      },
+    });
+
+    return roles.map((r) => ({
+      tenantCode: r.tenantCode,
+      id: r.id,
+      version: r.version,
+    }));
   }
 }

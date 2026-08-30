@@ -1,1 +1,3 @@
-{"feature_directory": "specs/025-authorization-sync-now"}
+{
+  "feature_directory": "specs/026-scheduled-authz-reconciliation"
+}

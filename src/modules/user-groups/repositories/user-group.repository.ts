@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
+import { Raw } from 'typeorm';
 
 import { UserGroupStatus } from '../domain/enums';
 import { UserGroup } from '../entities/user-group.entity';
@@ -83,5 +84,20 @@ export class UserGroupRepository extends BaseRepository<UserGroup> {
 
     const [items, total] = await qb.getManyAndCount();
     return { items, total };
+  }
+
+  async findDirtyUserGroups(): Promise<{ tenantCode: string; id: string; version: number }[]> {
+    const groups = await this.repository.find({
+      select: ['tenantCode', 'id', 'version'],
+      where: {
+        version: Raw((alias) => `${alias} <> COALESCE(projection_version, 0)`),
+      },
+    });
+
+    return groups.map((g) => ({
+      tenantCode: g.tenantCode,
+      id: g.id,
+      version: g.version,
+    }));
   }
 }

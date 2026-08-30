@@ -1,10 +1,7 @@
-import { randomUUID } from 'crypto';
-
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisCacheProvider } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
-import Redis from 'ioredis';
 
+import { DistributedLockAdapter } from './distributed-lock.adapter';
 import { EffectiveRoleProjectionService } from './effective-role-projection.service';
 import { GenerateAuthzWorkerLockKey } from '../../../constants';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
@@ -21,7 +18,6 @@ import { AuthorizationSyncJobRepository } from '../repositories/authorization-sy
 export class AuthorizationReconciliationWorker {
   private readonly logger = new Logger(AuthorizationReconciliationWorker.name);
   private readonly batchSize = 500;
-  private readonly lockTtlSeconds = 60; // 60 seconds distributed lock TTL
 
   constructor(
     private readonly syncJobRepo: AuthorizationSyncJobRepository,
@@ -33,56 +29,13 @@ export class AuthorizationReconciliationWorker {
     private readonly effectiveRoleProjectionService: EffectiveRoleProjectionService,
     private readonly outboxRepo: AuthSecurityEventOutboxRepository,
     private readonly transactionService: TransactionService,
-    private readonly redisCacheProvider: RedisCacheProvider,
+    private readonly lockAdapter: DistributedLockAdapter,
   ) {}
-
-  private get redisClient(): Redis | null {
-    const provider = this.redisCacheProvider as unknown as {
-      getClient?(): Redis | null;
-      client?: Redis | null;
-    };
-    return provider.getClient?.() ?? provider.client ?? null;
-  }
-
-  private async acquireLock(lockKey: string, lockValue: string): Promise<boolean> {
-    const client = this.redisClient;
-    if (!client) {
-      // Fallback: If Redis is unavailable, allow execution to proceed relying on PostgreSQL pessimistic lock
-      return true;
-    }
-    try {
-      const result = await client.set(lockKey, lockValue, 'EX', this.lockTtlSeconds, 'NX');
-      return result === 'OK';
-    } catch (error) {
-      this.logger.warn(`Failed to acquire distributed lock via Redis: ${error}`);
-      return true;
-    }
-  }
-
-  private async releaseLock(lockKey: string, lockValue: string): Promise<void> {
-    const client = this.redisClient;
-    if (!client) {
-      return;
-    }
-    const luaScript = `
-      if redis.call("get", KEYS[1]) == ARGV[1] then
-        return redis.call("del", KEYS[1])
-      else
-        return 0
-      end
-    `;
-    try {
-      await client.eval(luaScript, 1, lockKey, lockValue);
-    } catch (error) {
-      this.logger.warn(`Failed to release distributed lock via Redis: ${error}`);
-    }
-  }
 
   async processNextJob(): Promise<boolean> {
     const lockKey = GenerateAuthzWorkerLockKey();
-    const lockValue = randomUUID();
 
-    const acquired = await this.acquireLock(lockKey, lockValue);
+    const acquired = await this.lockAdapter.acquireLock(lockKey);
     if (!acquired) {
       this.logger.debug('Another pod/worker is currently processing jobs. Skipping cycle.');
       return false;
@@ -104,7 +57,7 @@ export class AuthorizationReconciliationWorker {
 
       return true;
     } finally {
-      await this.releaseLock(lockKey, lockValue);
+      await this.lockAdapter.releaseLock(lockKey);
     }
   }
 
