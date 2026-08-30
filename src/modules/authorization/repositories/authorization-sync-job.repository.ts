@@ -43,13 +43,10 @@ export class AuthorizationSyncJobRepository extends BaseRepository<Authorization
   }
 
   async claimNextPendingJob(): Promise<AuthorizationSyncJob | null> {
-    const pendingJob = await this.repository
-      .createQueryBuilder('job')
-      .setLock('pessimistic_write')
-      .setOnLocked('skip_locked')
-      .where('job.status = :status', { status: SyncJobStatus.PENDING })
-      .orderBy('job.createdAt', 'ASC')
-      .getOne();
+    const pendingJob = await this.repository.findOne({
+      where: { status: SyncJobStatus.PENDING },
+      order: { createdAt: 'ASC' },
+    });
 
     if (!pendingJob) {
       return null;
