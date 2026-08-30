@@ -224,4 +224,80 @@ describe('AuthorizationSyncService', () => {
       await expect(service.getJobStatus('non-existent-job')).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('enqueueSyncJob', () => {
+    it('should successfully enqueue job for SCHEDULED trigger with SYSTEM createdBy', async () => {
+      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+        id: 'ug-2',
+        version: 4,
+        projectionVersion: 2,
+      });
+
+      (mockSyncJobRepo.findInFlightJob as jest.Mock).mockResolvedValue(null);
+
+      const createdJob = {
+        id: 'job-sched-1',
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.USER_GROUP,
+        sourceId: 'ug-2',
+        sourceVersion: 4,
+        triggerType: SyncTriggerType.SCHEDULED,
+        status: SyncJobStatus.PENDING,
+        processedUsers: 0,
+        createdBy: 'SYSTEM',
+      } as AuthorizationSyncJob;
+
+      (mockSyncJobRepo.create as jest.Mock).mockResolvedValue(createdJob);
+
+      const result = await service.enqueueSyncJob({
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.USER_GROUP,
+        sourceId: 'ug-2',
+        triggerType: SyncTriggerType.SCHEDULED,
+        createdBy: 'SYSTEM',
+      });
+
+      expect(result.jobId).toBe('job-sched-1');
+      expect(result.triggerType).toBe(SyncTriggerType.SCHEDULED);
+      expect(mockSyncJobRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantCode: 'TEST_TENANT',
+          triggerType: SyncTriggerType.SCHEDULED,
+          createdBy: 'SYSTEM',
+        }),
+      );
+    });
+
+    it('should bypass repository source validation when ignoreValidateSource is true', async () => {
+      (mockSyncJobRepo.findInFlightJob as jest.Mock).mockResolvedValue(null);
+
+      const createdJob = {
+        id: 'job-sched-bypass',
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.USER_GROUP,
+        sourceId: 'ug-3',
+        sourceVersion: 2,
+        triggerType: SyncTriggerType.SCHEDULED,
+        status: SyncJobStatus.PENDING,
+        processedUsers: 0,
+        createdBy: 'SYSTEM',
+      } as AuthorizationSyncJob;
+
+      (mockSyncJobRepo.create as jest.Mock).mockResolvedValue(createdJob);
+
+      const result = await service.enqueueSyncJob({
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.USER_GROUP,
+        sourceId: 'ug-3',
+        sourceVersion: 2,
+        triggerType: SyncTriggerType.SCHEDULED,
+        createdBy: 'SYSTEM',
+        ignoreValidateSource: true,
+      });
+
+      expect(result.jobId).toBe('job-sched-bypass');
+      expect(mockUserGroupRepo.findByTenantAndId).not.toHaveBeenCalled();
+      expect(mockRoleRepo.findByIdAndTenant).not.toHaveBeenCalled();
+    });
+  });
 });

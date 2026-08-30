@@ -23,7 +23,7 @@ export class AuthorizationConsumer {
 
   constructor(private readonly reconciliationWorker: AuthorizationReconciliationWorker) {}
 
-  @EventPattern('authorization.sync-requested')
+  @EventPattern(EventType.AUTHORIZATION_SYNC_REQUESTED)
   async handleAuthorizationSyncRequested(
     @Payload()
     envelope: EventEnvelope<AuthorizationSyncRequestedPayload> & { eventType?: string },
@@ -64,7 +64,7 @@ export class AuthorizationConsumer {
       this.logger.log(
         `Processing authorization sync requested event for tenant ${payload.tenantCode}, job ${payload.jobId || 'N/A'}`,
       );
-      await this.reconciliationWorker.processNextJob();
+      await this.reconciliationWorker.processNextJob(payload.tenantCode);
     });
   }
 }

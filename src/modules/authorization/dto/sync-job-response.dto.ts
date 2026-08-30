@@ -72,4 +72,27 @@ export class SyncJobResponseDto {
       createdBy: job.createdBy,
     };
   }
+
+  static completedValue(params: {
+    tenantCode: string;
+    sourceType: SyncSourceType;
+    sourceId: string;
+    sourceVersion: number;
+    triggerType: SyncTriggerType;
+    message?: string;
+  }): SyncJobResponseDto {
+    return {
+      jobId: null,
+      tenantCode: params.tenantCode,
+      sourceType: params.sourceType,
+      sourceId: params.sourceId,
+      sourceVersion: params.sourceVersion,
+      triggerType: params.triggerType,
+      status: SyncJobStatus.COMPLETED,
+      processedUsers: 0,
+      totalUsers: 0,
+      isNoOp: true,
+      message: params.message ?? 'Configuration is already fully synchronized',
+    };
+  }
 }

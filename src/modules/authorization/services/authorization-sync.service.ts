@@ -43,47 +43,74 @@ export class AuthorizationSyncService {
       throw new Error('Tenant code is missing from active RequestContext');
     }
 
-    let sourceVersion = 1;
+    return this.enqueueSyncJob({
+      tenantCode,
+      sourceType: dto.sourceType,
+      sourceId: dto.sourceId,
+      triggerType,
+      createdBy: userId ?? null,
+    });
+  }
+
+  /**
+   * Enqueues an authorization sync job with dirty check and deduplication.
+   * Can be invoked directly by background schedulers in SYSTEM context or by requestSyncNow.
+   */
+  async enqueueSyncJob(params: {
+    tenantCode: string;
+    sourceType: SyncSourceType;
+    sourceId: string;
+    sourceVersion?: number;
+    triggerType?: SyncTriggerType;
+    createdBy?: string | null;
+    ignoreValidateSource?: boolean;
+  }): Promise<SyncJobResponseDto> {
+    const {
+      tenantCode,
+      sourceType,
+      sourceId,
+      triggerType = SyncTriggerType.SCHEDULED,
+      createdBy = 'SYSTEM',
+      ignoreValidateSource = false,
+    } = params;
+
+    let sourceVersion = params.sourceVersion ?? 1;
     let projectionVersion = 0;
 
-    if (dto.sourceType === SyncSourceType.USER_GROUP) {
-      const group = await this.userGroupRepo.findByTenantAndId(tenantCode, dto.sourceId);
-      if (!group) {
-        throw new NotFoundException(`User Group with id ${dto.sourceId} not found`);
+    if (!ignoreValidateSource) {
+      if (sourceType === SyncSourceType.USER_GROUP) {
+        const group = await this.userGroupRepo.findByTenantAndId(tenantCode, sourceId);
+        if (!group) {
+          throw new NotFoundException(`User Group with id ${sourceId} not found`);
+        }
+        sourceVersion = group.version;
+        projectionVersion = group.projectionVersion ?? 0;
+      } else if (sourceType === SyncSourceType.ROLE) {
+        const role = await this.roleRepo.findByIdAndTenant(sourceId, tenantCode);
+        if (!role) {
+          throw new NotFoundException(`Role with id ${sourceId} not found`);
+        }
+        sourceVersion = role.version;
+        projectionVersion = role.projectionVersion ?? 0;
       }
-      sourceVersion = group.version;
-      projectionVersion = group.projectionVersion ?? 0;
-    } else if (dto.sourceType === SyncSourceType.ROLE) {
-      const role = await this.roleRepo.findByIdAndTenant(dto.sourceId, tenantCode);
-      if (!role) {
-        throw new NotFoundException(`Role with id ${dto.sourceId} not found`);
-      }
-      sourceVersion = role.version;
-      projectionVersion = 'projectionVersion' in role ? Number(role['projectionVersion']) || 0 : 0;
     }
 
     // 1. Idempotent No-Op check: already synchronized
     if (sourceVersion <= projectionVersion) {
-      return {
-        jobId: null,
+      return SyncJobResponseDto.completedValue({
         tenantCode,
-        sourceType: dto.sourceType,
-        sourceId: dto.sourceId,
+        sourceType,
+        sourceId,
         sourceVersion,
         triggerType,
-        status: SyncJobStatus.COMPLETED,
-        processedUsers: 0,
-        totalUsers: 0,
-        isNoOp: true,
-        message: 'Configuration is already fully synchronized',
-      };
+      });
     }
 
     // 2. Check for in-flight job
     const inFlightJob = await this.syncJobRepo.findInFlightJob(
       tenantCode,
-      dto.sourceType,
-      dto.sourceId,
+      sourceType,
+      sourceId,
       sourceVersion,
     );
 
@@ -99,19 +126,13 @@ export class AuthorizationSyncService {
     try {
       return await this.createSyncJobTransactional(
         tenantCode,
-        userId,
-        dto,
+        createdBy ?? undefined,
+        { sourceType, sourceId },
         sourceVersion,
         triggerType,
       );
     } catch (error: unknown) {
-      return this.handleInFlightConflict(
-        error,
-        tenantCode,
-        dto.sourceType,
-        dto.sourceId,
-        sourceVersion,
-      );
+      return this.handleInFlightConflict(error, tenantCode, sourceType, sourceId, sourceVersion);
     }
   }
 

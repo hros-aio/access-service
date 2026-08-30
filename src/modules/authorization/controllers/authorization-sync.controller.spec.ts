@@ -10,15 +10,21 @@ import {
 } from '../entities/authorization-sync-job.entity';
 import { AuthorizationGuard } from '../guards/authorization.guard';
 import { AuthorizationSyncService } from '../services/authorization-sync.service';
+import { ScheduledReconciliationScanner } from '../services/scheduled-reconciliation-scanner.service';
 
 describe('AuthorizationSyncController', () => {
   let controller: AuthorizationSyncController;
   let mockSyncService: Partial<AuthorizationSyncService>;
+  let mockScanner: Partial<ScheduledReconciliationScanner>;
 
   beforeEach(async () => {
     mockSyncService = {
       requestSyncNow: jest.fn(),
       getJobStatus: jest.fn(),
+    };
+
+    mockScanner = {
+      handleCron: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -27,6 +33,10 @@ describe('AuthorizationSyncController', () => {
         {
           provide: AuthorizationSyncService,
           useValue: mockSyncService,
+        },
+        {
+          provide: ScheduledReconciliationScanner,
+          useValue: mockScanner,
         },
       ],
     })
@@ -93,6 +103,19 @@ describe('AuthorizationSyncController', () => {
 
       expect(mockSyncService.getJobStatus).toHaveBeenCalledWith('job-123');
       expect(result).toEqual(responseDto);
+    });
+  });
+
+  describe('POST /authz/scheduled-sweep', () => {
+    it('should trigger scheduled reconciliation scanner sweep and return response', async () => {
+      (mockScanner.handleCron as jest.Mock).mockResolvedValue(undefined);
+
+      const result = await controller.triggerScheduledSweep();
+
+      expect(mockScanner.handleCron).toHaveBeenCalled();
+      expect(result).toEqual({
+        message: 'Scheduled authorization reconciliation sweep executed successfully',
+      });
     });
   });
 });

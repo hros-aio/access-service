@@ -18,7 +18,9 @@ import { AuthorizationReconciliationWorker } from './services/authorization-reco
 import { AuthorizationSyncService } from './services/authorization-sync.service';
 import { BootstrapAuthorizationService } from './services/bootstrap-authorization.service';
 import { CumulativeAccessEvaluator } from './services/cumulative-access-evaluator.service';
+import { DistributedLockAdapter } from './services/distributed-lock.adapter';
 import { EffectiveRoleProjectionService } from './services/effective-role-projection.service';
+import { ScheduledReconciliationScanner } from './services/scheduled-reconciliation-scanner.service';
 import { SyncJobWatchdogService } from './services/sync-job-watchdog.service';
 import { UserAuthorizationCacheService } from './services/user-authorization-cache.service';
 
@@ -46,6 +48,8 @@ import { UserAuthorizationCacheService } from './services/user-authorization-cac
     AuthorizationSyncService,
     AuthorizationReconciliationWorker,
     SyncJobWatchdogService,
+    DistributedLockAdapter,
+    ScheduledReconciliationScanner,
     AuthorizationGuard,
   ],
   exports: [
@@ -58,6 +62,8 @@ import { UserAuthorizationCacheService } from './services/user-authorization-cac
     AuthorizationSyncService,
     AuthorizationReconciliationWorker,
     SyncJobWatchdogService,
+    DistributedLockAdapter,
+    ScheduledReconciliationScanner,
     AuthorizationGuard,
   ],
 })

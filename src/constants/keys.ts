@@ -30,6 +30,6 @@ export function GenerateUserAuthzVersionKey(tenantCode: string, userId: string):
   return `authz:version:${tenantCode}:${userId}`;
 }
 
-export function GenerateAuthzWorkerLockKey(): string {
-  return 'authz:reconciliation-worker:lock';
+export function GenerateAuthzWorkerLockKey(tenantCode: string): string {
+  return `authz:reconciliation-worker:lock:${tenantCode}`;
 }

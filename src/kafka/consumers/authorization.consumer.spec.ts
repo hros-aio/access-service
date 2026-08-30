@@ -59,7 +59,7 @@ describe('AuthorizationConsumer', () => {
     await consumer.handleAuthorizationSyncRequested(envelope);
 
     expect(runSpy).toHaveBeenCalled();
-    expect(mockReconciliationWorker.processNextJob).toHaveBeenCalled();
+    expect(mockReconciliationWorker.processNextJob).toHaveBeenCalledWith('TEST_TENANT');
   });
 
   it('should handle payload with eventType wrapped inside envelope.payload', async () => {
@@ -87,7 +87,7 @@ describe('AuthorizationConsumer', () => {
       envelope as unknown as Parameters<typeof consumer.handleAuthorizationSyncRequested>[0],
     );
 
-    expect(mockReconciliationWorker.processNextJob).toHaveBeenCalled();
+    expect(mockReconciliationWorker.processNextJob).toHaveBeenCalledWith('TEST_TENANT_2');
   });
 
   it('should ignore event if eventType is not authorization.sync-requested', async () => {
