@@ -1,6 +1,7 @@
 import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
+import { UserGroupImpactService } from './user-group-impact.service';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { ScopeType, UserGroupStatus } from '../domain/enums';
@@ -13,6 +14,7 @@ import {
 import { CreateUserGroupDto, UpdateUserGroupDto } from '../dto';
 import { UserGroupLifecycleService } from './user-group-lifecycle.service';
 import { UserGroup } from '../entities/user-group.entity';
+import { UserGroupMembershipRepository } from '../repositories/user-group-membership.repository';
 import { UserGroupRoleRepository } from '../repositories/user-group-role.repository';
 import { UserGroupRepository } from '../repositories/user-group.repository';
 
@@ -20,8 +22,10 @@ describe('UserGroupLifecycleService', () => {
   let service: UserGroupLifecycleService;
   let userGroupRepository: jest.Mocked<UserGroupRepository>;
   let userGroupRoleRepository: jest.Mocked<UserGroupRoleRepository>;
+  let userGroupMembershipRepository: jest.Mocked<UserGroupMembershipRepository>;
   let outboxRepository: jest.Mocked<AuthSecurityEventOutboxRepository>;
   let transactionService: jest.Mocked<TransactionService>;
+  let userGroupImpactService: jest.Mocked<UserGroupImpactService>;
 
   const mockTenantCode = 'tenant-001';
   const mockUserId = 'user-admin-01';
@@ -56,6 +60,10 @@ describe('UserGroupLifecycleService', () => {
       bulkSave: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<UserGroupRoleRepository>;
 
+    userGroupMembershipRepository = {
+      countByGroup: jest.fn().mockResolvedValue(10),
+    } as unknown as jest.Mocked<UserGroupMembershipRepository>;
+
     outboxRepository = {
       save: jest.fn().mockResolvedValue({} as AuthSecurityEventOutbox),
     } as unknown as jest.Mocked<AuthSecurityEventOutboxRepository>;
@@ -64,11 +72,15 @@ describe('UserGroupLifecycleService', () => {
       runInTransaction: jest.fn().mockImplementation((cb: () => unknown) => cb()),
     } as unknown as jest.Mocked<TransactionService>;
 
+    userGroupImpactService = {} as unknown as jest.Mocked<UserGroupImpactService>;
+
     service = new UserGroupLifecycleService(
       transactionService,
       userGroupRepository,
       userGroupRoleRepository,
+      userGroupMembershipRepository,
       outboxRepository,
+      userGroupImpactService,
     );
   });
 

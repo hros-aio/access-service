@@ -41,6 +41,10 @@ export class UserGroupMembershipRepository extends BaseRepository<UserGroupMembe
     });
   }
 
+  async countUserGroupMembers(tenantCode: string, userGroupId: string): Promise<number> {
+    return this.countByGroup(tenantCode, userGroupId);
+  }
+
   async findMemberEmployeeIdsByGroup(tenantCode: string, groupId: string): Promise<string[]> {
     const rows = await this.repository.find({
       where: { tenantCode, groupId },

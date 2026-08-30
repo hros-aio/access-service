@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -53,4 +54,13 @@ export class UpdateUserGroupDto {
   })
   @IsInt()
   version: number;
+
+  @ApiPropertyOptional({
+    description: 'Explicit confirmation flag required if impact exceeds the high-impact threshold',
+    example: true,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  confirmed?: boolean;
 }

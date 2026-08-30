@@ -7,6 +7,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { AuthorizationModule } from './modules/authorization/authorization.module';
 import { EmployeeModule } from './modules/employee/employee.module';
 import { HealthModule } from './modules/health/health.module';
+import { ImpactAnalysisModule } from './modules/impact-analysis/impact-analysis.module';
 import { InviteModule } from './modules/invite/invite.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { MfaModule } from './modules/mfa/mfa.module';
@@ -64,6 +65,7 @@ const config = new ConfigurationService({});
     PermissionsModule,
     RoleModule,
     UserGroupModule,
+    ImpactAnalysisModule,
     AuthorizationModule,
     ProvisioningModule,
   ],

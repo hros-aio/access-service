@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions';
+import { RoleModule } from '../roles/role.module';
+import { UserGroupModule } from '../user-groups/user-group.module';
 import { BootstrapAuthorizationController } from './controllers/bootstrap-authorization.controller';
 import { UserEffectiveRoleEntity } from './entities/user-effective-role.entity';
 import { AuthorizationGuard } from './guards/authorization.guard';
@@ -10,8 +13,6 @@ import { BootstrapAuthorizationService } from './services/bootstrap-authorizatio
 import { CumulativeAccessEvaluator } from './services/cumulative-access-evaluator.service';
 import { EffectiveRoleProjectionService } from './services/effective-role-projection.service';
 import { UserAuthorizationCacheService } from './services/user-authorization-cache.service';
-import { RoleModule } from '../roles/role.module';
-import { UserGroupModule } from '../user-groups/user-group.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { UserGroupModule } from '../user-groups/user-group.module';
     RoleModule,
     UserGroupModule,
     PermissionsModule,
+    AuthModule,
   ],
   controllers: [BootstrapAuthorizationController],
   providers: [

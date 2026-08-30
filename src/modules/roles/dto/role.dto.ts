@@ -184,6 +184,14 @@ export class UpdateCustomRoleDto {
   @IsBoolean()
   @IsOptional()
   readonly confirmedHighImpact?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Alias confirmation flag for high impact changes',
+  })
+  @IsBoolean()
+  @IsOptional()
+  readonly confirmed?: boolean;
 }
 
 export class DeactivateRoleDto {
@@ -196,7 +204,8 @@ export class DeactivateRoleDto {
 
   @ApiPropertyOptional({
     example: false,
-    description: 'Confirmation flag to deactivate despite active user group assignments',
+    description:
+      'Confirmation flag to deactivate despite active user group assignments or high impact',
   })
   @IsBoolean()
   @IsOptional()
@@ -250,6 +259,14 @@ export class UpdateRolePermissionsDto {
   @IsBoolean()
   @IsOptional()
   readonly confirmedHighImpact?: boolean;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Alias confirmation flag for high impact changes',
+  })
+  @IsBoolean()
+  @IsOptional()
+  readonly confirmed?: boolean;
 }
 
 export class HighImpactConfirmationRequiredResponseDto {
