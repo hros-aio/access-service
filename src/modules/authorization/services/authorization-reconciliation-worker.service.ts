@@ -33,20 +33,23 @@ export class AuthorizationReconciliationWorker {
   ) {}
 
   async processNextJob(): Promise<boolean> {
-    const lockKey = GenerateAuthzWorkerLockKey();
+    const job = await this.syncJobRepo.claimNextPendingJob();
+    if (!job) {
+      return false;
+    }
 
+    const lockKey = GenerateAuthzWorkerLockKey(job.tenantCode);
     const acquired = await this.lockAdapter.acquireLock(lockKey);
     if (!acquired) {
-      this.logger.debug('Another pod/worker is currently processing jobs. Skipping cycle.');
+      this.logger.debug(
+        `Another worker is currently processing jobs for tenant ${job.tenantCode}. Reclaiming job ${job.id} to PENDING.`,
+      );
+      // Revert status back to PENDING so other cycles / workers can pick it up
+      await this.syncJobRepo.reclaimStuckJob(job.id, job.retryCount ?? 0);
       return false;
     }
 
     try {
-      const job = await this.syncJobRepo.claimNextPendingJob();
-      if (!job) {
-        return false;
-      }
-
       try {
         await this.executeJob(job);
       } catch (error: unknown) {

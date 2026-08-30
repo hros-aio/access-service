@@ -102,24 +102,43 @@ describe('AuthorizationReconciliationWorker', () => {
   });
 
   describe('processNextJob', () => {
-    it('should return false if distributed lock could not be acquired (another pod running)', async () => {
-      (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(false);
-
-      const result = await worker.processNextJob();
-
-      expect(result).toBe(false);
-      expect(mockSyncJobRepo.claimNextPendingJob).not.toHaveBeenCalled();
-      expect(mockLockAdapter.releaseLock).not.toHaveBeenCalled();
-    });
-
     it('should return false if no pending job exists', async () => {
       (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(null);
 
       const result = await worker.processNextJob();
 
       expect(result).toBe(false);
+      expect(mockLockAdapter.acquireLock).not.toHaveBeenCalled();
       expect(mockEmployeeRepo.countEmployeesByTenant).not.toHaveBeenCalled();
-      expect(mockLockAdapter.releaseLock).toHaveBeenCalled();
+      expect(mockLockAdapter.releaseLock).not.toHaveBeenCalled();
+    });
+
+    it('should return false and reclaim job to PENDING if distributed lock could not be acquired for tenant', async () => {
+      const job = {
+        id: 'job-1',
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.USER_GROUP,
+        sourceId: 'ug-1',
+        sourceVersion: 3,
+        triggerType: SyncTriggerType.MANUAL,
+        status: SyncJobStatus.PROCESSING,
+        retryCount: 0,
+        createdBy: 'user-admin',
+      } as AuthorizationSyncJob;
+
+      (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
+      (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(false);
+      mockSyncJobRepo.reclaimStuckJob = jest.fn().mockResolvedValue(undefined);
+
+      const result = await worker.processNextJob();
+
+      expect(result).toBe(false);
+      expect(mockLockAdapter.acquireLock).toHaveBeenCalledWith(
+        'authz:reconciliation-worker:lock:TEST_TENANT',
+      );
+      expect(mockSyncJobRepo.reclaimStuckJob).toHaveBeenCalledWith('job-1', 0);
+      expect(mockEmployeeRepo.countEmployeesByTenant).not.toHaveBeenCalled();
+      expect(mockLockAdapter.releaseLock).not.toHaveBeenCalled();
     });
 
     it('should execute reconciliation for UserGroup job and mark completed', async () => {
