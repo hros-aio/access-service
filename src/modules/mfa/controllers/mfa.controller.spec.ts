@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { RequestContext } from '@new-hros/libs-core';
 
-import { AuthenticatedRequest, MfaController } from './mfa.controller';
+import { MfaController } from './mfa.controller';
 import { MfaFactorType } from '../dto/enroll_mfa.dto';
 import { MfaApplicationService } from '../services/mfa_application.service';
 
@@ -31,14 +32,14 @@ describe('MfaController', () => {
     });
 
     const reqWithUser = {
-      user: { tenantCode: 'tenant-abc', id: 'user-xyz' },
-    } as unknown as AuthenticatedRequest;
+      user: { tenantCode: 'tenant-abc', userId: 'user-xyz' },
+    } as unknown as RequestContext;
     await controller.initiateEnrollment({ factorType: MfaFactorType.TOTP }, reqWithUser);
     expect(service.initiateEnrollment).toHaveBeenCalledWith('tenant-abc', 'user-xyz', {
       factorType: MfaFactorType.TOTP,
     });
 
-    const reqWithoutUser = {} as unknown as AuthenticatedRequest;
+    const reqWithoutUser = {} as unknown as RequestContext;
     await controller.initiateEnrollment({ factorType: MfaFactorType.TOTP }, reqWithoutUser);
     expect(service.initiateEnrollment).toHaveBeenCalledWith(
       'tenant-001',
@@ -61,11 +62,11 @@ describe('MfaController', () => {
     };
     const reqWithUser = {
       user: { tenantCode: 't1', userId: 'u1' },
-    } as unknown as AuthenticatedRequest;
+    } as unknown as RequestContext;
     await controller.verifyEnrollment(dto, reqWithUser);
     expect(service.verifyAndActivateFactor).toHaveBeenCalledWith('t1', 'u1', dto);
 
-    const reqWithoutUser = {} as unknown as AuthenticatedRequest;
+    const reqWithoutUser = {} as unknown as RequestContext;
     await controller.verifyEnrollment(dto, reqWithoutUser);
     expect(service.verifyAndActivateFactor).toHaveBeenCalledWith(
       'tenant-001',
@@ -82,11 +83,11 @@ describe('MfaController', () => {
     });
 
     const dto = { challengeId: '00000000-0000-0000-0000-000000000002', code: '123456' };
-    const reqWithUser = { user: { tenantCode: 't1', id: 'u1' } } as unknown as AuthenticatedRequest;
+    const reqWithUser = { user: { tenantCode: 't1', userId: 'u1' } } as unknown as RequestContext;
     await controller.verifyChallenge(dto, reqWithUser);
     expect(service.verifyLoginChallenge).toHaveBeenCalledWith('t1', 'u1', dto);
 
-    const reqWithoutUser = {} as unknown as AuthenticatedRequest;
+    const reqWithoutUser = {} as unknown as RequestContext;
     await controller.verifyChallenge(dto, reqWithoutUser);
     expect(service.verifyLoginChallenge).toHaveBeenCalledWith(
       'tenant-001',

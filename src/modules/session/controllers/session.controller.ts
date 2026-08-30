@@ -1,24 +1,9 @@
 import { Body, Controller, HttpCode, HttpStatus, Param, Post, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { DEFAULT_TENANT_CODE, DEFAULT_USER, RequestContext } from '@new-hros/libs-core';
 
-import {
-  DEFAULT_ADMIN_USER_ID,
-  DEFAULT_SESSION_ID,
-  DEFAULT_TENANT_CODE,
-  DEFAULT_USER_ID,
-} from '../../../constants';
 import { ForceLogoutRequestDto, LogoutResponseDto } from '../dto/logout-response.dto';
 import { SessionService } from '../services/session.service';
-
-// Standard request shape with injected context
-interface AuthenticatedRequest extends Request {
-  user?: {
-    userId: string;
-    tenantCode: string;
-    sessionId: string;
-    roles?: string[];
-  };
-}
 
 @ApiTags('Session Management')
 @ApiBearerAuth()
@@ -36,10 +21,10 @@ export class SessionController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 503, description: 'Session store unavailable' })
-  async logout(@Req() req: AuthenticatedRequest): Promise<LogoutResponseDto> {
+  async logout(@Req() req: RequestContext): Promise<LogoutResponseDto> {
     const tenantCode = req.user?.tenantCode || DEFAULT_TENANT_CODE;
-    const userId = req.user?.userId || DEFAULT_USER_ID;
-    const sessionId = req.user?.sessionId || DEFAULT_SESSION_ID;
+    const userId = req.user?.userId || DEFAULT_USER.userId;
+    const sessionId = req.user?.sessionId || DEFAULT_USER.sessionId;
 
     return this.sessionService.logoutCurrentSession(tenantCode, userId, sessionId);
   }
@@ -59,10 +44,10 @@ export class SessionController {
   async forceLogout(
     @Param('userId') targetUserId: string,
     @Body() body: ForceLogoutRequestDto,
-    @Req() req: AuthenticatedRequest,
+    @Req() req: RequestContext,
   ): Promise<LogoutResponseDto> {
     const tenantCode = req.user?.tenantCode || DEFAULT_TENANT_CODE;
-    const adminUserId = req.user?.userId || DEFAULT_ADMIN_USER_ID;
+    const adminUserId = req.user?.userId || DEFAULT_USER.userId;
 
     return this.sessionService.revokeAllUserSessions({
       tenantCode,

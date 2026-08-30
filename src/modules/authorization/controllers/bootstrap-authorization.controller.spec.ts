@@ -1,12 +1,11 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
-import request from 'supertest';
+import { UnauthorizedException } from '@nestjs/common';
+import { RequestContext } from '@new-hros/libs-core';
 
 import { BootstrapAuthorizationController } from './bootstrap-authorization.controller';
 import { BootstrapAuthorizationService } from '../services/bootstrap-authorization.service';
 
 describe('BootstrapAuthorizationController', () => {
-  let app: INestApplication;
+  let controller: BootstrapAuthorizationController;
 
   const mockBootstrapService = {
     getBootstrapCapabilities: jest.fn().mockResolvedValue({
@@ -17,44 +16,35 @@ describe('BootstrapAuthorizationController', () => {
     }),
   };
 
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      controllers: [BootstrapAuthorizationController],
-      providers: [
-        {
-          provide: BootstrapAuthorizationService,
-          useValue: mockBootstrapService,
-        },
-      ],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    await app.init();
+  beforeEach(() => {
+    controller = new BootstrapAuthorizationController(
+      mockBootstrapService as unknown as BootstrapAuthorizationService,
+    );
   });
 
-  afterEach(async () => {
-    await app.close();
+  it('should throw UnauthorizedException when request context is unauthenticated', async () => {
+    const unauthenticatedReq = {} as unknown as RequestContext;
+    await expect(controller.getCapabilities(unauthenticatedReq)).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
-  it('GET /auth/bootstrap/capabilities should return 401 when unauthenticated', async () => {
-    const response = await request(app.getHttpServer()).get('/auth/bootstrap/capabilities');
-    expect(response.status).toBe(401);
-  });
+  it('should return capabilities when authenticated request context is provided', async () => {
+    const authenticatedReq = {
+      tenantCode: 'tenant-test',
+      user: {
+        userId: 'user-test',
+      },
+    } as unknown as RequestContext;
 
-  it('GET /auth/bootstrap/capabilities should return capabilities when authenticated headers are provided', async () => {
-    const response = await request(app.getHttpServer())
-      .get('/auth/bootstrap/capabilities')
-      .set('x-tenant-code', 'tenant-test')
-      .set('x-user-id', 'user-test')
-      .expect(200);
+    const response = await controller.getCapabilities(authenticatedReq);
 
-    expect(response.body.success).toBe(true);
-    expect(response.body.data.authorizationVersion).toBe(7);
-    expect(response.body.data.permissions).toEqual([
-      'employee.view',
-      'leave.apply',
-      'leave.approve',
-    ]);
+    expect(response.success).toBe(true);
+    expect(response.data.authorizationVersion).toBe(7);
+    expect(response.data.permissions).toEqual(['employee.view', 'leave.apply', 'leave.approve']);
+    expect(mockBootstrapService.getBootstrapCapabilities).toHaveBeenCalledWith(
+      'tenant-test',
+      'user-test',
+    );
   });
 });

@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionService } from '@new-hros/libs-sql';
-import { Repository } from 'typeorm';
+import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
+import { In } from 'typeorm';
 
+import { GenerateUserEffectiveRoleKey } from '../../../constants';
 import { UserEffectiveRoleEntity } from '../entities/user-effective-role.entity';
 import { ScopeConstraint } from '../interfaces/effective-user-role.interface';
 
@@ -12,11 +13,9 @@ export interface PersistUserEffectiveRoleEntry {
 }
 
 @Injectable()
-export class UserEffectiveRoleRepository {
-  constructor(private readonly transactionService: TransactionService) {}
-
-  private get repository(): Repository<UserEffectiveRoleEntity> {
-    return this.transactionService.getManager().getRepository(UserEffectiveRoleEntity);
+export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRoleEntity> {
+  constructor(transactionService: TransactionService) {
+    super(UserEffectiveRoleEntity, transactionService);
   }
 
   async findByEmployee(tenantCode: string, employeeId: string): Promise<UserEffectiveRoleEntity[]> {
@@ -30,29 +29,29 @@ export class UserEffectiveRoleRepository {
     return result.affected || 0;
   }
 
+  async deleteByTenantAndIds(tenantCode: string, ids: string[]): Promise<void> {
+    if (!ids || ids.length === 0) return;
+
+    await this.repository.delete({
+      tenantCode,
+      id: In(ids),
+    });
+  }
+
   async syncUserEffectiveRoles(
     tenantCode: string,
     employeeId: string,
     targetEntries: PersistUserEffectiveRoleEntry[],
   ): Promise<{ inserted: number; deleted: number }> {
-    const manager = this.transactionService.getManager();
-
     const currentRows = await this.repository.find({
       where: { tenantCode, employeeId },
     });
 
-    const createKey = (r: {
-      roleId: string;
-      sourceGroupId: string;
-      scopeType: string;
-      scopeEntityId?: string | null;
-    }): string => `${r.roleId}_${r.sourceGroupId}_${r.scopeType}_${r.scopeEntityId || 'null'}`;
-
-    const currentMap = new Map(currentRows.map((r) => [createKey(r), r]));
+    const currentMap = new Map(currentRows.map((r) => [GenerateUserEffectiveRoleKey(r), r]));
 
     const targetMap = new Map(
       targetEntries.map((t) => [
-        createKey({
+        GenerateUserEffectiveRoleKey({
           roleId: t.roleId,
           sourceGroupId: t.sourceGroupId,
           scopeType: t.scope.type,
@@ -77,35 +76,26 @@ export class UserEffectiveRoleRepository {
     }
 
     if (toDeleteIds.length > 0) {
-      await manager.query(
-        `
-        DELETE FROM user_effective_roles
-        WHERE tenant_code = $1 AND id = ANY($2::uuid[]);
-        `,
-        [tenantCode, toDeleteIds],
-      );
+      await this.deleteByTenantAndIds(tenantCode, toDeleteIds);
     }
 
     if (toInsert.length > 0) {
-      for (const item of toInsert) {
-        await manager.query(
-          `
-          INSERT INTO user_effective_roles (
-            id, tenant_code, employee_id, role_id, source_group_id, scope_type, scope_entity_id, created_at
-          ) VALUES (
-            gen_random_uuid(), $1, $2, $3, $4, $5, $6, NOW()
-          ) ON CONFLICT (tenant_code, employee_id, role_id, source_group_id, scope_type, scope_entity_id) DO NOTHING;
-          `,
-          [
-            tenantCode,
-            employeeId,
-            item.roleId,
-            item.sourceGroupId,
-            item.scope.type,
-            item.scope.refId || null,
-          ],
-        );
-      }
+      const entities = toInsert.map((item) => ({
+        tenantCode,
+        employeeId,
+        roleId: item.roleId,
+        sourceGroupId: item.sourceGroupId,
+        scopeType: item.scope.type,
+        scopeEntityId: item.scope.refId || null,
+      }));
+
+      await this.repository
+        .createQueryBuilder()
+        .insert()
+        .into(UserEffectiveRoleEntity)
+        .values(entities)
+        .orIgnore()
+        .execute();
     }
 
     return {
