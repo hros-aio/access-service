@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { RequestContextService } from '@new-hros/libs-core';
 
 import { RoleRepository } from '../../roles/repositories/role.repository';
 import { UserGroupRepository } from '../../user-groups/repositories/user-group.repository';
@@ -28,41 +29,15 @@ export class SyncStatusProjectionService {
   ) {}
 
   async getEntitySyncStatus(
-    tenantCode: string,
     sourceType: SyncSourceType,
     sourceId: string,
   ): Promise<SyncStatusResponseDto> {
-    if (!tenantCode) {
-      throw new Error('Tenant code is missing');
-    }
-
-    let sourceVersion = 1;
-    let projectionVersion = 0;
-    let entityFound = false;
-
-    if (sourceType === SyncSourceType.USER_GROUP) {
-      const group = await this.userGroupRepo.findByTenantAndId(tenantCode, sourceId);
-      if (group) {
-        entityFound = true;
-        sourceVersion = group.version;
-        projectionVersion = group.projectionVersion ?? 0;
-      }
-    } else if (sourceType === SyncSourceType.ROLE) {
-      const role = await this.roleRepo.findByIdAndTenant(sourceId, tenantCode);
-      if (role) {
-        entityFound = true;
-        sourceVersion = role.version;
-        projectionVersion = role.projectionVersion ?? 0;
-      }
-    } else {
-      throw new NotFoundException(`Unsupported source type: ${sourceType}`);
-    }
-
-    if (!entityFound) {
-      throw new NotFoundException(
-        `${sourceType} with id ${sourceId} not found in tenant ${tenantCode}`,
-      );
-    }
+    const tenantCode = RequestContextService.getTenantCode();
+    const { sourceVersion, projectionVersion } = await this.validateAndResolveEntityVersions(
+      tenantCode,
+      sourceType,
+      sourceId,
+    );
 
     const latestJob = await this.syncJobRepo.findLatestJobBySource(
       tenantCode,
@@ -95,10 +70,8 @@ export class SyncStatusProjectionService {
     };
   }
 
-  async getTenantSummary(tenantCode: string): Promise<SyncStatusSummaryResponseDto> {
-    if (!tenantCode) {
-      throw new Error('Tenant code is missing');
-    }
+  async getTenantSummary(): Promise<SyncStatusSummaryResponseDto> {
+    const tenantCode = RequestContextService.getTenantCode();
 
     const [userGroups, roles] = await Promise.all([
       this.userGroupRepo.findActiveGroups(tenantCode).catch(() => []),
@@ -252,5 +225,37 @@ export class SyncStatusProjectionService {
       nextExpectedSyncMethod: NextExpectedSyncMethod.NONE,
       activeJob: null,
     };
+  }
+
+  private async validateAndResolveEntityVersions(
+    tenantCode: string,
+    sourceType: SyncSourceType,
+    sourceId: string,
+  ): Promise<{ sourceVersion: number; projectionVersion: number }> {
+    if (sourceType === SyncSourceType.USER_GROUP) {
+      const group = await this.userGroupRepo.findByTenantAndId(tenantCode, sourceId);
+      if (!group) {
+        throw new NotFoundException(
+          `User Group with id ${sourceId} not found in tenant ${tenantCode}`,
+        );
+      }
+      return {
+        sourceVersion: group.version,
+        projectionVersion: group.projectionVersion ?? 0,
+      };
+    }
+
+    if (sourceType === SyncSourceType.ROLE) {
+      const role = await this.roleRepo.findByIdAndTenant(sourceId, tenantCode);
+      if (!role) {
+        throw new NotFoundException(`Role with id ${sourceId} not found in tenant ${tenantCode}`);
+      }
+      return {
+        sourceVersion: role.version,
+        projectionVersion: role.projectionVersion ?? 0,
+      };
+    }
+
+    throw new NotFoundException(`Unsupported source type: ${sourceType}`);
   }
 }

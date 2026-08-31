@@ -78,21 +78,13 @@ export class AuthorizationSyncService {
     let projectionVersion = 0;
 
     if (!ignoreValidateSource) {
-      if (sourceType === SyncSourceType.USER_GROUP) {
-        const group = await this.userGroupRepo.findByTenantAndId(tenantCode, sourceId);
-        if (!group) {
-          throw new NotFoundException(`User Group with id ${sourceId} not found`);
-        }
-        sourceVersion = group.version;
-        projectionVersion = group.projectionVersion ?? 0;
-      } else if (sourceType === SyncSourceType.ROLE) {
-        const role = await this.roleRepo.findByIdAndTenant(sourceId, tenantCode);
-        if (!role) {
-          throw new NotFoundException(`Role with id ${sourceId} not found`);
-        }
-        sourceVersion = role.version;
-        projectionVersion = role.projectionVersion ?? 0;
-      }
+      const versions = await this.validateAndResolveSourceVersions(
+        tenantCode,
+        sourceType,
+        sourceId,
+      );
+      sourceVersion = versions.sourceVersion;
+      projectionVersion = versions.projectionVersion;
     }
 
     // 1. Idempotent No-Op check: already synchronized
@@ -222,36 +214,17 @@ export class AuthorizationSyncService {
 
   async retryFailedSync(sourceType: SyncSourceType, sourceId: string): Promise<SyncJobResponseDto> {
     const tenantCode = RequestContextService.getTenantCode();
-    let userId: string | undefined;
-    try {
-      userId = RequestContextService.getUser()?.userId;
-    } catch {
-      userId = undefined;
-    }
+    const userId = RequestContextService.getUser()?.userId;
 
     if (!tenantCode) {
       throw new Error('Tenant code is missing from active RequestContext');
     }
 
-    let sourceVersion = 1;
-    let projectionVersion = 0;
-    if (sourceType === SyncSourceType.USER_GROUP) {
-      const group = await this.userGroupRepo.findByTenantAndId(tenantCode, sourceId);
-      if (!group) {
-        throw new NotFoundException(`User Group with id ${sourceId} not found`);
-      }
-      sourceVersion = group.version;
-      projectionVersion = group.projectionVersion ?? 0;
-    } else if (sourceType === SyncSourceType.ROLE) {
-      const role = await this.roleRepo.findByIdAndTenant(sourceId, tenantCode);
-      if (!role) {
-        throw new NotFoundException(`Role with id ${sourceId} not found`);
-      }
-      sourceVersion = role.version;
-      projectionVersion = role.projectionVersion ?? 0;
-    } else {
-      throw new NotFoundException(`Unsupported source type: ${sourceType}`);
-    }
+    const { sourceVersion, projectionVersion } = await this.validateAndResolveSourceVersions(
+      tenantCode,
+      sourceType,
+      sourceId,
+    );
 
     if (sourceVersion <= projectionVersion) {
       throw new BadRequestException('No failed synchronization found for this entity');
@@ -280,5 +253,35 @@ export class AuthorizationSyncService {
       createdBy: userId ?? 'SYSTEM',
       ignoreValidateSource: true,
     });
+  }
+
+  async validateAndResolveSourceVersions(
+    tenantCode: string,
+    sourceType: SyncSourceType,
+    sourceId: string,
+  ): Promise<{ sourceVersion: number; projectionVersion: number }> {
+    if (sourceType === SyncSourceType.USER_GROUP) {
+      const group = await this.userGroupRepo.findByTenantAndId(tenantCode, sourceId);
+      if (!group) {
+        throw new NotFoundException(`User Group with id ${sourceId} not found`);
+      }
+      return {
+        sourceVersion: group.version,
+        projectionVersion: group.projectionVersion ?? 0,
+      };
+    }
+
+    if (sourceType === SyncSourceType.ROLE) {
+      const role = await this.roleRepo.findByIdAndTenant(sourceId, tenantCode);
+      if (!role) {
+        throw new NotFoundException(`Role with id ${sourceId} not found`);
+      }
+      return {
+        sourceVersion: role.version,
+        projectionVersion: role.projectionVersion ?? 0,
+      };
+    }
+
+    throw new NotFoundException(`Unsupported source type: ${sourceType}`);
   }
 }

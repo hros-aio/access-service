@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { RequestContextService } from '@new-hros/libs-core';
 
 import { SyncJobResponseDto } from '../dto/sync-job-response.dto';
 import { SyncStatusResponseDto } from '../dto/sync-status-response.dto';
@@ -56,11 +55,7 @@ export class AuthorizationSyncController {
     type: SyncStatusSummaryResponseDto,
   })
   async getSyncStatusSummary(): Promise<SyncStatusSummaryResponseDto> {
-    const tenantCode = RequestContextService.getTenantCode();
-    if (!tenantCode) {
-      throw new Error('Tenant code is missing from active RequestContext');
-    }
-    return this.projectionService.getTenantSummary(tenantCode);
+    return this.projectionService.getTenantSummary();
   }
 
   @Get('sync-status/:sourceType/:sourceId')
@@ -75,11 +70,7 @@ export class AuthorizationSyncController {
     @Param('sourceType') sourceType: SyncSourceType,
     @Param('sourceId') sourceId: string,
   ): Promise<SyncStatusResponseDto> {
-    const tenantCode = RequestContextService.getTenantCode();
-    if (!tenantCode) {
-      throw new Error('Tenant code is missing from active RequestContext');
-    }
-    return this.projectionService.getEntitySyncStatus(tenantCode, sourceType, sourceId);
+    return this.projectionService.getEntitySyncStatus(sourceType, sourceId);
   }
 
   @Post('sync-status/:sourceType/:sourceId/retry')

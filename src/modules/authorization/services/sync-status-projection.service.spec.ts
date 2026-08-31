@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import { RequestContextService } from '@new-hros/libs-core';
 
 import { SyncStatusProjectionService } from './sync-status-projection.service';
 import { RoleRepository } from '../../roles/repositories/role.repository';
@@ -23,6 +24,8 @@ describe('SyncStatusProjectionService', () => {
   const roleId = 'role-uuid-1';
 
   beforeEach(() => {
+    jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue(tenantCode);
+
     mockSyncJobRepo = {
       findLatestJobBySource: jest.fn(),
       findLatestCompletedJobBySource: jest.fn(),
@@ -54,7 +57,7 @@ describe('SyncStatusProjectionService', () => {
       (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue(null);
 
       await expect(
-        service.getEntitySyncStatus(tenantCode, SyncSourceType.USER_GROUP, userGroupId),
+        service.getEntitySyncStatus(SyncSourceType.USER_GROUP, userGroupId),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -76,11 +79,7 @@ describe('SyncStatusProjectionService', () => {
       (mockSyncJobRepo.findLatestJobBySource as jest.Mock).mockResolvedValue(completedJob);
       (mockSyncJobRepo.findLatestCompletedJobBySource as jest.Mock).mockResolvedValue(completedJob);
 
-      const result = await service.getEntitySyncStatus(
-        tenantCode,
-        SyncSourceType.USER_GROUP,
-        userGroupId,
-      );
+      const result = await service.getEntitySyncStatus(SyncSourceType.USER_GROUP, userGroupId);
 
       expect(result.status).toBe(SyncComputedStatus.COMPLETED);
       expect(result.nextExpectedSyncMethod).toBe(NextExpectedSyncMethod.NONE);
@@ -107,11 +106,7 @@ describe('SyncStatusProjectionService', () => {
       (mockSyncJobRepo.findLatestJobBySource as jest.Mock).mockResolvedValue(completedJob);
       (mockSyncJobRepo.findLatestCompletedJobBySource as jest.Mock).mockResolvedValue(completedJob);
 
-      const result = await service.getEntitySyncStatus(
-        tenantCode,
-        SyncSourceType.USER_GROUP,
-        userGroupId,
-      );
+      const result = await service.getEntitySyncStatus(SyncSourceType.USER_GROUP, userGroupId);
 
       expect(result.status).toBe(SyncComputedStatus.PENDING);
       expect(result.nextExpectedSyncMethod).toBe(NextExpectedSyncMethod.SCHEDULED_DAILY);
@@ -137,7 +132,7 @@ describe('SyncStatusProjectionService', () => {
       (mockSyncJobRepo.findLatestJobBySource as jest.Mock).mockResolvedValue(processingJob);
       (mockSyncJobRepo.findLatestCompletedJobBySource as jest.Mock).mockResolvedValue(null);
 
-      const result = await service.getEntitySyncStatus(tenantCode, SyncSourceType.ROLE, roleId);
+      const result = await service.getEntitySyncStatus(SyncSourceType.ROLE, roleId);
 
       expect(result.status).toBe(SyncComputedStatus.PROCESSING);
       expect(result.nextExpectedSyncMethod).toBe(NextExpectedSyncMethod.MANUAL_IN_FLIGHT);
@@ -176,11 +171,7 @@ describe('SyncStatusProjectionService', () => {
       (mockSyncJobRepo.findLatestJobBySource as jest.Mock).mockResolvedValue(failedJob);
       (mockSyncJobRepo.findLatestCompletedJobBySource as jest.Mock).mockResolvedValue(null);
 
-      const result = await service.getEntitySyncStatus(
-        tenantCode,
-        SyncSourceType.USER_GROUP,
-        userGroupId,
-      );
+      const result = await service.getEntitySyncStatus(SyncSourceType.USER_GROUP, userGroupId);
 
       expect(result.status).toBe(SyncComputedStatus.FAILED);
       expect(result.nextExpectedSyncMethod).toBe(NextExpectedSyncMethod.SCHEDULED_DAILY);
@@ -235,7 +226,7 @@ describe('SyncStatusProjectionService', () => {
         },
       );
 
-      const summary = await service.getTenantSummary(tenantCode);
+      const summary = await service.getTenantSummary();
 
       expect(summary.tenantCode).toBe(tenantCode);
       expect(summary.totalEntities).toBe(4);

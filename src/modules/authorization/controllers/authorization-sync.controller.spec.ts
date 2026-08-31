@@ -143,18 +143,8 @@ describe('AuthorizationSyncController', () => {
 
       const result = await controller.getSyncStatusSummary();
 
-      expect(mockProjectionService.getTenantSummary).toHaveBeenCalledWith('TEST_TENANT');
+      expect(mockProjectionService.getTenantSummary).toHaveBeenCalled();
       expect(result).toEqual(summaryDto);
-    });
-
-    it('should throw error if tenantCode is missing from context', async () => {
-      jest
-        .spyOn(RequestContextService, 'getTenantCode')
-        .mockReturnValue(undefined as unknown as string);
-
-      await expect(controller.getSyncStatusSummary()).rejects.toThrow(
-        'Tenant code is missing from active RequestContext',
-      );
     });
   });
 
@@ -175,21 +165,10 @@ describe('AuthorizationSyncController', () => {
       const result = await controller.getEntitySyncStatus(SyncSourceType.USER_GROUP, 'ug-1');
 
       expect(mockProjectionService.getEntitySyncStatus).toHaveBeenCalledWith(
-        'TEST_TENANT',
         SyncSourceType.USER_GROUP,
         'ug-1',
       );
       expect(result).toEqual(statusDto);
-    });
-
-    it('should throw error if tenantCode is missing from context', async () => {
-      jest
-        .spyOn(RequestContextService, 'getTenantCode')
-        .mockReturnValue(undefined as unknown as string);
-
-      await expect(
-        controller.getEntitySyncStatus(SyncSourceType.USER_GROUP, 'ug-1'),
-      ).rejects.toThrow('Tenant code is missing from active RequestContext');
     });
   });
 
