@@ -42,6 +42,60 @@ export class AuthorizationSyncJobRepository extends BaseRepository<Authorization
     });
   }
 
+  async findLatestJobBySource(
+    tenantCode: string,
+    sourceType: SyncSourceType,
+    sourceId: string,
+  ): Promise<AuthorizationSyncJob | null> {
+    return this.repository.findOne({
+      where: {
+        tenantCode,
+        sourceType,
+        sourceId,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  async findLatestCompletedJobBySource(
+    tenantCode: string,
+    sourceType: SyncSourceType,
+    sourceId: string,
+  ): Promise<AuthorizationSyncJob | null> {
+    return this.repository.findOne({
+      where: {
+        tenantCode,
+        sourceType,
+        sourceId,
+        status: SyncJobStatus.COMPLETED,
+      },
+      order: {
+        completedAt: 'DESC',
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  async findActiveJobBySource(
+    tenantCode: string,
+    sourceType: SyncSourceType,
+    sourceId: string,
+  ): Promise<AuthorizationSyncJob | null> {
+    return this.repository.findOne({
+      where: {
+        tenantCode,
+        sourceType,
+        sourceId,
+        status: In([SyncJobStatus.PENDING, SyncJobStatus.PROCESSING]),
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
   async claimNextPendingJob(tenantCode: string): Promise<AuthorizationSyncJob | null> {
     const pendingJob = await this.repository.findOne({
       where: { tenantCode, status: SyncJobStatus.PENDING },

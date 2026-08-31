@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
@@ -218,5 +218,67 @@ export class AuthorizationSyncService {
     }
 
     return SyncJobResponseDto.fromEntity(job, false, 'Job status retrieved successfully');
+  }
+
+  async retryFailedSync(sourceType: SyncSourceType, sourceId: string): Promise<SyncJobResponseDto> {
+    const tenantCode = RequestContextService.getTenantCode();
+    let userId: string | undefined;
+    try {
+      userId = RequestContextService.getUser()?.userId;
+    } catch {
+      userId = undefined;
+    }
+
+    if (!tenantCode) {
+      throw new Error('Tenant code is missing from active RequestContext');
+    }
+
+    let sourceVersion = 1;
+    let projectionVersion = 0;
+    if (sourceType === SyncSourceType.USER_GROUP) {
+      const group = await this.userGroupRepo.findByTenantAndId(tenantCode, sourceId);
+      if (!group) {
+        throw new NotFoundException(`User Group with id ${sourceId} not found`);
+      }
+      sourceVersion = group.version;
+      projectionVersion = group.projectionVersion ?? 0;
+    } else if (sourceType === SyncSourceType.ROLE) {
+      const role = await this.roleRepo.findByIdAndTenant(sourceId, tenantCode);
+      if (!role) {
+        throw new NotFoundException(`Role with id ${sourceId} not found`);
+      }
+      sourceVersion = role.version;
+      projectionVersion = role.projectionVersion ?? 0;
+    } else {
+      throw new NotFoundException(`Unsupported source type: ${sourceType}`);
+    }
+
+    if (sourceVersion <= projectionVersion) {
+      throw new BadRequestException('No failed synchronization found for this entity');
+    }
+
+    const inFlightJob = await this.syncJobRepo.findInFlightJob(
+      tenantCode,
+      sourceType,
+      sourceId,
+      sourceVersion,
+    );
+    if (inFlightJob) {
+      return SyncJobResponseDto.fromEntity(
+        inFlightJob,
+        false,
+        'Existing synchronization job already in progress',
+      );
+    }
+
+    return this.enqueueSyncJob({
+      tenantCode,
+      sourceType,
+      sourceId,
+      sourceVersion,
+      triggerType: SyncTriggerType.MANUAL,
+      createdBy: userId ?? 'SYSTEM',
+      ignoreValidateSource: true,
+    });
   }
 }

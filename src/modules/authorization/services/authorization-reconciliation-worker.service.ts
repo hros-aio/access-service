@@ -11,6 +11,10 @@ import { RoleRepository } from '../../roles/repositories/role.repository';
 import { UserGroupRepository } from '../../user-groups/repositories/user-group.repository';
 import { MembershipReconciler } from '../../user-groups/services/membership-reconciler.service';
 import { UserGroupMatchingEngine } from '../../user-groups/services/user-group-matching.engine';
+import {
+  HIGH_IMPACT_USER_THRESHOLD,
+  LONG_RUNNING_SYNC_THRESHOLD_MS,
+} from '../constants/sync-notification.constants';
 import { AuthorizationSyncJob, SyncSourceType } from '../entities/authorization-sync-job.entity';
 import { AuthorizationSyncJobRepository } from '../repositories/authorization-sync-job.repository';
 
@@ -131,6 +135,12 @@ export class AuthorizationReconciliationWorker {
       // Mark job completed
       await this.syncJobRepo.markCompleted(job.id, processed);
 
+      const durationMs = job.startedAt
+        ? Math.max(0, Date.now() - new Date(job.startedAt).getTime())
+        : 0;
+      const isHighImpact = processed >= HIGH_IMPACT_USER_THRESHOLD;
+      const isLongRunning = durationMs >= LONG_RUNNING_SYNC_THRESHOLD_MS;
+
       // Append outbox event for sync completion
       const outboxEvent = AuthSecurityEventOutbox.fromAuthorizationSyncCompleted(
         { tenantCode: job.tenantCode, userId: job.createdBy ?? undefined },
@@ -142,6 +152,11 @@ export class AuthorizationReconciliationWorker {
           triggerType: job.triggerType,
           totalUsers: totalEmployees,
           processedUsers: processed,
+          affectedUsers: processed,
+          durationMs,
+          isHighImpact,
+          isLongRunning,
+          requiresEmailNotification: isHighImpact || isLongRunning,
           initiatedBy: job.createdBy,
         },
       );
@@ -155,9 +170,14 @@ export class AuthorizationReconciliationWorker {
 
   private async handleJobFailure(job: AuthorizationSyncJob, error: Error): Promise<void> {
     const errorDetails = {
+      code: error.name || 'SYNC_EXECUTION_ERROR',
       message: error?.message || 'Unknown synchronization failure',
       stack: error?.stack,
     };
+
+    const durationMs = job.startedAt
+      ? Math.max(0, Date.now() - new Date(job.startedAt).getTime())
+      : 0;
 
     await this.transactionService.runInTransaction(async () => {
       await this.syncJobRepo.markFailed(job.id, errorDetails);
@@ -172,6 +192,9 @@ export class AuthorizationReconciliationWorker {
           triggerType: job.triggerType,
           totalUsers: job.totalUsers ?? 0,
           processedUsers: job.processedUsers,
+          durationMs,
+          errorCode: errorDetails.code,
+          errorMessage: errorDetails.message,
           errorDetails,
           initiatedBy: job.createdBy,
         },

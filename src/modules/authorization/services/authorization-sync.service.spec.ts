@@ -300,4 +300,85 @@ describe('AuthorizationSyncService', () => {
       expect(mockRoleRepo.findByIdAndTenant).not.toHaveBeenCalled();
     });
   });
+
+  describe('retryFailedSync', () => {
+    it('should throw BadRequestException if entity is already completed (version <= projectionVersion)', async () => {
+      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+        id: 'ug-1',
+        version: 2,
+        projectionVersion: 2,
+      });
+
+      await expect(service.retryFailedSync(SyncSourceType.USER_GROUP, 'ug-1')).rejects.toThrow(
+        'No failed synchronization found for this entity',
+      );
+    });
+
+    it('should return existing in-flight job if already running', async () => {
+      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+        id: 'ug-1',
+        version: 3,
+        projectionVersion: 2,
+      });
+
+      const inFlightJob = {
+        id: 'job-active-retry',
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.USER_GROUP,
+        sourceId: 'ug-1',
+        sourceVersion: 3,
+        triggerType: SyncTriggerType.MANUAL,
+        status: SyncJobStatus.PROCESSING,
+        processedUsers: 0,
+      } as unknown as AuthorizationSyncJob;
+
+      (mockSyncJobRepo.findInFlightJob as jest.Mock).mockResolvedValue(inFlightJob);
+
+      const result = await service.retryFailedSync(SyncSourceType.USER_GROUP, 'ug-1');
+
+      expect(result.jobId).toBe('job-active-retry');
+      expect(result.status).toBe(SyncJobStatus.PROCESSING);
+      expect(mockSyncJobRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('should enqueue a new manual sync job for failed entity', async () => {
+      (mockRoleRepo.findByIdAndTenant as jest.Mock).mockResolvedValue({
+        id: 'role-1',
+        version: 4,
+        projectionVersion: 3,
+      });
+
+      (mockSyncJobRepo.findInFlightJob as jest.Mock).mockResolvedValue(null);
+
+      const createdJob = {
+        id: 'job-retry-new',
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.ROLE,
+        sourceId: 'role-1',
+        sourceVersion: 4,
+        triggerType: SyncTriggerType.MANUAL,
+        status: SyncJobStatus.PENDING,
+        processedUsers: 0,
+        createdBy: 'user-123',
+      } as unknown as AuthorizationSyncJob;
+
+      (mockSyncJobRepo.create as jest.Mock).mockResolvedValue(createdJob);
+
+      const result = await service.retryFailedSync(SyncSourceType.ROLE, 'role-1');
+
+      expect(result.jobId).toBe('job-retry-new');
+      expect(result.status).toBe(SyncJobStatus.PENDING);
+      expect(result.triggerType).toBe(SyncTriggerType.MANUAL);
+      expect(mockSyncJobRepo.create).toHaveBeenCalled();
+      expect(mockOutboxRepo.create).toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundException if entity does not exist', async () => {
+      (mockRoleRepo.findByIdAndTenant as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.retryFailedSync(SyncSourceType.ROLE, 'non-existent-role'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
 });

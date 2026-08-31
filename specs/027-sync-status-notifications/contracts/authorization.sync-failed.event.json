@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuthorizationSyncFailedEvent",
+  "type": "object",
+  "required": [
+    "jobId",
+    "tenantCode",
+    "sourceType",
+    "sourceId",
+    "sourceVersion",
+    "triggerType",
+    "totalUsers",
+    "processedUsers",
+    "durationMs",
+    "errorCode",
+    "errorMessage",
+    "requiresEmailNotification",
+    "timestamp"
+  ],
+  "properties": {
+    "jobId": { "type": "string", "format": "uuid" },
+    "tenantCode": { "type": "string" },
+    "sourceType": { "type": "string", "enum": ["USER_GROUP", "ROLE"] },
+    "sourceId": { "type": "string", "format": "uuid" },
+    "sourceVersion": { "type": "integer" },
+    "triggerType": { "type": "string", "enum": ["MANUAL", "SCHEDULED", "SYSTEM"] },
+    "totalUsers": { "type": "integer", "minimum": 0 },
+    "processedUsers": { "type": "integer", "minimum": 0 },
+    "durationMs": { "type": "integer", "minimum": 0 },
+    "errorCode": { "type": "string" },
+    "errorMessage": { "type": "string" },
+    "requiresEmailNotification": { "type": "boolean", "enum": [true] },
+    "initiatedBy": { "type": ["string", "null"] },
+    "timestamp": { "type": "string", "format": "date-time" }
+  }
+}

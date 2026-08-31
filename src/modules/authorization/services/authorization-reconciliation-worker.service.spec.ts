@@ -206,7 +206,44 @@ describe('AuthorizationReconciliationWorker', () => {
       );
     });
 
-    it('should handle failure by marking job failed and emitting outbox event', async () => {
+    it('should classify high-impact and long-running jobs in outbox event when thresholds exceeded', async () => {
+      const startTime = new Date(Date.now() - 35000); // 35 seconds ago
+      const job = {
+        id: 'job-high-impact',
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.USER_GROUP,
+        sourceId: 'ug-1',
+        sourceVersion: 3,
+        triggerType: SyncTriggerType.MANUAL,
+        status: SyncJobStatus.PROCESSING,
+        startedAt: startTime,
+        createdBy: 'user-admin',
+      } as AuthorizationSyncJob;
+
+      (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(true);
+      (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
+      (mockEmployeeRepo.countEmployeesByTenant as jest.Mock).mockResolvedValue(550); // >= 500 threshold
+      const mockBatch = Array.from({ length: 550 }, (_, i) => ({ employeeId: `emp-${i}` }));
+      (mockEmployeeRepo.findEmployeesBatch as jest.Mock)
+        .mockResolvedValueOnce(mockBatch.slice(0, 500))
+        .mockResolvedValueOnce(mockBatch.slice(500, 550))
+        .mockResolvedValueOnce([]);
+
+      const result = await worker.processNextJob('TEST_TENANT');
+
+      expect(result).toBe(true);
+      expect(mockOutboxRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sanitizedPayload: expect.objectContaining({
+            isHighImpact: true,
+            isLongRunning: true,
+            requiresEmailNotification: true,
+          }),
+        }),
+      );
+    });
+
+    it('should handle failure by marking job failed and emitting enriched failure outbox event', async () => {
       const job = {
         id: 'job-1',
         tenantCode: 'TEST_TENANT',
@@ -231,7 +268,14 @@ describe('AuthorizationReconciliationWorker', () => {
         'job-1',
         expect.objectContaining({ message: 'DB Connection Failed' }),
       );
-      expect(mockOutboxRepo.create).toHaveBeenCalled();
+      expect(mockOutboxRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sanitizedPayload: expect.objectContaining({
+            requiresEmailNotification: true,
+            errorMessage: 'DB Connection Failed',
+          }),
+        }),
+      );
       expect(mockLockAdapter.releaseLock).toHaveBeenCalledWith(
         'authz:reconciliation-worker:lock:TEST_TENANT',
       );
