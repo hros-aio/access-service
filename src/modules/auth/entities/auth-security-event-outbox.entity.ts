@@ -480,6 +480,11 @@ export class AuthSecurityEventOutbox extends BaseEntity {
       triggerType: string;
       totalUsers?: number | null;
       processedUsers: number;
+      affectedUsers?: number | null;
+      durationMs?: number | null;
+      isHighImpact?: boolean;
+      isLongRunning?: boolean;
+      requiresEmailNotification?: boolean;
       initiatedBy?: string | null;
     },
   ): AuthSecurityEventOutbox {
@@ -487,6 +492,13 @@ export class AuthSecurityEventOutbox extends BaseEntity {
     outbox.tenantCode = ctx.tenantCode;
     outbox.userId = ctx.userId;
     outbox.eventType = EventType.AUTHORIZATION_SYNC_COMPLETED;
+    const affectedUsers = data.affectedUsers ?? data.processedUsers;
+    const isHighImpact = data.isHighImpact ?? affectedUsers >= 500;
+    const durationMs = data.durationMs ?? 0;
+    const isLongRunning = data.isLongRunning ?? durationMs >= 30000;
+    const requiresEmailNotification =
+      data.requiresEmailNotification ?? (isHighImpact || isLongRunning);
+
     outbox.sanitizedPayload = {
       jobId: data.jobId,
       tenantCode: ctx.tenantCode,
@@ -496,6 +508,11 @@ export class AuthSecurityEventOutbox extends BaseEntity {
       triggerType: data.triggerType,
       totalUsers: data.totalUsers ?? data.processedUsers,
       processedUsers: data.processedUsers,
+      affectedUsers,
+      durationMs,
+      isHighImpact,
+      isLongRunning,
+      requiresEmailNotification,
       initiatedBy: data.initiatedBy ?? ctx.userId ?? 'SYSTEM',
       timestamp: new Date().toISOString(),
     };
@@ -513,6 +530,9 @@ export class AuthSecurityEventOutbox extends BaseEntity {
       triggerType: string;
       totalUsers?: number | null;
       processedUsers: number;
+      durationMs?: number | null;
+      errorCode?: string;
+      errorMessage?: string;
       errorDetails?: Record<string, unknown> | null;
       initiatedBy?: string | null;
     },
@@ -521,6 +541,15 @@ export class AuthSecurityEventOutbox extends BaseEntity {
     outbox.tenantCode = ctx.tenantCode;
     outbox.userId = ctx.userId;
     outbox.eventType = EventType.AUTHORIZATION_SYNC_FAILED;
+    const durationMs = data.durationMs ?? 0;
+    const errorCode =
+      data.errorCode ?? (data.errorDetails as { code?: string })?.code ?? 'SYNC_EXECUTION_ERROR';
+    const rawErrorMessage =
+      data.errorMessage ??
+      (data.errorDetails as { message?: string })?.message ??
+      'Synchronization failed';
+    const errorMessage = String(rawErrorMessage).split('\n')[0].substring(0, 500);
+
     outbox.sanitizedPayload = {
       jobId: data.jobId,
       tenantCode: ctx.tenantCode,
@@ -528,9 +557,16 @@ export class AuthSecurityEventOutbox extends BaseEntity {
       sourceId: data.sourceId,
       sourceVersion: data.sourceVersion,
       triggerType: data.triggerType,
-      totalUsers: data.totalUsers,
+      totalUsers: data.totalUsers ?? 0,
       processedUsers: data.processedUsers,
-      errorDetails: data.errorDetails ?? null,
+      durationMs,
+      errorCode,
+      errorMessage,
+      errorDetails: {
+        code: errorCode,
+        message: errorMessage,
+      },
+      requiresEmailNotification: true,
       initiatedBy: data.initiatedBy ?? ctx.userId ?? 'SYSTEM',
       timestamp: new Date().toISOString(),
     };

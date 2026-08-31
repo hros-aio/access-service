@@ -2,10 +2,14 @@ import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { SyncJobResponseDto } from '../dto/sync-job-response.dto';
+import { SyncStatusResponseDto } from '../dto/sync-status-response.dto';
+import { SyncStatusSummaryResponseDto } from '../dto/sync-status-summary-response.dto';
 import { TriggerSyncNowDto } from '../dto/trigger-sync-now.dto';
+import { SyncSourceType } from '../entities/authorization-sync-job.entity';
 import { AuthorizationGuard, RequirePermissions } from '../guards/authorization.guard';
 import { AuthorizationSyncService } from '../services/authorization-sync.service';
 import { ScheduledReconciliationScanner } from '../services/scheduled-reconciliation-scanner.service';
+import { SyncStatusProjectionService } from '../services/sync-status-projection.service';
 
 @ApiTags('Authorization Sync')
 @ApiBearerAuth()
@@ -15,6 +19,7 @@ export class AuthorizationSyncController {
   constructor(
     private readonly syncService: AuthorizationSyncService,
     private readonly scanner: ScheduledReconciliationScanner,
+    private readonly projectionService: SyncStatusProjectionService,
   ) {}
 
   @Post('sync-now')
@@ -30,7 +35,7 @@ export class AuthorizationSyncController {
   }
 
   @Get('sync-jobs/:jobId')
-  @RequirePermissions('user_group.read', 'role.read')
+  @RequirePermissions('user_group.read', 'role.read', 'user_group.view', 'role.view')
   @ApiOperation({ summary: 'Retrieve status and progress of a synchronization job' })
   @ApiResponse({
     status: 200,
@@ -39,6 +44,48 @@ export class AuthorizationSyncController {
   })
   async getSyncJobStatus(@Param('jobId') jobId: string): Promise<SyncJobResponseDto> {
     return this.syncService.getJobStatus(jobId);
+  }
+
+  @Get('sync-status/summary')
+  @RequirePermissions('user_group.read', 'role.read', 'user_group.view', 'role.view')
+  @ApiOperation({ summary: 'Retrieve tenant-wide synchronization summary' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tenant-wide aggregate synchronization state counts',
+    type: SyncStatusSummaryResponseDto,
+  })
+  async getSyncStatusSummary(): Promise<SyncStatusSummaryResponseDto> {
+    return this.projectionService.getTenantSummary();
+  }
+
+  @Get('sync-status/:sourceType/:sourceId')
+  @RequirePermissions('user_group.read', 'role.read', 'user_group.view', 'role.view')
+  @ApiOperation({ summary: 'Retrieve real-time synchronization status and metadata for an entity' })
+  @ApiResponse({
+    status: 200,
+    description: 'Entity synchronization status and progress details',
+    type: SyncStatusResponseDto,
+  })
+  async getEntitySyncStatus(
+    @Param('sourceType') sourceType: SyncSourceType,
+    @Param('sourceId') sourceId: string,
+  ): Promise<SyncStatusResponseDto> {
+    return this.projectionService.getEntitySyncStatus(sourceType, sourceId);
+  }
+
+  @Post('sync-status/:sourceType/:sourceId/retry')
+  @RequirePermissions('user_group.sync', 'role.sync')
+  @ApiOperation({ summary: 'Retry a failed synchronization for Role or User Group' })
+  @ApiResponse({
+    status: 200,
+    description: 'Failed sync job retried successfully',
+    type: SyncJobResponseDto,
+  })
+  async retryFailedSync(
+    @Param('sourceType') sourceType: SyncSourceType,
+    @Param('sourceId') sourceId: string,
+  ): Promise<SyncJobResponseDto> {
+    return this.syncService.retryFailedSync(sourceType, sourceId);
   }
 
   @Post('scheduled-sweep')

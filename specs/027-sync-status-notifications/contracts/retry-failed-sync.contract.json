@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RetryFailedSyncEndpoint",
+  "type": "object",
+  "properties": {
+    "request": {
+      "type": "object",
+      "properties": {
+        "method": { "type": "string", "enum": ["POST"] },
+        "path": { "type": "string", "pattern": "^/authz/sync-status/(USER_GROUP|ROLE)/[0-9a-fA-F-]{36}/retry$" },
+        "headers": {
+          "type": "object",
+          "properties": {
+            "Authorization": { "type": "string" },
+            "X-Tenant-Code": { "type": "string" }
+          },
+          "required": ["Authorization"]
+        }
+      }
+    },
+    "responses": {
+      "type": "object",
+      "properties": {
+        "200": {
+          "description": "Retry job queued successfully or active job returned",
+          "type": "object",
+          "properties": {
+            "jobId": { "type": "string", "format": "uuid" },
+            "tenantCode": { "type": "string" },
+            "sourceType": { "type": "string", "enum": ["USER_GROUP", "ROLE"] },
+            "sourceId": { "type": "string", "format": "uuid" },
+            "sourceVersion": { "type": "integer" },
+            "triggerType": { "type": "string", "enum": ["MANUAL"] },
+            "status": { "type": "string", "enum": ["PENDING", "PROCESSING"] },
+            "message": { "type": "string" }
+          },
+          "required": ["jobId", "tenantCode", "sourceType", "sourceId", "sourceVersion", "triggerType", "status"]
+        },
+        "400": {
+          "description": "Entity is already completed; no failed sync exists",
+          "type": "object",
+          "properties": {
+            "statusCode": { "type": "integer", "enum": [400] },
+            "message": { "type": "string" },
+            "error": { "type": "string" }
+          }
+        },
+        "404": {
+          "description": "Entity not found within tenant",
+          "type": "object",
+          "properties": {
+            "statusCode": { "type": "integer", "enum": [404] },
+            "message": { "type": "string" },
+            "error": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

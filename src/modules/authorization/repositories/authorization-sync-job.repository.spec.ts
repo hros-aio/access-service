@@ -1,5 +1,5 @@
 import { TransactionService } from '@new-hros/libs-sql';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
 import { AuthorizationSyncJobRepository } from './authorization-sync-job.repository';
 import {
@@ -95,6 +95,90 @@ describe('AuthorizationSyncJobRepository', () => {
 
       expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
         where: { tenantCode: 'TENANT_A', id: 'job-1' },
+      });
+      expect(result).toEqual(mockJob);
+    });
+  });
+
+  describe('findLatestJobBySource', () => {
+    it('should find latest job by source ordered by createdAt DESC', async () => {
+      const mockJob = { id: 'job-latest', tenantCode: 'TENANT_A' } as AuthorizationSyncJob;
+      (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(mockJob);
+
+      const result = await repository.findLatestJobBySource(
+        'TENANT_A',
+        SyncSourceType.USER_GROUP,
+        'ug-1',
+      );
+
+      expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          tenantCode: 'TENANT_A',
+          sourceType: SyncSourceType.USER_GROUP,
+          sourceId: 'ug-1',
+        },
+        order: {
+          createdAt: 'DESC',
+        },
+      });
+      expect(result).toEqual(mockJob);
+    });
+  });
+
+  describe('findLatestCompletedJobBySource', () => {
+    it('should find latest completed job by source ordered by completedAt DESC, createdAt DESC', async () => {
+      const mockJob = {
+        id: 'job-completed',
+        status: SyncJobStatus.COMPLETED,
+      } as AuthorizationSyncJob;
+      (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(mockJob);
+
+      const result = await repository.findLatestCompletedJobBySource(
+        'TENANT_A',
+        SyncSourceType.ROLE,
+        'role-1',
+      );
+
+      expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          tenantCode: 'TENANT_A',
+          sourceType: SyncSourceType.ROLE,
+          sourceId: 'role-1',
+          status: SyncJobStatus.COMPLETED,
+        },
+        order: {
+          completedAt: 'DESC',
+          createdAt: 'DESC',
+        },
+      });
+      expect(result).toEqual(mockJob);
+    });
+  });
+
+  describe('findActiveJobBySource', () => {
+    it('should find active PENDING or PROCESSING job by source', async () => {
+      const mockJob = {
+        id: 'job-active',
+        status: SyncJobStatus.PROCESSING,
+      } as AuthorizationSyncJob;
+      (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(mockJob);
+
+      const result = await repository.findActiveJobBySource(
+        'TENANT_A',
+        SyncSourceType.USER_GROUP,
+        'ug-1',
+      );
+
+      expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          tenantCode: 'TENANT_A',
+          sourceType: SyncSourceType.USER_GROUP,
+          sourceId: 'ug-1',
+          status: In([SyncJobStatus.PENDING, SyncJobStatus.PROCESSING]),
+        },
+        order: {
+          createdAt: 'DESC',
+        },
       });
       expect(result).toEqual(mockJob);
     });
