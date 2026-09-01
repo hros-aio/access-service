@@ -38,7 +38,7 @@ describe('UserGroupRoleAssignmentService', () => {
     } as unknown as jest.Mocked<UserGroupRoleRepository>;
 
     mockRoleRepo = {
-      findByIdAndTenant: jest.fn(),
+      findById: jest.fn(),
     } as unknown as jest.Mocked<RoleRepository>;
 
     mockOutboxRepo = {
@@ -75,7 +75,7 @@ describe('UserGroupRoleAssignmentService', () => {
       id: 'group-1',
       version: 1,
     } as never);
-    mockRoleRepo.findByIdAndTenant.mockResolvedValue({
+    mockRoleRepo.findById.mockResolvedValue({
       id: 'role-1',
       name: 'Role 1',
       status: 'INACTIVE',
@@ -94,7 +94,7 @@ describe('UserGroupRoleAssignmentService', () => {
       id: 'group-1',
       version: 1,
     } as never);
-    mockRoleRepo.findByIdAndTenant.mockResolvedValue({
+    mockRoleRepo.findById.mockResolvedValue({
       id: 'role-1',
       name: 'Role 1',
       status: 'ACTIVE',
@@ -128,7 +128,7 @@ describe('UserGroupRoleAssignmentService', () => {
       projectionVersion: 0,
     };
     mockUserGroupRepo.findByTenantAndId.mockResolvedValue(existingGroup as never);
-    mockRoleRepo.findByIdAndTenant.mockResolvedValue({
+    mockRoleRepo.findById.mockResolvedValue({
       id: 'role-1',
       name: 'Role 1',
       status: 'ACTIVE',

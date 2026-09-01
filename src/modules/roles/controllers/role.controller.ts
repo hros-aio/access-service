@@ -12,6 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { PaginatedResult } from '@new-hros/libs-sql';
 
 import {
   CopyRoleDto,
@@ -19,12 +20,12 @@ import {
   DeactivateRoleDto,
   FilterRoleDto,
   HighImpactConfirmationRequiredResponseDto,
+  PaginatedRoleResponseDto,
   RenameRoleDto,
   RoleImpactResponseDto,
   RoleResponseDto,
   UpdateCustomRoleDto,
 } from '../dto/role.dto';
-import { RoleStatus } from '../interfaces/system-role-template.interface';
 import { RoleApplicationService } from '../services/role.application.service';
 
 @ApiTags('Roles')
@@ -34,8 +35,8 @@ export class RoleController {
 
   @Get()
   @ApiOperation({ summary: 'List all roles in current tenant with metrics and unassigned badges' })
-  @ApiResponse({ status: 200, type: [RoleResponseDto] })
-  async listRoles(@Query() query: FilterRoleDto): Promise<RoleResponseDto[]> {
+  @ApiResponse({ status: 200, type: PaginatedRoleResponseDto })
+  async listRoles(@Query() query: FilterRoleDto): Promise<PaginatedResult<RoleResponseDto>> {
     return this.roleApplicationService.list(query);
   }
 
@@ -80,12 +81,7 @@ export class RoleController {
   async updateCustomRole(
     @Param('id') id: string,
     @Body() dto: UpdateCustomRoleDto,
-  ): Promise<{
-    role?: RoleResponseDto;
-    confirmationRequired?: boolean;
-    affectedUserCount?: number;
-    message?: string;
-  }> {
+  ): Promise<RoleResponseDto | HighImpactConfirmationRequiredResponseDto> {
     return this.roleApplicationService.updateCustom(id, dto);
   }
 
@@ -98,12 +94,7 @@ export class RoleController {
   async updateRolePermissions(
     @Param('id') id: string,
     @Body() dto: { permissionCodes: string[]; version?: number; confirmed?: boolean },
-  ): Promise<{
-    role?: RoleResponseDto;
-    confirmationRequired?: boolean;
-    affectedUserCount?: number;
-    message?: string;
-  }> {
+  ): Promise<RoleResponseDto | HighImpactConfirmationRequiredResponseDto> {
     return this.roleApplicationService.updatePermissions(id, dto);
   }
 
@@ -115,13 +106,7 @@ export class RoleController {
   async deactivateRole(
     @Param('id') id: string,
     @Body() dto?: DeactivateRoleDto,
-  ): Promise<{
-    role?: RoleResponseDto;
-    confirmationRequired?: boolean;
-    affectedUserGroupCount?: number;
-    affectedUserCount?: number;
-    message?: string;
-  }> {
+  ): Promise<RoleResponseDto | HighImpactConfirmationRequiredResponseDto> {
     return this.roleApplicationService.deactivate(id, dto);
   }
 
@@ -138,16 +123,6 @@ export class RoleController {
   @ApiResponse({ status: 200, type: RoleResponseDto })
   async renameRole(@Param('id') id: string, @Body() dto: RenameRoleDto): Promise<RoleResponseDto> {
     return this.roleApplicationService.rename(id, dto);
-  }
-
-  @Patch(':id/status')
-  @ApiOperation({ summary: 'Update role status (ACTIVE / INACTIVE)' })
-  @ApiResponse({ status: 200, type: RoleResponseDto })
-  async updateRoleStatus(
-    @Param('id') id: string,
-    @Body('status') status: RoleStatus,
-  ): Promise<RoleResponseDto> {
-    return this.roleApplicationService.updateStatus(id, status);
   }
 
   @Delete(':id')

@@ -28,7 +28,7 @@ describe('AuthorizationGuard', () => {
       getRole: jest.fn(),
     };
     roleRepo = {
-      findByIdAndTenant: jest.fn(),
+      findById: jest.fn(),
     };
     evaluator = {
       evaluateAccess: jest.fn(),

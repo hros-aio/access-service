@@ -1,12 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
+  Min,
 } from 'class-validator';
 
 import { Role } from '../entities/role.entity';
@@ -68,20 +71,16 @@ export class RoleResponseDto {
 
   static fromRole(
     role: Role,
-    userCount?: number,
     options?: {
-      isUnassigned?: boolean;
       assignedUserGroupCount?: number;
       activeUserReachCount?: number;
     },
   ): RoleResponseDto {
-    const activeReach = options?.activeUserReachCount ?? userCount;
+    const activeReach = options?.activeUserReachCount ?? 0;
     const isUnassigned =
-      options?.isUnassigned !== undefined
-        ? options.isUnassigned
-        : options?.assignedUserGroupCount !== undefined
-          ? options.assignedUserGroupCount === 0
-          : undefined;
+      options?.assignedUserGroupCount !== undefined
+        ? options.assignedUserGroupCount === 0
+        : undefined;
 
     return {
       id: role.id,
@@ -98,7 +97,7 @@ export class RoleResponseDto {
       })),
       userCount: activeReach,
       isUnassigned,
-      assignedUserGroupCount: options?.assignedUserGroupCount,
+      assignedUserGroupCount: options?.assignedUserGroupCount ?? 0,
       activeUserReachCount: activeReach,
       createdAt: role.createdAt ? role.createdAt.toISOString() : new Date().toISOString(),
       updatedAt: role.updatedAt ? role.updatedAt.toISOString() : new Date().toISOString(),
@@ -176,14 +175,6 @@ export class UpdateCustomRoleDto {
   @IsArray()
   @IsString({ each: true })
   readonly permissionCodes: string[];
-
-  @ApiPropertyOptional({
-    example: false,
-    description: 'Confirmation flag if affected user count exceeds high impact threshold',
-  })
-  @IsBoolean()
-  @IsOptional()
-  readonly confirmedHighImpact?: boolean;
 
   @ApiPropertyOptional({
     example: false,
@@ -296,4 +287,35 @@ export class FilterRoleDto {
   @IsOptional()
   @IsEnum(RoleStatus)
   readonly status?: RoleStatus;
+
+  @ApiPropertyOptional({ default: 1, description: 'Page number' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  readonly page?: number = 1;
+
+  @ApiPropertyOptional({ default: 10, description: 'Items per page' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  readonly limit?: number = 10;
+}
+
+export class PaginatedRoleResponseDto {
+  @ApiProperty({ type: [RoleResponseDto] })
+  readonly data: RoleResponseDto[];
+
+  @ApiProperty({ example: 42 })
+  readonly total: number;
+
+  @ApiProperty({ example: 1 })
+  readonly page: number;
+
+  @ApiProperty({ example: 10 })
+  readonly limit: number;
+
+  @ApiProperty({ example: 5 })
+  readonly totalPages: number;
 }

@@ -46,7 +46,7 @@ describe('Scheduled Authorization Reconciliation (E2E Integration Flow)', () => 
 
     mockRoleRepo = {
       findDirtyRoles: jest.fn().mockResolvedValue([]),
-      findByIdAndTenant: jest.fn().mockResolvedValue(null),
+      findById: jest.fn().mockResolvedValue(null),
     };
 
     mockSyncJobRepo = {

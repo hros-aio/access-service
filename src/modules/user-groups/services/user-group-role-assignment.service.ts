@@ -65,12 +65,7 @@ export class UserGroupRoleAssignmentService {
     // Validate target roles existence, status, and tenant scoping
     const targetRoleIds = Array.from(new Set(dto.roleIds));
     for (const roleId of targetRoleIds) {
-      const role = await this.roleRepository.findByIdAndTenant(roleId, tenantCode);
-      if (!role) {
-        throw new InvalidRoleAssignmentError(
-          `Role with ID "${roleId}" was not found or does not belong to the calling tenant`,
-        );
-      }
+      const role = await this.roleRepository.findById(roleId, { required: true });
       if (role.status !== 'ACTIVE') {
         throw new InvalidRoleAssignmentError(
           `Role "${role.name}" (${roleId}) is inactive and cannot be assigned to a User Group`,

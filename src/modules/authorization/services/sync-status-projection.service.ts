@@ -75,7 +75,7 @@ export class SyncStatusProjectionService {
 
     const [userGroups, roles] = await Promise.all([
       this.userGroupRepo.findActiveGroups(tenantCode).catch(() => []),
-      this.roleRepo.findByTenant(tenantCode).catch(() => []),
+      this.roleRepo.find({}).catch(() => []),
     ]);
 
     const entities: {
@@ -246,10 +246,7 @@ export class SyncStatusProjectionService {
     }
 
     if (sourceType === SyncSourceType.ROLE) {
-      const role = await this.roleRepo.findByIdAndTenant(sourceId, tenantCode);
-      if (!role) {
-        throw new NotFoundException(`Role with id ${sourceId} not found in tenant ${tenantCode}`);
-      }
+      const role = await this.roleRepo.findById(sourceId, { required: true });
       return {
         sourceVersion: role.version,
         projectionVersion: role.projectionVersion ?? 0,
