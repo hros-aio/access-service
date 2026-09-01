@@ -278,7 +278,7 @@ export class AuthorizationSyncService {
     }
 
     if (sourceType === SyncSourceType.ROLE) {
-      const role = await this.roleRepo.findByIdAndTenant(sourceId, tenantCode);
+      const role = await this.roleRepo.findById(sourceId);
       if (!role) {
         throw new NotFoundException(`Role with id ${sourceId} not found`);
       }

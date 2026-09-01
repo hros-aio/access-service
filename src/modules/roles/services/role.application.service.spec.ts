@@ -9,6 +9,10 @@ import { PermissionDependencyService } from '../../permissions';
 import { RolePermission } from '../entities/role-permission.entity';
 import { Role } from '../entities/role.entity';
 import {
+  HighImpactConfirmationRequiredResponseDto,
+  RoleResponseDto,
+} from '../dto/role.dto';
+import {
   CannotDeleteSystemRoleException,
   CannotMutateSystemRoleException,
   DuplicateRoleNameException,
@@ -22,12 +26,12 @@ import { RoleRepository } from '../repositories/role.repository';
 describe('RoleApplicationService', () => {
   let service: RoleApplicationService;
   let mockRoleRepository: {
-    findByTenant: jest.Mock;
+    find: jest.Mock;
     findById: jest.Mock;
     findByName: jest.Mock;
-    countAssignedUsers: jest.Mock;
     countActiveUserReach: jest.Mock;
     countAssignedUserGroups: jest.Mock;
+    countAssignedUserGroupAndUser: jest.Mock;
     save: jest.Mock;
     delete: jest.Mock;
   };
@@ -52,12 +56,14 @@ describe('RoleApplicationService', () => {
 
   beforeEach(async () => {
     mockRoleRepository = {
-      findByTenant: jest.fn().mockResolvedValue([]),
+      find: jest.fn().mockResolvedValue({ data: [], total: 0, page: 1, limit: 10, totalPages: 0 }),
       findById: jest.fn().mockResolvedValue(null),
       findByName: jest.fn().mockResolvedValue(null),
-      countAssignedUsers: jest.fn().mockResolvedValue(0),
       countActiveUserReach: jest.fn().mockResolvedValue(0),
       countAssignedUserGroups: jest.fn().mockResolvedValue(0),
+      countAssignedUserGroupAndUser: jest
+        .fn()
+        .mockResolvedValue({ assignedUserGroupCount: 0, activeUserReachCount: 0 }),
       save: jest.fn().mockImplementation((r) => r),
       delete: jest.fn().mockResolvedValue(undefined),
     };
@@ -130,7 +136,6 @@ describe('RoleApplicationService', () => {
       expect(result.name).toBe('HR Specialist');
       expect(result.type).toBe(RoleType.CUSTOM);
       expect(result.version).toBe(1);
-      expect(result.isUnassigned).toBe(true);
       expect(mockRolePermissionRepository.bulkSave).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ permissionCode: 'employee.view', isProtected: false }),
@@ -209,14 +214,14 @@ describe('RoleApplicationService', () => {
       expect(mockRoleCacheService.syncRole).toHaveBeenCalled();
     });
 
-    it('should throw RoleNotFoundException if source role does not exist in tenant', async () => {
-      mockRoleRepository.findById.mockResolvedValue(null);
+    it('should throw an error if source role does not exist in tenant', async () => {
+      mockRoleRepository.findById.mockRejectedValue(new Error('Record not found with ID: missing-role'));
 
       await expect(
         service.copy('missing-role', {
           name: 'New Custom Role',
         }),
-      ).rejects.toThrow(RoleNotFoundException);
+      ).rejects.toThrow('Record not found with ID: missing-role');
     });
   });
 
@@ -260,8 +265,10 @@ describe('RoleApplicationService', () => {
       const role = new Role();
       role.id = 'role-1';
       mockRoleRepository.findById.mockResolvedValue(role);
-      mockRoleRepository.countActiveUserReach.mockResolvedValue(45);
-      mockRoleRepository.countAssignedUserGroups.mockResolvedValue(2);
+      mockRoleRepository.countAssignedUserGroupAndUser.mockResolvedValue({
+        activeUserReachCount: 45,
+        assignedUserGroupCount: 2,
+      });
 
       const impact = await service.estimateImpact('role-1');
 
@@ -281,10 +288,14 @@ describe('RoleApplicationService', () => {
       customRole.status = RoleStatus.ACTIVE;
 
       mockRoleRepository.findById.mockResolvedValue(customRole);
-      mockRoleRepository.countAssignedUserGroups.mockResolvedValue(3);
-      mockRoleRepository.countActiveUserReach.mockResolvedValue(80);
+      mockRoleRepository.countAssignedUserGroupAndUser.mockResolvedValue({
+        assignedUserGroupCount: 3,
+        activeUserReachCount: 80,
+      });
 
-      const result = await service.deactivate('role-assigned', { confirmed: false });
+      const result = (await service.deactivate('role-assigned', {
+        confirmed: false,
+      })) as HighImpactConfirmationRequiredResponseDto;
 
       expect(result.confirmationRequired).toBe(true);
       expect(result.affectedUserGroupCount).toBe(3);
@@ -301,12 +312,16 @@ describe('RoleApplicationService', () => {
       customRole.version = 1;
 
       mockRoleRepository.findById.mockResolvedValue(customRole);
-      mockRoleRepository.countAssignedUserGroups.mockResolvedValue(1);
-      mockRoleRepository.countActiveUserReach.mockResolvedValue(10);
+      mockRoleRepository.countAssignedUserGroupAndUser.mockResolvedValue({
+        assignedUserGroupCount: 1,
+        activeUserReachCount: 10,
+      });
 
-      const result = await service.deactivate('role-assigned', { confirmed: true });
+      const result = (await service.deactivate('role-assigned', {
+        confirmed: true,
+      })) as RoleResponseDto;
 
-      expect(result.role?.status).toBe(RoleStatus.INACTIVE);
+      expect(result.status).toBe(RoleStatus.INACTIVE);
       expect(mockOutboxRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           eventType: EventType.ROLE_DEACTIVATED,
@@ -347,17 +362,47 @@ describe('RoleApplicationService', () => {
       role2.id = 'r2';
       role2.name = 'Assigned Role';
 
-      mockRoleRepository.findByTenant.mockResolvedValue([role1, role2]);
-      mockRoleRepository.countAssignedUserGroups.mockResolvedValueOnce(0).mockResolvedValueOnce(2);
-      mockRoleRepository.countActiveUserReach.mockResolvedValueOnce(0).mockResolvedValueOnce(35);
+      mockRoleRepository.find.mockResolvedValue({
+        data: [role1, role2],
+        total: 2,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
+      mockRoleRepository.countAssignedUserGroupAndUser
+        .mockResolvedValueOnce({ assignedUserGroupCount: 0, activeUserReachCount: 0 })
+        .mockResolvedValueOnce({ assignedUserGroupCount: 2, activeUserReachCount: 35 });
 
-      const list = await service.list();
+      const list = await service.list({});
 
-      expect(list).toHaveLength(2);
-      expect(list[0].isUnassigned).toBe(true);
-      expect(list[0].activeUserReachCount).toBe(0);
-      expect(list[1].isUnassigned).toBe(false);
-      expect(list[1].activeUserReachCount).toBe(35);
+      expect(list.total).toBe(2);
+      expect(list.data).toHaveLength(2);
+      expect(list.data[0].isUnassigned).toBe(true);
+      expect(list.data[0].activeUserReachCount).toBe(0);
+      expect(list.data[1].isUnassigned).toBe(false);
+      expect(list.data[1].activeUserReachCount).toBe(35);
+    });
+
+    it('should return role by ID with reach metrics', async () => {
+      const role = new Role();
+      role.id = 'r1';
+      role.name = 'Role 1';
+      role.type = RoleType.CUSTOM;
+      role.status = RoleStatus.ACTIVE;
+      role.version = 1;
+
+      mockRoleRepository.findById.mockResolvedValue(role);
+      mockRoleRepository.countAssignedUserGroupAndUser.mockResolvedValue({
+        assignedUserGroupCount: 2,
+        activeUserReachCount: 15,
+      });
+
+      const result = await service.getById('r1');
+
+      expect(result.id).toBe('r1');
+      expect(result.activeUserReachCount).toBe(15);
+      expect(result.assignedUserGroupCount).toBe(2);
+      expect(result.isUnassigned).toBe(false);
     });
   });
 
@@ -391,16 +436,16 @@ describe('RoleApplicationService', () => {
       mockRoleRepository.findById.mockResolvedValue(customRole);
       mockRoleRepository.save.mockImplementation(async (r: Role) => r);
 
-      const result = await service.updatePermissions('custom-role-1', {
+      const result = (await service.updatePermissions('custom-role-1', {
         permissionCodes: ['employee.view'],
         version: 1,
-      });
+      })) as RoleResponseDto;
 
       expect(mockRolePermissionRepository.deleteByRoleId).toHaveBeenCalledWith('custom-role-1');
       expect(mockRolePermissionRepository.bulkSave).toHaveBeenCalled();
       expect(mockOutboxRepository.save).toHaveBeenCalled();
       expect(mockRoleCacheService.syncRole).toHaveBeenCalled();
-      expect(result.role).toBeDefined();
+      expect(result.id).toBe('custom-role-1');
     });
   });
 

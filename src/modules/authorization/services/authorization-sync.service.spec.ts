@@ -40,7 +40,7 @@ describe('AuthorizationSyncService', () => {
     };
 
     mockRoleRepo = {
-      findByIdAndTenant: jest.fn(),
+      findById: jest.fn(),
     };
 
     mockOutboxRepo = {
@@ -297,7 +297,7 @@ describe('AuthorizationSyncService', () => {
 
       expect(result.jobId).toBe('job-sched-bypass');
       expect(mockUserGroupRepo.findByTenantAndId).not.toHaveBeenCalled();
-      expect(mockRoleRepo.findByIdAndTenant).not.toHaveBeenCalled();
+      expect(mockRoleRepo.findById).not.toHaveBeenCalled();
     });
 
     it('should pass priority through to repository when provided', async () => {
@@ -377,7 +377,7 @@ describe('AuthorizationSyncService', () => {
     });
 
     it('should enqueue a new manual sync job for failed entity', async () => {
-      (mockRoleRepo.findByIdAndTenant as jest.Mock).mockResolvedValue({
+      (mockRoleRepo.findById as jest.Mock).mockResolvedValue({
         id: 'role-1',
         version: 4,
         projectionVersion: 3,
@@ -409,7 +409,7 @@ describe('AuthorizationSyncService', () => {
     });
 
     it('should throw NotFoundException if entity does not exist', async () => {
-      (mockRoleRepo.findByIdAndTenant as jest.Mock).mockResolvedValue(null);
+      (mockRoleRepo.findById as jest.Mock).mockResolvedValue(null);
 
       await expect(
         service.retryFailedSync(SyncSourceType.ROLE, 'non-existent-role'),

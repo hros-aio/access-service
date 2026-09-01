@@ -37,8 +37,8 @@ describe('SyncStatusProjectionService', () => {
     };
 
     mockRoleRepo = {
-      findByIdAndTenant: jest.fn(),
-      findByTenant: jest.fn(),
+      findById: jest.fn(),
+      find: jest.fn(),
     };
 
     service = new SyncStatusProjectionService(
@@ -114,9 +114,8 @@ describe('SyncStatusProjectionService', () => {
     });
 
     it('should return PROCESSING status with MANUAL_IN_FLIGHT when active job is processing', async () => {
-      (mockRoleRepo.findByIdAndTenant as jest.Mock).mockResolvedValue({
+      (mockRoleRepo.findById as jest.Mock).mockResolvedValue({
         id: roleId,
-        tenantCode,
         version: 2,
         projectionVersion: 1,
       });
@@ -198,7 +197,7 @@ describe('SyncStatusProjectionService', () => {
         { id: 'ug-2', version: 3, projectionVersion: 2 }, // Pending
       ]);
 
-      (mockRoleRepo.findByTenant as jest.Mock).mockResolvedValue([
+      (mockRoleRepo.find as jest.Mock).mockResolvedValue([
         { id: 'role-1', version: 1, projectionVersion: 1 }, // Completed
         { id: 'role-2', version: 2, projectionVersion: 1 }, // Failed
       ]);

@@ -58,7 +58,9 @@ export class BootstrapAuthorizationService {
         }
       } else {
         // Fallback to database
-        const dbRole = await this.roleRepo.findByIdAndTenant(roleAssignment.roleId, tenantCode);
+        const dbRole = await this.roleRepo.findById(roleAssignment.roleId, {
+          relations: ['permissions'],
+        });
         if (dbRole) {
           roleNamesSet.add(dbRole.name);
           if (dbRole.permissions) {

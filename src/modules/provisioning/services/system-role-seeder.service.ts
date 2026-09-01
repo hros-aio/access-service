@@ -30,7 +30,7 @@ export class SystemRoleSeederService {
         const template = SYSTEM_ROLE_TEMPLATES[templateKey];
 
         // Check if role already exists for tenant
-        const existing = await this.roleRepository.findBySystemKey(tenantCode, templateKey);
+        const existing = await this.roleRepository.findBySystemKey(templateKey);
         if (existing) {
           createdRoles.push(existing);
           continue;

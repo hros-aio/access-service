@@ -133,7 +133,7 @@ export class AuthorizationGuard implements CanActivate {
     }
 
     // Fallback to DB
-    const dbRole = await this.roleRepo.findByIdAndTenant(roleId, tenantCode);
+    const dbRole = await this.roleRepo.findById(roleId, { relations: ['permissions'] });
     if (!dbRole) {
       return [];
     }

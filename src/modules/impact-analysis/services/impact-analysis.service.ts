@@ -144,7 +144,7 @@ export class ImpactAnalysisService {
     userGroupIdToRemove?: string,
   ): Promise<CoverageLossWarning | null> {
     // 1. Fetch active built-in admin roles via RoleRepository
-    const adminRoles = await this.roleRepo.findActiveBuiltInAdminRoles(tenantCode);
+    const adminRoles = await this.roleRepo.findActiveBuiltInAdminRoles();
 
     if (!adminRoles || adminRoles.length === 0) {
       return null;

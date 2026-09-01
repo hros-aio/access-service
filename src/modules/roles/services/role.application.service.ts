@@ -1,6 +1,6 @@
 import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { RequestContextService } from '@new-hros/libs-core';
-import { TransactionService } from '@new-hros/libs-sql';
+import { PaginatedResult, TransactionService } from '@new-hros/libs-sql';
 
 import { RoleCacheService } from './role-cache.service';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
@@ -12,6 +12,7 @@ import {
   CreateCustomRoleDto,
   DeactivateRoleDto,
   FilterRoleDto,
+  HighImpactConfirmationRequiredResponseDto,
   RenameRoleDto,
   RoleImpactResponseDto,
   RoleResponseDto,
@@ -46,51 +47,47 @@ export class RoleApplicationService {
     private readonly outboxRepository: AuthSecurityEventOutboxRepository,
   ) {}
 
-  async list(filters?: FilterRoleDto): Promise<RoleResponseDto[]> {
+  async list(filters: FilterRoleDto): Promise<PaginatedResult<RoleResponseDto>> {
     const tenantCode = RequestContextService.getTenantCode();
-    const roles = await this.roleRepository.findByTenant(tenantCode, filters);
-    const results: RoleResponseDto[] = [];
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 10;
 
-    for (const role of roles) {
-      const activeUserReachCount = await this.roleRepository.countActiveUserReach(
-        role.id,
-        tenantCode,
-      );
-      const assignedUserGroupCount = await this.roleRepository.countAssignedUserGroups(
-        role.id,
-        tenantCode,
-      );
-      results.push(
-        RoleResponseDto.fromRole(role, activeUserReachCount, {
-          isUnassigned: assignedUserGroupCount === 0,
+    const paginatedResult = await this.roleRepository.find(filters, {
+      pagination: { page, limit },
+      relations: ['permissions'],
+      order: {
+        createdAt: 'ASC',
+      },
+    });
+
+    const items: RoleResponseDto[] = [];
+
+    for (const role of paginatedResult.data) {
+      const { assignedUserGroupCount, activeUserReachCount } =
+        await this.roleRepository.countAssignedUserGroupAndUser(role.id, tenantCode);
+
+      items.push(
+        RoleResponseDto.fromRole(role, {
           assignedUserGroupCount,
           activeUserReachCount,
         }),
       );
     }
 
-    return results;
+    return {
+      ...paginatedResult,
+      data: items,
+    };
   }
 
   async getById(roleId: string): Promise<RoleResponseDto> {
     const tenantCode = RequestContextService.getTenantCode();
-    const role = await this.roleRepository.findById(roleId);
-    if (!role) {
-      this.logger.error(`Role not found: ${roleId} for tenant: ${tenantCode}`);
-      throw new RoleNotFoundException(roleId);
-    }
+    const role = await this.roleRepository.findById(roleId, { required: true });
 
-    const activeUserReachCount = await this.roleRepository.countActiveUserReach(
-      role.id,
-      tenantCode,
-    );
-    const assignedUserGroupCount = await this.roleRepository.countAssignedUserGroups(
-      role.id,
-      tenantCode,
-    );
+    const { assignedUserGroupCount, activeUserReachCount } =
+      await this.roleRepository.countAssignedUserGroupAndUser(role.id, tenantCode);
 
-    return RoleResponseDto.fromRole(role, activeUserReachCount, {
-      isUnassigned: assignedUserGroupCount === 0,
+    return RoleResponseDto.fromRole(role, {
       assignedUserGroupCount,
       activeUserReachCount,
     });
@@ -109,14 +106,10 @@ export class RoleApplicationService {
     }
 
     // 2. Validate role name uniqueness within tenant
-    const existing = await this.roleRepository.findByName(dto.name, tenantCode);
-    if (existing) {
-      this.logger.error(`Duplicate role name '${dto.name}' in tenant '${tenantCode}'`);
-      throw new DuplicateRoleNameException(dto.name);
-    }
+    await this.validateRoleName(dto.name, tenantCode);
 
     const createdRole = await this.transactionService.runInTransaction(async () => {
-      const role = Role.fromRequest({ tenantCode, userId }, dto);
+      const role = Role.fromRequest(userId, dto);
       const savedRole = await this.roleRepository.save(role);
 
       // Insert role_permissions with is_protected = false
@@ -128,10 +121,7 @@ export class RoleApplicationService {
         rp.isProtected = false;
         return rp;
       });
-
-      if (rolePermissions.length > 0) {
-        await this.rolePermissionRepository.bulkSave(rolePermissions);
-      }
+      await this.rolePermissionRepository.bulkSave(rolePermissions);
 
       // Record outbox event
       const outbox = AuthSecurityEventOutbox.fromRoleCreated(
@@ -140,43 +130,32 @@ export class RoleApplicationService {
       );
       await this.outboxRepository.save(outbox);
 
-      const reloaded = await this.roleRepository.findById(savedRole.id);
-      return reloaded ?? savedRole;
+      return savedRole;
     });
 
     // Synchronous Redis cache seeding
     await this.roleCacheService.syncRole(createdRole);
 
-    return RoleResponseDto.fromRole(createdRole, 0, {
-      isUnassigned: true,
-      assignedUserGroupCount: 0,
-      activeUserReachCount: 0,
-    });
+    return RoleResponseDto.fromRole(createdRole);
   }
 
   async copy(sourceRoleId: string, dto: CopyRoleDto): Promise<RoleResponseDto> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
-    const sourceRole = await this.roleRepository.findById(sourceRoleId);
-    if (!sourceRole) {
-      this.logger.error(`Source role not found: ${sourceRoleId}`);
-      throw new RoleNotFoundException(sourceRoleId);
-    }
-
-    const existingName = await this.roleRepository.findByName(dto.name, tenantCode);
-    if (existingName) {
-      this.logger.error(`Duplicate role name '${dto.name}' in tenant '${tenantCode}'`);
-      throw new DuplicateRoleNameException(dto.name);
-    }
+    const sourceRole = await this.roleRepository.findById(sourceRoleId, {
+      required: true,
+      relations: ['permissions'],
+    });
+    await this.validateRoleName(dto.name, tenantCode);
 
     const permissionCodes = (sourceRole.permissions || []).map((p) => p.permissionCode);
 
     const clonedRole = await this.transactionService.runInTransaction(async () => {
-      const role = Role.fromRequest(
-        { tenantCode, userId },
-        { name: dto.name, description: dto.description ?? sourceRole.description },
-      );
+      const role = Role.fromRequest(userId, {
+        name: dto.name,
+        description: dto.description ?? sourceRole.description,
+      });
 
       const savedRole = await this.roleRepository.save(role);
 
@@ -189,10 +168,7 @@ export class RoleApplicationService {
         rp.isProtected = false;
         return rp;
       });
-
-      if (rolePermissions.length > 0) {
-        await this.rolePermissionRepository.bulkSave(rolePermissions);
-      }
+      await this.rolePermissionRepository.bulkSave(rolePermissions);
 
       // Record outbox event
       const outbox = AuthSecurityEventOutbox.fromRoleCopied(
@@ -201,35 +177,20 @@ export class RoleApplicationService {
       );
       await this.outboxRepository.save(outbox);
 
-      const reloaded = await this.roleRepository.findById(savedRole.id);
-      return reloaded ?? savedRole;
+      return savedRole;
     });
 
     await this.roleCacheService.syncRole(clonedRole);
 
-    return RoleResponseDto.fromRole(clonedRole, 0, {
-      isUnassigned: true,
-      assignedUserGroupCount: 0,
-      activeUserReachCount: 0,
-    });
+    return RoleResponseDto.fromRole(clonedRole);
   }
 
   async estimateImpact(roleId: string): Promise<RoleImpactResponseDto> {
     const tenantCode = RequestContextService.getTenantCode();
-    const role = await this.roleRepository.findById(roleId);
-    if (!role) {
-      this.logger.error(`Role not found for impact estimation: ${roleId}`);
-      throw new RoleNotFoundException(roleId);
-    }
+    const role = await this.roleRepository.findById(roleId, { required: true });
 
-    const activeUserReachCount = await this.roleRepository.countActiveUserReach(
-      role.id,
-      tenantCode,
-    );
-    const assignedUserGroupCount = await this.roleRepository.countAssignedUserGroups(
-      role.id,
-      tenantCode,
-    );
+    const { assignedUserGroupCount, activeUserReachCount } =
+      await this.roleRepository.countAssignedUserGroupAndUser(role.id, tenantCode);
 
     return {
       roleId: role.id,
@@ -242,20 +203,11 @@ export class RoleApplicationService {
   async updateCustom(
     id: string,
     dto: UpdateCustomRoleDto,
-  ): Promise<{
-    role?: RoleResponseDto;
-    confirmationRequired?: boolean;
-    affectedUserCount?: number;
-    message?: string;
-  }> {
+  ): Promise<RoleResponseDto | HighImpactConfirmationRequiredResponseDto> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
-    const role = await this.roleRepository.findById(id);
-    if (!role) {
-      this.logger.error(`Role not found: ${id}`);
-      throw new RoleNotFoundException(id);
-    }
+    const role = await this.roleRepository.findById(id, { required: true });
 
     if (role.type === RoleType.SYSTEM) {
       this.logger.error(`Cannot mutate system role: ${role.name}`);
@@ -272,7 +224,7 @@ export class RoleApplicationService {
 
     // 2. Validate name uniqueness if changed
     if (role.name !== dto.name) {
-      const existing = await this.roleRepository.findByName(dto.name, tenantCode);
+      const existing = await this.roleRepository.findByName(dto.name);
       if (existing && existing.id !== role.id) {
         this.logger.error(`Duplicate role name '${dto.name}' in tenant '${tenantCode}'`);
         throw new DuplicateRoleNameException(dto.name);
@@ -288,24 +240,18 @@ export class RoleApplicationService {
     }
 
     // 4. High-impact blast radius check
-    const affectedUserCount = await this.roleRepository.countActiveUserReach(id, tenantCode);
-    const isConfirmed = dto.confirmedHighImpact === true || dto.confirmed === true;
-    if (affectedUserCount >= this.HIGH_IMPACT_THRESHOLD && !isConfirmed) {
-      return {
-        confirmationRequired: true,
-        affectedUserCount,
-        message: `This role change affects ${affectedUserCount} users. Explicit confirmation is required.`,
-      };
+    const { assignedUserGroupCount, activeUserReachCount: affectedUserCount } =
+      await this.roleRepository.countAssignedUserGroupAndUser(role.id, tenantCode);
+
+    if (affectedUserCount >= this.HIGH_IMPACT_THRESHOLD && dto.confirmed !== true) {
+      return this.responseForHighImpactUsersConfirmation(affectedUserCount);
     }
 
     const updatedRole = await this.transactionService.runInTransaction(async () => {
       const lockedRole = await this.roleRepository.findById(id, {
         lock: { mode: 'pessimistic_write' },
+        required: true,
       });
-      if (!lockedRole) {
-        this.logger.error(`Role not found under pessimistic lock: ${id}`);
-        throw new RoleNotFoundException(id);
-      }
 
       if (dto.version !== undefined && lockedRole.version !== dto.version) {
         this.logger.error(
@@ -315,14 +261,11 @@ export class RoleApplicationService {
       }
 
       lockedRole.name = dto.name;
-      if (dto.description !== undefined) {
-        lockedRole.description = dto.description;
-      }
+      lockedRole.description = dto.description;
       lockedRole.version += 1;
       lockedRole.updatedBy = userId;
 
       await this.rolePermissionRepository.deleteByRoleId(lockedRole.id);
-
       const newRolePermissions = dto.permissionCodes.map((code) => {
         const rp = new RolePermission();
         rp.tenantCode = tenantCode;
@@ -331,58 +274,34 @@ export class RoleApplicationService {
         rp.isProtected = false;
         return rp;
       });
-
-      if (newRolePermissions.length > 0) {
-        await this.rolePermissionRepository.bulkSave(newRolePermissions);
-      }
+      await this.rolePermissionRepository.bulkSave(newRolePermissions);
 
       const savedRole = await this.roleRepository.save(lockedRole);
-
       const outbox = AuthSecurityEventOutbox.fromPermissionsUpdated(
         { tenantCode, userId },
         { role: savedRole, permissionCodes: dto.permissionCodes },
       );
       await this.outboxRepository.save(outbox);
 
-      const reloaded = await this.roleRepository.findById(savedRole.id);
-      return reloaded ?? savedRole;
+      return savedRole;
     });
 
     await this.roleCacheService.syncRole(updatedRole);
 
-    const assignedUserGroupCount = await this.roleRepository.countAssignedUserGroups(
-      updatedRole.id,
-      tenantCode,
-    );
-
-    return {
-      role: RoleResponseDto.fromRole(updatedRole, affectedUserCount, {
-        isUnassigned: assignedUserGroupCount === 0,
-        assignedUserGroupCount,
-        activeUserReachCount: affectedUserCount,
-      }),
-    };
+    return RoleResponseDto.fromRole(updatedRole, {
+      assignedUserGroupCount,
+      activeUserReachCount: affectedUserCount,
+    });
   }
 
   async deactivate(
     id: string,
     dto?: DeactivateRoleDto,
-  ): Promise<{
-    role?: RoleResponseDto;
-    confirmationRequired?: boolean;
-    affectedUserGroupCount?: number;
-    affectedUserCount?: number;
-    message?: string;
-  }> {
+  ): Promise<RoleResponseDto | HighImpactConfirmationRequiredResponseDto> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
-    const role = await this.roleRepository.findById(id);
-    if (!role) {
-      this.logger.error(`Role not found: ${id}`);
-      throw new RoleNotFoundException(id);
-    }
-
+    const role = await this.roleRepository.findById(id, { required: true });
     if (role.type === RoleType.SYSTEM && role.systemRoleKey === SystemRoleKey.ADMINISTRATOR) {
       this.logger.error(`Cannot deactivate critical system role: ${role.name}`);
       throw new CriticalRoleDeactivationException(role.name);
@@ -395,19 +314,14 @@ export class RoleApplicationService {
       throw new RoleVersionConflictException(role.id, dto.version, role.version);
     }
 
-    const affectedUserGroupCount = await this.roleRepository.countAssignedUserGroups(
-      id,
-      tenantCode,
-    );
-    const affectedUserCount = await this.roleRepository.countActiveUserReach(id, tenantCode);
+    const { assignedUserGroupCount, activeUserReachCount } =
+      await this.roleRepository.countAssignedUserGroupAndUser(role.id, tenantCode);
 
-    if (affectedUserGroupCount > 0 && !dto?.confirmed) {
-      return {
-        confirmationRequired: true,
-        affectedUserGroupCount,
-        affectedUserCount,
-        message: `This role is currently assigned to ${affectedUserGroupCount} User Group(s) affecting ${affectedUserCount} user(s). Explicit confirmation is required to deactivate.`,
-      };
+    if (assignedUserGroupCount > 0 && !dto?.confirmed) {
+      return this.responseForHighImpactUserGroupsConfirmation(
+        assignedUserGroupCount,
+        activeUserReachCount,
+      );
     }
 
     const deactivatedRole = await this.transactionService.runInTransaction(async () => {
@@ -431,13 +345,12 @@ export class RoleApplicationService {
       lockedRole.updatedBy = userId;
 
       const saved = await this.roleRepository.save(lockedRole);
-
       const outbox = AuthSecurityEventOutbox.fromRoleDeactivated(
         { tenantCode, userId },
         {
           role: saved,
-          affectedUserGroupCount,
-          affectedUserCount,
+          affectedUserGroupCount: assignedUserGroupCount,
+          affectedUserCount: activeUserReachCount,
         },
       );
       await this.outboxRepository.save(outbox);
@@ -447,24 +360,17 @@ export class RoleApplicationService {
 
     await this.roleCacheService.syncRole(deactivatedRole);
 
-    return {
-      role: RoleResponseDto.fromRole(deactivatedRole, affectedUserCount, {
-        isUnassigned: affectedUserGroupCount === 0,
-        assignedUserGroupCount: affectedUserGroupCount,
-        activeUserReachCount: affectedUserCount,
-      }),
-    };
+    return RoleResponseDto.fromRole(deactivatedRole, {
+      assignedUserGroupCount: assignedUserGroupCount,
+      activeUserReachCount: activeUserReachCount,
+    });
   }
 
   async reactivate(id: string): Promise<RoleResponseDto> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
-    const role = await this.roleRepository.findById(id);
-    if (!role) {
-      this.logger.error(`Role not found: ${id}`);
-      throw new RoleNotFoundException(id);
-    }
+    await this.roleRepository.findById(id, { required: true });
 
     const reactivatedRole = await this.transactionService.runInTransaction(async () => {
       const lockedRole = await this.roleRepository.findById(id, {
@@ -492,17 +398,10 @@ export class RoleApplicationService {
 
     await this.roleCacheService.syncRole(reactivatedRole);
 
-    const assignedUserGroupCount = await this.roleRepository.countAssignedUserGroups(
-      reactivatedRole.id,
-      tenantCode,
-    );
-    const activeUserReachCount = await this.roleRepository.countActiveUserReach(
-      reactivatedRole.id,
-      tenantCode,
-    );
+    const { assignedUserGroupCount, activeUserReachCount } =
+      await this.roleRepository.countAssignedUserGroupAndUser(reactivatedRole.id, tenantCode);
 
-    return RoleResponseDto.fromRole(reactivatedRole, activeUserReachCount, {
-      isUnassigned: assignedUserGroupCount === 0,
+    return RoleResponseDto.fromRole(reactivatedRole, {
       assignedUserGroupCount,
       activeUserReachCount,
     });
@@ -515,19 +414,13 @@ export class RoleApplicationService {
     const updatedRole = await this.transactionService.runInTransaction(async () => {
       const role = await this.roleRepository.findById(roleId, {
         lock: { mode: 'pessimistic_write' },
+        required: true,
       });
-      if (!role) {
-        this.logger.error(`Role not found: ${roleId}`);
-        throw new RoleNotFoundException(roleId);
+      if (role.name === dto.name) {
+        return role;
       }
 
-      if (role.name !== dto.name) {
-        const existing = await this.roleRepository.findByName(dto.name, tenantCode);
-        if (existing && existing.id !== role.id) {
-          this.logger.error(`Duplicate role name '${dto.name}' in tenant '${tenantCode}'`);
-          throw new DuplicateRoleNameException(dto.name);
-        }
-      }
+      await this.validateRoleName(dto.name, tenantCode);
 
       const oldName = role.name;
       role.name = dto.name;
@@ -553,51 +446,16 @@ export class RoleApplicationService {
     return RoleResponseDto.fromRole(updatedRole);
   }
 
-  async updateStatus(roleId: string, status: RoleStatus): Promise<RoleResponseDto> {
-    const userId = RequestContextService.getUser().userId;
-
-    const updatedRole = await this.transactionService.runInTransaction(async () => {
-      const role = await this.roleRepository.findById(roleId, {
-        lock: { mode: 'pessimistic_write' },
-      });
-      if (!role) {
-        this.logger.error(`Role not found: ${roleId}`);
-        throw new RoleNotFoundException(roleId);
-      }
-
-      if (status === RoleStatus.INACTIVE && role.systemRoleKey === SystemRoleKey.ADMINISTRATOR) {
-        this.logger.error(`Cannot deactivate critical system role: ${role.name}`);
-        throw new CriticalRoleDeactivationException(role.name);
-      }
-
-      role.status = status;
-      role.version += 1;
-      role.updatedBy = userId;
-
-      return this.roleRepository.save(role);
-    });
-
-    await this.roleCacheService.syncRole(updatedRole);
-    return RoleResponseDto.fromRole(updatedRole);
-  }
-
   async updatePermissions(
     id: string,
     dto: { permissionCodes: string[]; version?: number; confirmed?: boolean },
-  ): Promise<{
-    role?: RoleResponseDto;
-    confirmationRequired?: boolean;
-    affectedUserCount?: number;
-    message?: string;
-  }> {
+  ): Promise<RoleResponseDto | HighImpactConfirmationRequiredResponseDto> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
-    const role = await this.roleRepository.findById(id);
-    if (!role) {
-      this.logger.error(`Role not found: ${id}`);
-      throw new RoleNotFoundException(id);
-    }
+    const role = await this.roleRepository.findById(id, {
+      required: true,
+    });
 
     // 1. Optimistic locking check
     if (dto.version !== undefined && role.version !== dto.version) {
@@ -636,22 +494,15 @@ export class RoleApplicationService {
 
     // 4. High-impact blast radius check
     const affectedUserCount = await this.roleRepository.countActiveUserReach(id, tenantCode);
-    if (affectedUserCount >= this.HIGH_IMPACT_THRESHOLD && !dto.confirmed) {
-      return {
-        confirmationRequired: true,
-        affectedUserCount,
-        message: `This role change affects ${affectedUserCount} users. Explicit confirmation is required.`,
-      };
+    if (affectedUserCount >= this.HIGH_IMPACT_THRESHOLD && dto.confirmed !== true) {
+      return this.responseForHighImpactUsersConfirmation(affectedUserCount);
     }
 
     const updatedRole = await this.transactionService.runInTransaction(async () => {
       const lockedRole = await this.roleRepository.findById(id, {
         lock: { mode: 'pessimistic_write' },
+        required: true,
       });
-      if (!lockedRole) {
-        this.logger.error(`Role not found under pessimistic lock: ${id}`);
-        throw new RoleNotFoundException(id);
-      }
 
       if (dto.version !== undefined && lockedRole.version !== dto.version) {
         this.logger.error(
@@ -681,21 +532,16 @@ export class RoleApplicationService {
         rp.isProtected = protectedSet.has(code);
         return rp;
       });
-
-      if (newRolePermissions.length > 0) {
-        await this.rolePermissionRepository.bulkSave(newRolePermissions);
-      }
+      await this.rolePermissionRepository.bulkSave(newRolePermissions);
 
       const savedRole = await this.roleRepository.save(lockedRole);
-
       const outbox = AuthSecurityEventOutbox.fromPermissionsUpdated(
         { tenantCode, userId },
         { role: savedRole, permissionCodes: dto.permissionCodes },
       );
       await this.outboxRepository.save(outbox);
 
-      const reloaded = await this.roleRepository.findById(savedRole.id);
-      return reloaded ?? savedRole;
+      return savedRole;
     });
 
     // Synchronous Redis runtime cache update
@@ -706,13 +552,10 @@ export class RoleApplicationService {
       tenantCode,
     );
 
-    return {
-      role: RoleResponseDto.fromRole(updatedRole, affectedUserCount, {
-        isUnassigned: assignedUserGroupCount === 0,
-        assignedUserGroupCount,
-        activeUserReachCount: affectedUserCount,
-      }),
-    };
+    return RoleResponseDto.fromRole(updatedRole, {
+      assignedUserGroupCount,
+      activeUserReachCount: affectedUserCount,
+    });
   }
 
   async delete(roleId: string): Promise<void> {
@@ -736,5 +579,35 @@ export class RoleApplicationService {
 
     const tenantCode = RequestContextService.getTenantCode();
     await this.roleCacheService.invalidateRole(tenantCode, roleId);
+  }
+
+  private async validateRoleName(name: string, tenantCode: string): Promise<void> {
+    const existingRole = await this.roleRepository.findByName(name);
+    if (existingRole) {
+      this.logger.error(`Duplicate role name '${name}' in tenant '${tenantCode}'`);
+      throw new DuplicateRoleNameException(name);
+    }
+  }
+
+  private responseForHighImpactUsersConfirmation(
+    affectedUserCount: number,
+  ): HighImpactConfirmationRequiredResponseDto {
+    return {
+      confirmationRequired: true,
+      affectedUserCount,
+      message: `This role change affects ${affectedUserCount} users. Explicit confirmation is required.`,
+    };
+  }
+
+  private responseForHighImpactUserGroupsConfirmation(
+    affectedUserGroupCount: number,
+    affectedUserCount: number,
+  ): HighImpactConfirmationRequiredResponseDto {
+    return {
+      confirmationRequired: true,
+      affectedUserGroupCount,
+      affectedUserCount,
+      message: `This role change affects ${affectedUserGroupCount} User Group(s) and ${affectedUserCount} user(s). Explicit confirmation is required.`,
+    };
   }
 }
