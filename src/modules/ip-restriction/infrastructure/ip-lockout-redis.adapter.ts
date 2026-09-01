@@ -9,10 +9,7 @@ export class IpLockoutRedisAdapter {
   constructor(private readonly redisCacheProvider: RedisCacheProvider) {}
 
   private getRedisClient(): Redis | null {
-    const provider = this.redisCacheProvider as unknown as {
-      getClient?(): Redis | null;
-    };
-    return provider.getClient?.() ?? null;
+    return this.redisCacheProvider.getClient();
   }
 
   public getKey(tenantCode: string, userId: string): string {

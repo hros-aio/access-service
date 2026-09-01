@@ -8,13 +8,6 @@ import {
 } from '../interfaces/effective-user-role.interface';
 import { UserEffectiveRoleRepository } from '../repositories/user-effective-role.repository';
 
-interface RedisClientInterface {
-  set(key: string, value: string, mode: string, duration: number): Promise<string>;
-  get(key: string): Promise<string | null>;
-  del(key: string): Promise<number>;
-  incr(key: string): Promise<number>;
-}
-
 @Injectable()
 export class UserAuthorizationCacheService {
   private readonly logger = new Logger(UserAuthorizationCacheService.name);
@@ -24,10 +17,6 @@ export class UserAuthorizationCacheService {
     private readonly redisCacheProvider: RedisCacheProvider,
     private readonly effectiveRoleRepo: UserEffectiveRoleRepository,
   ) {}
-
-  private get client(): RedisClientInterface | undefined {
-    return (this.redisCacheProvider as unknown as { client?: RedisClientInterface }).client;
-  }
 
   async syncUserCache(
     tenantCode: string,
@@ -48,9 +37,10 @@ export class UserAuthorizationCacheService {
     }
 
     let version = 1;
-    if (this.client) {
+    const redisClient = this.redisCacheProvider.getClient();
+    if (redisClient) {
       try {
-        version = await this.client.incr(GenerateUserAuthzVersionKey(tenantCode, userId));
+        version = await redisClient.incr(GenerateUserAuthzVersionKey(tenantCode, userId));
       } catch (err) {
         this.logger.warn(
           `Failed to increment version for user ${userId}: ${(err as Error).message}`,
@@ -63,10 +53,10 @@ export class UserAuthorizationCacheService {
       roles,
     };
 
-    if (this.client) {
+    if (redisClient) {
       try {
         const key = GenerateUserAuthzCacheKey(tenantCode, userId);
-        await this.client.set(key, JSON.stringify(payload), 'EX', this.TTL_SECONDS);
+        await redisClient.set(key, JSON.stringify(payload), 'EX', this.TTL_SECONDS);
       } catch (err) {
         this.logger.error(
           `Failed to write authorization cache for user ${userId}: ${(err as Error).message}`,
@@ -81,10 +71,11 @@ export class UserAuthorizationCacheService {
     tenantCode: string,
     userId: string,
   ): Promise<UserAuthorizationProfile> {
-    if (this.client) {
+    const redisClient = this.redisCacheProvider.getClient();
+    if (redisClient) {
       try {
         const key = GenerateUserAuthzCacheKey(tenantCode, userId);
-        const data = await this.client.get(key);
+        const data = await redisClient.get(key);
         if (data) {
           return JSON.parse(data) as UserAuthorizationProfile;
         }
@@ -107,10 +98,11 @@ export class UserAuthorizationCacheService {
   }
 
   async invalidateUserCache(tenantCode: string, userId: string): Promise<void> {
-    if (!this.client) return;
+    const redisClient = this.redisCacheProvider.getClient();
+    if (!redisClient) return;
     try {
       const key = GenerateUserAuthzCacheKey(tenantCode, userId);
-      await this.client.del(key);
+      await redisClient.del(key);
     } catch (err) {
       this.logger.warn(`Failed to invalidate cache for user ${userId}: ${(err as Error).message}`);
     }

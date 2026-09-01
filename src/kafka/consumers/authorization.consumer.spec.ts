@@ -62,58 +62,6 @@ describe('AuthorizationConsumer', () => {
     expect(mockReconciliationWorker.processNextJob).toHaveBeenCalledWith('TEST_TENANT');
   });
 
-  it('should handle payload with eventType wrapped inside envelope.payload', async () => {
-    const envelope = {
-      id: 'evt-sync-2',
-      topic: 'authorization.sync-requested',
-      producer: 'auth-svc',
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-      correlationId: 'corr-sync-2',
-      payload: {
-        eventType: EventType.AUTHORIZATION_SYNC_REQUESTED,
-        payload: {
-          jobId: 'job-456',
-          tenantCode: 'TEST_TENANT_2',
-          sourceType: 'ROLE',
-          sourceId: 'role-1',
-          sourceVersion: 1,
-          triggerType: 'MANUAL',
-        },
-      },
-    };
-
-    await consumer.handleAuthorizationSyncRequested(
-      envelope as unknown as Parameters<typeof consumer.handleAuthorizationSyncRequested>[0],
-    );
-
-    expect(mockReconciliationWorker.processNextJob).toHaveBeenCalledWith('TEST_TENANT_2');
-  });
-
-  it('should ignore event if eventType is not authorization.sync-requested', async () => {
-    const envelope = {
-      id: 'evt-other',
-      topic: 'authorization.sync-requested',
-      producer: 'auth-svc',
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-      correlationId: 'corr-other',
-      eventType: 'other.event',
-      payload: {
-        jobId: 'job-789',
-        tenantCode: 'TEST_TENANT',
-        sourceType: 'ROLE',
-        sourceId: 'role-2',
-        sourceVersion: 1,
-        triggerType: 'MANUAL',
-      },
-    };
-
-    await consumer.handleAuthorizationSyncRequested(envelope);
-
-    expect(mockReconciliationWorker.processNextJob).not.toHaveBeenCalled();
-  });
-
   it('should skip execution if tenantCode is missing', async () => {
     const envelope = {
       id: 'evt-no-tenant',

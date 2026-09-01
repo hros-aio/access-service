@@ -26,21 +26,9 @@ export class AuthorizationConsumer {
   @EventPattern(EventType.AUTHORIZATION_SYNC_REQUESTED)
   async handleAuthorizationSyncRequested(
     @Payload()
-    envelope: EventEnvelope<AuthorizationSyncRequestedPayload> & { eventType?: string },
+    envelope: EventEnvelope<AuthorizationSyncRequestedPayload>,
   ): Promise<void> {
-    const eventType =
-      envelope.eventType ||
-      (envelope as unknown as { payload?: { eventType?: string } }).payload?.eventType ||
-      EventType.AUTHORIZATION_SYNC_REQUESTED;
-
-    if (eventType !== EventType.AUTHORIZATION_SYNC_REQUESTED) {
-      return;
-    }
-
-    const payload = envelope.payload?.tenantCode
-      ? envelope.payload
-      : (envelope as unknown as { payload?: { payload?: AuthorizationSyncRequestedPayload } })
-          .payload?.payload || envelope.payload;
+    const payload = envelope.payload;
 
     if (!payload?.tenantCode) {
       this.logger.warn(

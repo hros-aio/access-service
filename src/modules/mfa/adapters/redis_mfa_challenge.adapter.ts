@@ -72,15 +72,11 @@ export class RedisMfaChallengeAdapter {
   ): Promise<void> {
     try {
       const key = this.getKey(tenantCode, userId, challengeId);
-      const provider = this.redisCacheProvider as unknown as {
-        getClient?(): { del(key: string): Promise<number> } | null;
-        del?(key: string): Promise<number>;
-      };
-      const client = provider.getClient?.();
+      const client = this.redisCacheProvider.getClient();
       if (client) {
         await client.del(key);
-      } else if (provider.del) {
-        await provider.del(key);
+      } else {
+        await this.redisCacheProvider.del(key);
       }
     } catch (error) {
       // Ignore cache deletion errors

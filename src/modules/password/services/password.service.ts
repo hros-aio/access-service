@@ -365,11 +365,7 @@ export class PasswordService {
 
     const redisKey = `auth:sso-setup:${flowId}`;
     try {
-      const provider = this.redisCacheProvider as unknown as {
-        getClient?(): { del(key: string): Promise<number> } | null;
-        client?: { del(key: string): Promise<number> } | null;
-      };
-      const client = provider.getClient?.() ?? provider.client ?? null;
+      const client = this.redisCacheProvider.getClient();
       if (client) {
         await client.del(redisKey);
       }

@@ -230,15 +230,7 @@ export class InvitationApplicationService {
   }
 
   private async revokeSessionsAndChallenges(tenantCode: string, userId: string): Promise<void> {
-    const provider = this.redisCacheProvider as unknown as {
-      client?: {
-        smembers(key: string): Promise<string[]>;
-        del(...keys: string[]): Promise<number>;
-        keys(pattern: string): Promise<string[]>;
-        get(key: string): Promise<string | null>;
-      };
-    };
-    const client = provider.client;
+    const client = this.redisCacheProvider.getClient();
     if (!client) {
       throw new AuthSessionStoreUnavailableError();
     }

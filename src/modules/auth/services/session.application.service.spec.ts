@@ -15,7 +15,7 @@ describe('SessionApplicationService', () => {
     };
 
     const mockRedisCacheProvider = {
-      client: mockRedisClient,
+      getClient: jest.fn().mockReturnValue(mockRedisClient),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -76,7 +76,7 @@ describe('SessionApplicationService', () => {
 
     it('should exit early if redis client is not initialized', async () => {
       const mockRedisCacheProvider = {
-        client: null,
+        getClient: jest.fn().mockReturnValue(null),
       };
 
       const module: TestingModule = await Test.createTestingModule({

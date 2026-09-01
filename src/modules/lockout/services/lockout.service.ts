@@ -20,10 +20,7 @@ export class LockoutService {
   ) {}
 
   private getRedisClient(): Redis | null {
-    const provider = this.redisCacheProvider as unknown as {
-      getClient?(): Redis | null;
-    };
-    return provider.getClient?.() ?? null;
+    return this.redisCacheProvider.getClient();
   }
 
   private getAdapter(): RedisLockoutAdapter {
