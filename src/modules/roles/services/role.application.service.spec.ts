@@ -6,17 +6,13 @@ import { RoleApplicationService } from './role.application.service';
 import { EventType } from '../../../enums';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { PermissionDependencyService } from '../../permissions';
+import { HighImpactConfirmationRequiredResponseDto, RoleResponseDto } from '../dto/role.dto';
 import { RolePermission } from '../entities/role-permission.entity';
 import { Role } from '../entities/role.entity';
-import {
-  HighImpactConfirmationRequiredResponseDto,
-  RoleResponseDto,
-} from '../dto/role.dto';
 import {
   CannotDeleteSystemRoleException,
   CannotMutateSystemRoleException,
   DuplicateRoleNameException,
-  RoleNotFoundException,
   RoleVersionConflictException,
 } from '../exceptions/role.exceptions';
 import { RoleStatus, RoleType, SystemRoleKey } from '../interfaces/system-role-template.interface';
@@ -215,7 +211,9 @@ describe('RoleApplicationService', () => {
     });
 
     it('should throw an error if source role does not exist in tenant', async () => {
-      mockRoleRepository.findById.mockRejectedValue(new Error('Record not found with ID: missing-role'));
+      mockRoleRepository.findById.mockRejectedValue(
+        new Error('Record not found with ID: missing-role'),
+      );
 
       await expect(
         service.copy('missing-role', {
