@@ -6,6 +6,7 @@ import { RoleCacheService } from './role-cache.service';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { PermissionDependencyService } from '../../permissions';
+import { SYSTEM_ROLE_TEMPLATES } from '../constants/system-role-templates.constant';
 import {
   CopyRoleDto,
   CreateCustomRoleDto,
@@ -23,6 +24,7 @@ import {
   CannotMutateSystemRoleException,
   CriticalRoleDeactivationException,
   DuplicateRoleNameException,
+  ProtectedCapabilityRemovalException,
   RoleNotFoundException,
   RoleVersionConflictException,
 } from '../exceptions/role.exceptions';
@@ -577,6 +579,140 @@ export class RoleApplicationService {
 
     await this.roleCacheService.syncRole(updatedRole);
     return RoleResponseDto.fromRole(updatedRole);
+  }
+
+  async updatePermissions(
+    id: string,
+    dto: { permissionCodes: string[]; version?: number; confirmed?: boolean },
+  ): Promise<{
+    role?: RoleResponseDto;
+    confirmationRequired?: boolean;
+    affectedUserCount?: number;
+    message?: string;
+  }> {
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
+
+    const role = await this.roleRepository.findById(id);
+    if (!role) {
+      this.logger.error(`Role not found: ${id}`);
+      throw new RoleNotFoundException(id);
+    }
+
+    // 1. Optimistic locking check
+    if (dto.version !== undefined && role.version !== dto.version) {
+      this.logger.error(
+        `Role version conflict for role ${role.id}: expected ${dto.version}, current ${role.version}`,
+      );
+      throw new RoleVersionConflictException(role.id, dto.version, role.version);
+    }
+
+    // 2. Check System Role protected capabilities inviolability
+    if (role.type === RoleType.SYSTEM && role.systemRoleKey) {
+      const template = SYSTEM_ROLE_TEMPLATES[role.systemRoleKey];
+      if (template) {
+        const requiredProtectedCodes = template.permissions
+          .filter((p) => p.isProtected)
+          .map((p) => p.code);
+        const omittedProtected = requiredProtectedCodes.filter(
+          (code) => !dto.permissionCodes.includes(code),
+        );
+        if (omittedProtected.length > 0) {
+          this.logger.error(
+            `Attempt to remove protected capabilities [${omittedProtected.join(', ')}] from system role '${role.name}'`,
+          );
+          throw new ProtectedCapabilityRemovalException(role.name, omittedProtected);
+        }
+      }
+    }
+
+    // 3. Capability dependency validation
+    const validation = this.permissionDependencyService.validatePermissionSet(dto.permissionCodes);
+    if (!validation.isValid) {
+      const errorMessage = `Capability dependency validation failed: ${validation.errors.join('; ')}`;
+      this.logger.error(errorMessage);
+      throw new UnprocessableEntityException(errorMessage);
+    }
+
+    // 4. High-impact blast radius check
+    const affectedUserCount = await this.roleRepository.countActiveUserReach(id, tenantCode);
+    if (affectedUserCount >= this.HIGH_IMPACT_THRESHOLD && !dto.confirmed) {
+      return {
+        confirmationRequired: true,
+        affectedUserCount,
+        message: `This role change affects ${affectedUserCount} users. Explicit confirmation is required.`,
+      };
+    }
+
+    const updatedRole = await this.transactionService.runInTransaction(async () => {
+      const lockedRole = await this.roleRepository.findById(id, {
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!lockedRole) {
+        this.logger.error(`Role not found under pessimistic lock: ${id}`);
+        throw new RoleNotFoundException(id);
+      }
+
+      if (dto.version !== undefined && lockedRole.version !== dto.version) {
+        this.logger.error(
+          `Role version conflict under pessimistic lock for role ${lockedRole.id}: expected ${dto.version}, current ${lockedRole.version}`,
+        );
+        throw new RoleVersionConflictException(lockedRole.id, dto.version, lockedRole.version);
+      }
+
+      lockedRole.version += 1;
+      lockedRole.updatedBy = userId;
+
+      await this.rolePermissionRepository.deleteByRoleId(lockedRole.id);
+
+      const isSystemRole = lockedRole.type === RoleType.SYSTEM && lockedRole.systemRoleKey;
+      const systemTemplate = isSystemRole ? SYSTEM_ROLE_TEMPLATES[lockedRole.systemRoleKey!] : null;
+      const protectedSet = new Set(
+        systemTemplate
+          ? systemTemplate.permissions.filter((p) => p.isProtected).map((p) => p.code)
+          : [],
+      );
+
+      const newRolePermissions = dto.permissionCodes.map((code) => {
+        const rp = new RolePermission();
+        rp.tenantCode = tenantCode;
+        rp.roleId = lockedRole.id;
+        rp.permissionCode = code;
+        rp.isProtected = protectedSet.has(code);
+        return rp;
+      });
+
+      if (newRolePermissions.length > 0) {
+        await this.rolePermissionRepository.bulkSave(newRolePermissions);
+      }
+
+      const savedRole = await this.roleRepository.save(lockedRole);
+
+      const outbox = AuthSecurityEventOutbox.fromPermissionsUpdated(
+        { tenantCode, userId },
+        { role: savedRole, permissionCodes: dto.permissionCodes },
+      );
+      await this.outboxRepository.save(outbox);
+
+      const reloaded = await this.roleRepository.findById(savedRole.id);
+      return reloaded ?? savedRole;
+    });
+
+    // Synchronous Redis runtime cache update
+    await this.roleCacheService.syncRole(updatedRole);
+
+    const assignedUserGroupCount = await this.roleRepository.countAssignedUserGroups(
+      updatedRole.id,
+      tenantCode,
+    );
+
+    return {
+      role: RoleResponseDto.fromRole(updatedRole, affectedUserCount, {
+        isUnassigned: assignedUserGroupCount === 0,
+        assignedUserGroupCount,
+        activeUserReachCount: affectedUserCount,
+      }),
+    };
   }
 
   async delete(roleId: string): Promise<void> {

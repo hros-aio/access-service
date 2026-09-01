@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UpdateRolePermissionsRequest",
+  "type": "object",
+  "required": ["permissions"],
+  "properties": {
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Updated set of permission codes assigned to the role"
+    }
+  },
+  "additionalProperties": false
+}

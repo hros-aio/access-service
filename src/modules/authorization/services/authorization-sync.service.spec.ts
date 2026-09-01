@@ -299,6 +299,41 @@ describe('AuthorizationSyncService', () => {
       expect(mockUserGroupRepo.findByTenantAndId).not.toHaveBeenCalled();
       expect(mockRoleRepo.findByIdAndTenant).not.toHaveBeenCalled();
     });
+
+    it('should pass priority through to repository when provided', async () => {
+      (mockSyncJobRepo.findInFlightJob as jest.Mock).mockResolvedValue(null);
+
+      const createdJob = {
+        id: 'job-urgent-1',
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.USER_GROUP,
+        sourceId: 'ug-urgent',
+        sourceVersion: 2,
+        triggerType: SyncTriggerType.MANUAL,
+        priority: 'URGENT',
+        status: SyncJobStatus.PENDING,
+        processedUsers: 0,
+      } as unknown as AuthorizationSyncJob;
+
+      (mockSyncJobRepo.create as jest.Mock).mockResolvedValue(createdJob);
+
+      const result = await service.enqueueSyncJob({
+        tenantCode: 'TEST_TENANT',
+        sourceType: SyncSourceType.USER_GROUP,
+        sourceId: 'ug-urgent',
+        sourceVersion: 2,
+        triggerType: SyncTriggerType.MANUAL,
+        priority: createdJob.priority,
+        ignoreValidateSource: true,
+      });
+
+      expect(result.jobId).toBe('job-urgent-1');
+      expect(mockSyncJobRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          priority: 'URGENT',
+        }),
+      );
+    });
   });
 
   describe('retryFailedSync', () => {

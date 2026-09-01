@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuthorizationSyncFailedEvent",
+  "type": "object",
+  "required": [
+    "eventId",
+    "tenantId",
+    "eventType",
+    "urgency",
+    "timestamp",
+    "payload"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "tenantId": { "type": "string" },
+    "eventType": { "type": "string", "enum": ["authorization.sync-failed"] },
+    "urgency": { "type": "string", "enum": ["CRITICAL", "STANDARD"] },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "payload": {
+      "type": "object",
+      "required": ["jobId", "sourceType", "sourceId", "priority", "errorCode", "errorReason"],
+      "properties": {
+        "jobId": { "type": "string", "format": "uuid" },
+        "sourceType": { "type": "string", "enum": ["USER_GROUP", "ROLE", "TENANT"] },
+        "sourceId": { "type": "string" },
+        "priority": { "type": "string", "enum": ["URGENT", "STANDARD", "SCHEDULED"] },
+        "errorCode": { "type": "string" },
+        "errorReason": { "type": "string" },
+        "retryCount": { "type": "integer" }
+      }
+    }
+  }
+}

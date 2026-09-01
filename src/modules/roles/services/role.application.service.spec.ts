@@ -361,6 +361,49 @@ describe('RoleApplicationService', () => {
     });
   });
 
+  describe('updatePermissions', () => {
+    it('should throw ProtectedCapabilityRemovalException when trying to remove protected capabilities from system role', async () => {
+      const systemRole = new Role();
+      systemRole.id = 'sys-role-1';
+      systemRole.name = 'Employee';
+      systemRole.type = RoleType.SYSTEM;
+      systemRole.systemRoleKey = SystemRoleKey.EMPLOYEE;
+      systemRole.version = 1;
+
+      mockRoleRepository.findById.mockResolvedValue(systemRole);
+
+      await expect(
+        service.updatePermissions('sys-role-1', {
+          permissionCodes: ['leave.request'], // Missing protected employee.view, location.view, leave.view
+          version: 1,
+        }),
+      ).rejects.toThrow('Cannot remove protected capabilities');
+    });
+
+    it('should synchronously update permissions, save outbox event, and sync Redis cache', async () => {
+      const customRole = new Role();
+      customRole.id = 'custom-role-1';
+      customRole.name = 'Finance Analyst';
+      customRole.type = RoleType.CUSTOM;
+      customRole.tenantCode = 'tenant-01';
+      customRole.version = 1;
+
+      mockRoleRepository.findById.mockResolvedValue(customRole);
+      mockRoleRepository.save.mockImplementation(async (r: Role) => r);
+
+      const result = await service.updatePermissions('custom-role-1', {
+        permissionCodes: ['employee.view'],
+        version: 1,
+      });
+
+      expect(mockRolePermissionRepository.deleteByRoleId).toHaveBeenCalledWith('custom-role-1');
+      expect(mockRolePermissionRepository.bulkSave).toHaveBeenCalled();
+      expect(mockOutboxRepository.save).toHaveBeenCalled();
+      expect(mockRoleCacheService.syncRole).toHaveBeenCalled();
+      expect(result.role).toBeDefined();
+    });
+  });
+
   describe('deleteRole', () => {
     it('should throw CannotDeleteSystemRoleException if role is of type SYSTEM', async () => {
       const systemRole = new Role();
