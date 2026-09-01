@@ -31,11 +31,7 @@ export class RestrictedSessionGuard implements CanActivate {
 
     let sessionData: Record<string, string>;
     try {
-      const provider = this.redisCacheProvider as unknown as {
-        getClient?(): { hgetall(key: string): Promise<Record<string, string>> } | null;
-        client?: { hgetall(key: string): Promise<Record<string, string>> } | null;
-      };
-      const client = provider.getClient?.() ?? provider.client ?? null;
+      const client = this.redisCacheProvider.getClient();
       if (!client) {
         throw new AuthStoreUnavailableError();
       }

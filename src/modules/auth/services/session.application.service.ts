@@ -8,13 +8,7 @@ export class SessionApplicationService {
   constructor(private readonly redisCacheProvider: RedisCacheProvider) {}
 
   async revokeAllSessions(tenantCode: string, userId: string): Promise<void> {
-    const provider = this.redisCacheProvider as unknown as {
-      client?: {
-        smembers(key: string): Promise<string[]>;
-        del(...keys: string[]): Promise<number>;
-      };
-    };
-    const client = provider.client;
+    const client = this.redisCacheProvider.getClient();
     if (!client) {
       return;
     }

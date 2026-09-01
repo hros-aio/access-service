@@ -25,3 +25,18 @@ export interface SystemRoleTemplate {
   description: string;
   permissions: SystemRolePermissionTemplate[];
 }
+
+export interface CachedRoleData {
+  roleId: string;
+  tenantCode: string;
+  name: string;
+  type: RoleType;
+  systemRoleKey: SystemRoleKey | undefined;
+  status: RoleStatus;
+  version: number;
+  permissions: {
+    code: string;
+    isProtected: boolean;
+  }[];
+  updatedAt: string;
+}

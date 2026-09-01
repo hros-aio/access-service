@@ -364,13 +364,7 @@ export class AuthApplicationService {
     try {
       await this.redisCacheProvider.set(sessionKey, sessionData, ttlSeconds);
 
-      const provider = this.redisCacheProvider as unknown as {
-        getClient?(): {
-          sadd(key: string, member: string): Promise<number>;
-          expire(key: string, seconds: number): Promise<number>;
-        } | null;
-      };
-      const client = provider.getClient?.();
+      const client = this.redisCacheProvider.getClient();
       if (client) {
         const userSessionsKey = GenerateUserSessionsKey(tenantCode, user.id);
         await client.sadd(userSessionsKey, sessionId);

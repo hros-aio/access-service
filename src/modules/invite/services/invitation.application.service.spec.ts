@@ -136,7 +136,7 @@ describe('InvitationApplicationService', () => {
     };
 
     mockRedisCacheProvider = {
-      client: mockRedisClient,
+      getClient: jest.fn().mockReturnValue(mockRedisClient),
     };
 
     const module: TestingModule = await Test.createTestingModule({

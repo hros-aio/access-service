@@ -74,15 +74,11 @@ export class PasswordResetRedisAdapter {
 
   async deleteChallenge(challengeId: string, tenantCode: string, userId: string): Promise<void> {
     const key = this.getKey(challengeId, tenantCode, userId);
-    const provider = this.redisCacheProvider as unknown as {
-      getClient?(): { del(key: string): Promise<number> } | null;
-      del?(key: string): Promise<number>;
-    };
-    const client = provider.getClient?.();
+    const client = this.redisCacheProvider.getClient();
     if (client) {
       await client.del(key);
-    } else if (provider.del) {
-      await provider.del(key);
+    } else {
+      await this.redisCacheProvider.del(key);
     }
   }
 }

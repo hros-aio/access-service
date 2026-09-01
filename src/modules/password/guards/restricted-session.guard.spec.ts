@@ -19,7 +19,7 @@ describe('RestrictedSessionGuard', () => {
     };
 
     mockRedisCacheProvider = {
-      client: mockRedisClient,
+      getClient: jest.fn().mockReturnValue(mockRedisClient),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -106,7 +106,7 @@ describe('RestrictedSessionGuard', () => {
 
   it('should throw AuthStoreUnavailableError and re-throw when Redis client is null', async () => {
     const context = createMockContext({ authorization: 'Bearer flow-null' });
-    mockRedisCacheProvider.client = null;
+    (mockRedisCacheProvider.getClient as jest.Mock).mockReturnValue(null);
 
     await expect(guard.canActivate(context)).rejects.toThrow(AuthStoreUnavailableError);
   });

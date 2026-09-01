@@ -33,3 +33,7 @@ export function GenerateUserAuthzVersionKey(tenantCode: string, userId: string):
 export function GenerateAuthzWorkerLockKey(tenantCode: string): string {
   return `authz:reconciliation-worker:lock:${tenantCode}`;
 }
+
+export function GenerateRoleAuthzCacheKey(tenantCode: string, roleId: string): string {
+  return `authz:role:${tenantCode}:${roleId}`;
+}

@@ -70,13 +70,7 @@ export class MfaAdminApplicationService {
       // 4. Revoke active Redis sessions
       let revokedCount = 0;
       try {
-        const provider = this.redisCacheProvider as unknown as {
-          getClient?(): {
-            smembers(key: string): Promise<string[]>;
-            del(key: string): Promise<number>;
-          } | null;
-        };
-        const client = provider.getClient?.();
+        const client = this.redisCacheProvider.getClient();
         const userSessionsKey = GenerateUserSessionsKey(tenantCode, targetUserId);
 
         if (client) {

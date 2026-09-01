@@ -41,7 +41,7 @@ describe('UserAuthorizationCacheService', () => {
         UserAuthorizationCacheService,
         {
           provide: RedisCacheProvider,
-          useValue: { client: redisMock },
+          useValue: { getClient: jest.fn().mockReturnValue(redisMock) },
         },
         {
           provide: UserEffectiveRoleRepository,
@@ -74,7 +74,11 @@ describe('UserAuthorizationCacheService', () => {
     const cachedProfile = {
       version: 3,
       roles: [
-        { roleId: 'role-cached', scope: { type: 'TENANT', refId: null }, sourceGroupId: 'g-1' },
+        {
+          roleId: 'role-cached',
+          scope: { type: 'TENANT' as const, refId: null },
+          sourceGroupId: 'g-1',
+        },
       ],
     };
     redisMock.get.mockResolvedValueOnce(JSON.stringify(cachedProfile));

@@ -1,32 +1,22 @@
-import { Injectable } from '@nestjs/common';
-import { RedisCacheProvider } from '@new-hros/libs-core';
+import { Inject, Injectable } from '@nestjs/common';
+import { CACHE_PROVIDER_TOKEN, CacheService } from '@new-hros/libs-core';
 
+import { GenerateRoleAuthzCacheKey } from '../../../constants';
 import { Role } from '../entities/role.entity';
-
-interface RedisClientInterface {
-  set(key: string, value: string, mode: string, duration: number): Promise<string>;
-  get(key: string): Promise<string | null>;
-  del(key: string): Promise<number>;
-}
+import { CachedRoleData } from '../interfaces/system-role-template.interface';
 
 @Injectable()
 export class RoleCacheService {
   private readonly TTL_SECONDS = 86400; // 24 hours
 
-  constructor(private readonly redisCacheProvider: RedisCacheProvider) {}
-
-  private get client(): RedisClientInterface | undefined {
-    return (this.redisCacheProvider as unknown as { client?: RedisClientInterface }).client;
-  }
-
-  private getCacheKey(tenantCode: string, roleId: string): string {
-    return `authz:role:${tenantCode}:${roleId}`;
-  }
+  constructor(
+    @Inject(CACHE_PROVIDER_TOKEN)
+    private readonly cacheService: CacheService,
+  ) {}
 
   async syncRole(role: Role): Promise<void> {
-    if (!this.client) return;
-    const key = this.getCacheKey(role.tenantCode, role.id);
-    const cachedData = {
+    const key = GenerateRoleAuthzCacheKey(role.tenantCode, role.id);
+    const cachedData: CachedRoleData = {
       roleId: role.id,
       tenantCode: role.tenantCode,
       name: role.name,
@@ -41,24 +31,16 @@ export class RoleCacheService {
       updatedAt: new Date().toISOString(),
     };
 
-    await this.client.set(key, JSON.stringify(cachedData), 'EX', this.TTL_SECONDS);
+    await this.cacheService.set(key, cachedData, this.TTL_SECONDS);
   }
 
-  async getRole(tenantCode: string, roleId: string): Promise<Record<string, unknown> | null> {
-    if (!this.client) return null;
-    const key = this.getCacheKey(tenantCode, roleId);
-    const data = await this.client.get(key);
-    if (!data) return null;
-    try {
-      return JSON.parse(data);
-    } catch {
-      return null;
-    }
+  async getRole(tenantCode: string, roleId: string): Promise<CachedRoleData | null> {
+    const key = GenerateRoleAuthzCacheKey(tenantCode, roleId);
+    return this.cacheService.get<CachedRoleData>(key);
   }
 
   async invalidateRole(tenantCode: string, roleId: string): Promise<void> {
-    if (!this.client) return;
-    const key = this.getCacheKey(tenantCode, roleId);
-    await this.client.del(key);
+    const key = GenerateRoleAuthzCacheKey(tenantCode, roleId);
+    await this.cacheService.del(key);
   }
 }
