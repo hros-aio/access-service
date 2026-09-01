@@ -89,6 +89,24 @@ export class RoleController {
     return this.roleApplicationService.updateCustom(id, dto);
   }
 
+  @Patch(':id/permissions')
+  @ApiOperation({
+    summary: 'Synchronously update or revoke permissions for a role with immediate Redis eviction',
+  })
+  @ApiResponse({ status: 200, type: RoleResponseDto })
+  @ApiResponse({ status: 200, type: HighImpactConfirmationRequiredResponseDto })
+  async updateRolePermissions(
+    @Param('id') id: string,
+    @Body() dto: { permissionCodes: string[]; version?: number; confirmed?: boolean },
+  ): Promise<{
+    role?: RoleResponseDto;
+    confirmationRequired?: boolean;
+    affectedUserCount?: number;
+    message?: string;
+  }> {
+    return this.roleApplicationService.updatePermissions(id, dto);
+  }
+
   @Post(':id/deactivate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Deactivate a custom role with multi-group impact check' })

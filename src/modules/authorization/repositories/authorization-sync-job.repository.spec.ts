@@ -22,7 +22,9 @@ describe('AuthorizationSyncJobRepository', () => {
     setLock: jest.Mock;
     setOnLocked: jest.Mock;
     where: jest.Mock;
+    andWhere: jest.Mock;
     orderBy: jest.Mock;
+    addOrderBy: jest.Mock;
     getOne: jest.Mock;
   };
 
@@ -31,7 +33,9 @@ describe('AuthorizationSyncJobRepository', () => {
       setLock: jest.fn().mockReturnThis(),
       setOnLocked: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
       getOne: jest.fn(),
     };
 
@@ -185,33 +189,33 @@ describe('AuthorizationSyncJobRepository', () => {
   });
 
   describe('claimNextPendingJob', () => {
-    it('should return null if no pending jobs are available', async () => {
-      (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(null);
+    it('should return null if no pending job found', async () => {
+      qb.getOne.mockResolvedValue(null);
 
       const result = await repository.claimNextPendingJob('TENANT_A');
 
-      expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
-        where: { tenantCode: 'TENANT_A', status: SyncJobStatus.PENDING },
-        order: { createdAt: 'ASC' },
+      expect(mockTypeormRepo.createQueryBuilder).toHaveBeenCalledWith('job');
+      expect(qb.where).toHaveBeenCalledWith('job.tenant_code = :tenantCode', {
+        tenantCode: 'TENANT_A',
+      });
+      expect(qb.andWhere).toHaveBeenCalledWith('job.status = :status', {
+        status: SyncJobStatus.PENDING,
       });
       expect(result).toBeNull();
     });
 
-    it('should claim and return job if available', async () => {
+    it('should claim and return highest priority pending job', async () => {
       const pendingJob = {
         id: 'job-1',
         tenantCode: 'TENANT_A',
         status: SyncJobStatus.PENDING,
       } as AuthorizationSyncJob;
-      (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(pendingJob);
+      qb.getOne.mockResolvedValue(pendingJob);
       (mockTypeormRepo.update as jest.Mock).mockResolvedValue({ affected: 1 });
 
       const result = await repository.claimNextPendingJob('TENANT_A');
 
-      expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
-        where: { tenantCode: 'TENANT_A', status: SyncJobStatus.PENDING },
-        order: { createdAt: 'ASC' },
-      });
+      expect(mockTypeormRepo.createQueryBuilder).toHaveBeenCalledWith('job');
       expect(mockTypeormRepo.update).toHaveBeenCalledWith(
         { id: 'job-1' },
         expect.objectContaining({ status: SyncJobStatus.PROCESSING }),

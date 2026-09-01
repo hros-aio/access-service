@@ -9,6 +9,7 @@ import { UserGroupRepository } from '../../user-groups/repositories/user-group.r
 import { SyncJobResponseDto } from '../dto/sync-job-response.dto';
 import { TriggerSyncNowDto } from '../dto/trigger-sync-now.dto';
 import {
+  SyncJobPriority,
   SyncJobStatus,
   SyncSourceType,
   SyncTriggerType,
@@ -62,6 +63,7 @@ export class AuthorizationSyncService {
     sourceId: string;
     sourceVersion?: number;
     triggerType?: SyncTriggerType;
+    priority?: SyncJobPriority;
     createdBy?: string | null;
     ignoreValidateSource?: boolean;
   }): Promise<SyncJobResponseDto> {
@@ -70,6 +72,7 @@ export class AuthorizationSyncService {
       sourceType,
       sourceId,
       triggerType = SyncTriggerType.SCHEDULED,
+      priority = SyncJobPriority.STANDARD,
       createdBy = 'SYSTEM',
       ignoreValidateSource = false,
     } = params;
@@ -122,6 +125,7 @@ export class AuthorizationSyncService {
         { sourceType, sourceId },
         sourceVersion,
         triggerType,
+        priority,
       );
     } catch (error: unknown) {
       return this.handleInFlightConflict(error, tenantCode, sourceType, sourceId, sourceVersion);
@@ -134,6 +138,7 @@ export class AuthorizationSyncService {
     dto: TriggerSyncNowDto,
     sourceVersion: number,
     triggerType: SyncTriggerType,
+    priority: SyncJobPriority = SyncJobPriority.STANDARD,
   ): Promise<SyncJobResponseDto> {
     return this.transactionService.runInTransaction(async () => {
       const job = await this.syncJobRepo.create({
@@ -142,6 +147,7 @@ export class AuthorizationSyncService {
         sourceId: dto.sourceId,
         sourceVersion,
         triggerType,
+        priority,
         status: SyncJobStatus.PENDING,
         processedUsers: 0,
         createdBy: userId ?? null,

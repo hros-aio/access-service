@@ -2,6 +2,7 @@ import { BaseEntity } from '@new-hros/libs-sql';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 import { EventType, TableName } from '../../../enums';
+import { SyncJobPriority } from '../../authorization/entities/authorization-sync-job.entity';
 import { Role } from '../../roles/entities/role.entity';
 import { User } from '../../user/entities/user.entity';
 import { UserGroup } from '../../user-groups/entities/user-group.entity';
@@ -424,7 +425,7 @@ export class AuthSecurityEventOutbox extends BaseEntity {
 
   static fromAuthorizationUserGroupUpdated(
     ctx: OutboxContext,
-    data: { userGroup: UserGroup },
+    data: { userGroup: UserGroup; isUrgent?: boolean },
   ): AuthSecurityEventOutbox {
     const outbox = new AuthSecurityEventOutbox();
     outbox.tenantCode = ctx.tenantCode;
@@ -435,6 +436,8 @@ export class AuthSecurityEventOutbox extends BaseEntity {
       userGroupId: data.userGroup.id,
       version: data.userGroup.version,
       ruleAttributeKeys: data.userGroup.ruleAttributeKeys,
+      isUrgent: data.isUrgent ?? false,
+      priority: data.isUrgent ? SyncJobPriority.URGENT : SyncJobPriority.STANDARD,
       timestamp: new Date().toISOString(),
     };
     outbox.publishStatus = 'pending';
@@ -562,6 +565,7 @@ export class AuthSecurityEventOutbox extends BaseEntity {
       durationMs,
       errorCode,
       errorMessage,
+      urgency: 'CRITICAL',
       errorDetails: {
         code: errorCode,
         message: errorMessage,

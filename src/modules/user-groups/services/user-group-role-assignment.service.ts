@@ -164,6 +164,7 @@ export class UserGroupRoleAssignmentService {
 
       const syncOutbox = AuthSecurityEventOutbox.fromAuthorizationUserGroupUpdated(outboxContext, {
         userGroup: savedGroup,
+        isUrgent: removedRoleIds.length > 0,
       });
       await this.outboxRepository.save(syncOutbox);
 

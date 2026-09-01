@@ -14,6 +14,11 @@ export enum SyncTriggerType {
   SYSTEM = 'SYSTEM',
 }
 
+export enum SyncJobPriority {
+  URGENT = 'URGENT',
+  STANDARD = 'STANDARD',
+}
+
 export enum SyncJobStatus {
   PENDING = 'PENDING',
   PROCESSING = 'PROCESSING',
@@ -23,6 +28,7 @@ export enum SyncJobStatus {
 
 @Entity(TableName.AUTHORIZATION_SYNC_JOBS)
 @Index('idx_authz_sync_jobs_poll', ['status', 'createdAt'])
+@Index('idx_authz_sync_jobs_priority_claim', ['status', 'priority', 'createdAt'])
 export class AuthorizationSyncJob extends BaseEntity {
   @Column({ name: 'source_type', type: 'varchar', length: 32 })
   sourceType: SyncSourceType;
@@ -35,6 +41,14 @@ export class AuthorizationSyncJob extends BaseEntity {
 
   @Column({ name: 'trigger_type', type: 'varchar', length: 32, default: SyncTriggerType.MANUAL })
   triggerType: SyncTriggerType;
+
+  @Column({
+    name: 'priority',
+    type: 'varchar',
+    length: 32,
+    default: SyncJobPriority.STANDARD,
+  })
+  priority: SyncJobPriority;
 
   @Column({ name: 'status', type: 'varchar', length: 32, default: SyncJobStatus.PENDING })
   status: SyncJobStatus;
