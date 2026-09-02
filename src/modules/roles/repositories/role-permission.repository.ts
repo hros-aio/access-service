@@ -12,10 +12,6 @@ export class RolePermissionRepository {
     return this.transactionService.getManager().getRepository(RolePermission);
   }
 
-  async save(rolePermission: RolePermission): Promise<RolePermission> {
-    return this.repository.save(rolePermission);
-  }
-
   async bulkSave(rolePermissions: RolePermission[]): Promise<RolePermission[]> {
     if (rolePermissions.length === 0) return [];
     return this.repository.save(rolePermissions);

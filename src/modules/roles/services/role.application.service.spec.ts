@@ -6,7 +6,7 @@ import { RoleApplicationService } from './role.application.service';
 import { EventType } from '../../../enums';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { PermissionDependencyService } from '../../permissions';
-import { HighImpactConfirmationRequiredResponseDto, RoleResponseDto } from '../dto/role.dto';
+import { HighImpactConfirmationRequiredResponseDto } from '../dto/role.dto';
 import { RolePermission } from '../entities/role-permission.entity';
 import { Role } from '../entities/role.entity';
 import {
@@ -270,10 +270,7 @@ describe('RoleApplicationService', () => {
 
       const impact = await service.estimateImpact('role-1');
 
-      expect(impact.roleId).toBe('role-1');
-      expect(impact.activeUserReachCount).toBe(45);
-      expect(impact.assignedUserGroupCount).toBe(2);
-      expect(impact.isUnassigned).toBe(false);
+      expect(impact).toEqual([2, 45]);
     });
   });
 
@@ -317,7 +314,7 @@ describe('RoleApplicationService', () => {
 
       const result = (await service.deactivate('role-assigned', {
         confirmed: true,
-      })) as RoleResponseDto;
+      })) as Role;
 
       expect(result.status).toBe(RoleStatus.INACTIVE);
       expect(mockOutboxRepository.save).toHaveBeenCalledWith(
@@ -351,7 +348,7 @@ describe('RoleApplicationService', () => {
   });
 
   describe('listRoles & getRoleById (US5)', () => {
-    it('should enrich role list with isUnassigned and reach count', async () => {
+    it('should enrich role list with reach count and assigned group count', async () => {
       const role1 = new Role();
       role1.id = 'r1';
       role1.name = 'Unassigned Role';
@@ -375,9 +372,9 @@ describe('RoleApplicationService', () => {
 
       expect(list.total).toBe(2);
       expect(list.data).toHaveLength(2);
-      expect(list.data[0].isUnassigned).toBe(true);
+      expect(list.data[0].assignedUserGroupCount).toBe(0);
       expect(list.data[0].activeUserReachCount).toBe(0);
-      expect(list.data[1].isUnassigned).toBe(false);
+      expect(list.data[1].assignedUserGroupCount).toBe(2);
       expect(list.data[1].activeUserReachCount).toBe(35);
     });
 
@@ -400,7 +397,6 @@ describe('RoleApplicationService', () => {
       expect(result.id).toBe('r1');
       expect(result.activeUserReachCount).toBe(15);
       expect(result.assignedUserGroupCount).toBe(2);
-      expect(result.isUnassigned).toBe(false);
     });
   });
 
@@ -437,7 +433,7 @@ describe('RoleApplicationService', () => {
       const result = (await service.updatePermissions('custom-role-1', {
         permissionCodes: ['employee.view'],
         version: 1,
-      })) as RoleResponseDto;
+      })) as Role;
 
       expect(mockRolePermissionRepository.deleteByRoleId).toHaveBeenCalledWith('custom-role-1');
       expect(mockRolePermissionRepository.bulkSave).toHaveBeenCalled();

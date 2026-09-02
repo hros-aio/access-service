@@ -14,8 +14,6 @@ import {
   FilterRoleDto,
   HighImpactConfirmationRequiredResponseDto,
   RenameRoleDto,
-  RoleImpactResponseDto,
-  RoleResponseDto,
   UpdateCustomRoleDto,
 } from '../dto/role.dto';
 import { RolePermission } from '../entities/role-permission.entity';
@@ -47,8 +45,7 @@ export class RoleApplicationService {
     private readonly outboxRepository: AuthSecurityEventOutboxRepository,
   ) {}
 
-  async list(filters: FilterRoleDto): Promise<PaginatedResult<RoleResponseDto>> {
-    const tenantCode = RequestContextService.getTenantCode();
+  async list(filters: FilterRoleDto): Promise<PaginatedResult<Role>> {
     const page = filters?.page ?? 1;
     const limit = filters?.limit ?? 10;
 
@@ -60,18 +57,13 @@ export class RoleApplicationService {
       },
     });
 
-    const items: RoleResponseDto[] = [];
+    const items: Role[] = [];
 
     for (const role of paginatedResult.data) {
       const { assignedUserGroupCount, activeUserReachCount } =
-        await this.roleRepository.countAssignedUserGroupAndUser(role.id, tenantCode);
+        await this.roleRepository.countAssignedUserGroupAndUser(role.id);
 
-      items.push(
-        RoleResponseDto.fromRole(role, {
-          assignedUserGroupCount,
-          activeUserReachCount,
-        }),
-      );
+      items.push({ ...role, assignedUserGroupCount, activeUserReachCount });
     }
 
     return {
@@ -80,20 +72,16 @@ export class RoleApplicationService {
     };
   }
 
-  async getById(roleId: string): Promise<RoleResponseDto> {
-    const tenantCode = RequestContextService.getTenantCode();
+  async getById(roleId: string): Promise<Role> {
     const role = await this.roleRepository.findById(roleId, { required: true });
 
     const { assignedUserGroupCount, activeUserReachCount } =
-      await this.roleRepository.countAssignedUserGroupAndUser(role.id, tenantCode);
+      await this.roleRepository.countAssignedUserGroupAndUser(role.id);
 
-    return RoleResponseDto.fromRole(role, {
-      assignedUserGroupCount,
-      activeUserReachCount,
-    });
+    return { ...role, assignedUserGroupCount, activeUserReachCount };
   }
 
-  async createCustom(dto: CreateCustomRoleDto): Promise<RoleResponseDto> {
+  async createCustom(dto: CreateCustomRoleDto): Promise<Role> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
@@ -136,10 +124,10 @@ export class RoleApplicationService {
     // Synchronous Redis cache seeding
     await this.roleCacheService.syncRole(createdRole);
 
-    return RoleResponseDto.fromRole(createdRole);
+    return createdRole;
   }
 
-  async copy(sourceRoleId: string, dto: CopyRoleDto): Promise<RoleResponseDto> {
+  async copy(sourceRoleId: string, dto: CopyRoleDto): Promise<Role> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
@@ -182,28 +170,22 @@ export class RoleApplicationService {
 
     await this.roleCacheService.syncRole(clonedRole);
 
-    return RoleResponseDto.fromRole(clonedRole);
+    return clonedRole;
   }
 
-  async estimateImpact(roleId: string): Promise<RoleImpactResponseDto> {
-    const tenantCode = RequestContextService.getTenantCode();
+  async estimateImpact(roleId: string): Promise<[number, number]> {
     const role = await this.roleRepository.findById(roleId, { required: true });
 
     const { assignedUserGroupCount, activeUserReachCount } =
-      await this.roleRepository.countAssignedUserGroupAndUser(role.id, tenantCode);
+      await this.roleRepository.countAssignedUserGroupAndUser(role.id);
 
-    return {
-      roleId: role.id,
-      assignedUserGroupCount,
-      activeUserReachCount,
-      isUnassigned: assignedUserGroupCount === 0,
-    };
+    return [assignedUserGroupCount, activeUserReachCount];
   }
 
   async updateCustom(
     id: string,
     dto: UpdateCustomRoleDto,
-  ): Promise<RoleResponseDto | HighImpactConfirmationRequiredResponseDto> {
+  ): Promise<Role | HighImpactConfirmationRequiredResponseDto> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
@@ -241,7 +223,7 @@ export class RoleApplicationService {
 
     // 4. High-impact blast radius check
     const { assignedUserGroupCount, activeUserReachCount: affectedUserCount } =
-      await this.roleRepository.countAssignedUserGroupAndUser(role.id, tenantCode);
+      await this.roleRepository.countAssignedUserGroupAndUser(role.id);
 
     if (affectedUserCount >= this.HIGH_IMPACT_THRESHOLD && dto.confirmed !== true) {
       return this.responseForHighImpactUsersConfirmation(affectedUserCount);
@@ -288,16 +270,17 @@ export class RoleApplicationService {
 
     await this.roleCacheService.syncRole(updatedRole);
 
-    return RoleResponseDto.fromRole(updatedRole, {
+    return {
+      ...updatedRole,
       assignedUserGroupCount,
       activeUserReachCount: affectedUserCount,
-    });
+    };
   }
 
   async deactivate(
     id: string,
     dto?: DeactivateRoleDto,
-  ): Promise<RoleResponseDto | HighImpactConfirmationRequiredResponseDto> {
+  ): Promise<Role | HighImpactConfirmationRequiredResponseDto> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
@@ -315,7 +298,7 @@ export class RoleApplicationService {
     }
 
     const { assignedUserGroupCount, activeUserReachCount } =
-      await this.roleRepository.countAssignedUserGroupAndUser(role.id, tenantCode);
+      await this.roleRepository.countAssignedUserGroupAndUser(role.id);
 
     if (assignedUserGroupCount > 0 && !dto?.confirmed) {
       return this.responseForHighImpactUserGroupsConfirmation(
@@ -360,13 +343,14 @@ export class RoleApplicationService {
 
     await this.roleCacheService.syncRole(deactivatedRole);
 
-    return RoleResponseDto.fromRole(deactivatedRole, {
+    return {
+      ...deactivatedRole,
       assignedUserGroupCount: assignedUserGroupCount,
       activeUserReachCount: activeUserReachCount,
-    });
+    };
   }
 
-  async reactivate(id: string): Promise<RoleResponseDto> {
+  async reactivate(id: string): Promise<Role> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
@@ -399,15 +383,16 @@ export class RoleApplicationService {
     await this.roleCacheService.syncRole(reactivatedRole);
 
     const { assignedUserGroupCount, activeUserReachCount } =
-      await this.roleRepository.countAssignedUserGroupAndUser(reactivatedRole.id, tenantCode);
+      await this.roleRepository.countAssignedUserGroupAndUser(reactivatedRole.id);
 
-    return RoleResponseDto.fromRole(reactivatedRole, {
+    return {
+      ...reactivatedRole,
       assignedUserGroupCount,
       activeUserReachCount,
-    });
+    };
   }
 
-  async rename(roleId: string, dto: RenameRoleDto): Promise<RoleResponseDto> {
+  async rename(roleId: string, dto: RenameRoleDto): Promise<Role> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
@@ -443,13 +428,13 @@ export class RoleApplicationService {
 
     await this.roleCacheService.syncRole(updatedRole);
 
-    return RoleResponseDto.fromRole(updatedRole);
+    return updatedRole;
   }
 
   async updatePermissions(
     id: string,
     dto: { permissionCodes: string[]; version?: number; confirmed?: boolean },
-  ): Promise<RoleResponseDto | HighImpactConfirmationRequiredResponseDto> {
+  ): Promise<Role | HighImpactConfirmationRequiredResponseDto> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
@@ -493,7 +478,7 @@ export class RoleApplicationService {
     }
 
     // 4. High-impact blast radius check
-    const affectedUserCount = await this.roleRepository.countActiveUserReach(id, tenantCode);
+    const affectedUserCount = await this.roleRepository.countActiveUserReach(id);
     if (affectedUserCount >= this.HIGH_IMPACT_THRESHOLD && dto.confirmed !== true) {
       return this.responseForHighImpactUsersConfirmation(affectedUserCount);
     }
@@ -549,13 +534,13 @@ export class RoleApplicationService {
 
     const assignedUserGroupCount = await this.roleRepository.countAssignedUserGroups(
       updatedRole.id,
-      tenantCode,
     );
 
-    return RoleResponseDto.fromRole(updatedRole, {
+    return {
+      ...updatedRole,
       assignedUserGroupCount,
       activeUserReachCount: affectedUserCount,
-    });
+    };
   }
 
   async delete(roleId: string): Promise<void> {

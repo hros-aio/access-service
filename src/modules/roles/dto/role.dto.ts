@@ -69,18 +69,10 @@ export class RoleResponseDto {
   @ApiProperty({ example: '2026-08-25T00:00:00.000Z' })
   readonly updatedAt: string;
 
-  static fromRole(
-    role: Role,
-    options?: {
-      assignedUserGroupCount?: number;
-      activeUserReachCount?: number;
-    },
-  ): RoleResponseDto {
-    const activeReach = options?.activeUserReachCount ?? 0;
+  static fromRole(role: Role): RoleResponseDto {
+    const activeReach = role?.activeUserReachCount ?? 0;
     const isUnassigned =
-      options?.assignedUserGroupCount !== undefined
-        ? options.assignedUserGroupCount === 0
-        : undefined;
+      role?.assignedUserGroupCount !== undefined ? role.assignedUserGroupCount === 0 : undefined;
 
     return {
       id: role.id,
@@ -97,11 +89,15 @@ export class RoleResponseDto {
       })),
       userCount: activeReach,
       isUnassigned,
-      assignedUserGroupCount: options?.assignedUserGroupCount ?? 0,
+      assignedUserGroupCount: role?.assignedUserGroupCount ?? 0,
       activeUserReachCount: activeReach,
       createdAt: role.createdAt ? role.createdAt.toISOString() : new Date().toISOString(),
       updatedAt: role.updatedAt ? role.updatedAt.toISOString() : new Date().toISOString(),
     };
+  }
+
+  static fromRoles(roles: Role[]): RoleResponseDto[] {
+    return roles.map((role) => RoleResponseDto.fromRole(role));
   }
 }
 
@@ -204,17 +200,11 @@ export class DeactivateRoleDto {
 }
 
 export class RoleImpactResponseDto {
-  @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' })
-  readonly roleId: string;
-
   @ApiProperty({ example: 2 })
   readonly assignedUserGroupCount: number;
 
   @ApiProperty({ example: 45 })
   readonly activeUserReachCount: number;
-
-  @ApiProperty({ example: false })
-  readonly isUnassigned: boolean;
 }
 
 export class RenameRoleDto {
