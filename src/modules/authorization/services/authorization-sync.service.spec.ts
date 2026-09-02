@@ -36,7 +36,7 @@ describe('AuthorizationSyncService', () => {
     };
 
     mockUserGroupRepo = {
-      findByTenantAndId: jest.fn(),
+      findFullyById: jest.fn(),
     };
 
     mockRoleRepo = {
@@ -66,7 +66,7 @@ describe('AuthorizationSyncService', () => {
 
   describe('requestSyncNow', () => {
     it('should return no-op response when entity is already synchronized', async () => {
-      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+      (mockUserGroupRepo.findFullyById as jest.Mock).mockResolvedValue({
         id: 'ug-1',
         version: 2,
         projectionVersion: 2,
@@ -84,7 +84,7 @@ describe('AuthorizationSyncService', () => {
     });
 
     it('should return existing in-flight job if already running', async () => {
-      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+      (mockUserGroupRepo.findFullyById as jest.Mock).mockResolvedValue({
         id: 'ug-1',
         version: 3,
         projectionVersion: 2,
@@ -116,7 +116,7 @@ describe('AuthorizationSyncService', () => {
     });
 
     it('should create new sync job and outbox event when dirty', async () => {
-      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+      (mockUserGroupRepo.findFullyById as jest.Mock).mockResolvedValue({
         id: 'ug-1',
         version: 3,
         projectionVersion: 2,
@@ -150,7 +150,7 @@ describe('AuthorizationSyncService', () => {
     });
 
     it('should catch unique constraint 23505 race condition and return existing in-flight job', async () => {
-      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+      (mockUserGroupRepo.findFullyById as jest.Mock).mockResolvedValue({
         id: 'ug-1',
         version: 3,
         projectionVersion: 2,
@@ -183,7 +183,7 @@ describe('AuthorizationSyncService', () => {
     });
 
     it('should throw NotFoundException if entity does not exist', async () => {
-      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue(null);
+      (mockUserGroupRepo.findFullyById as jest.Mock).mockResolvedValue(null);
 
       await expect(
         service.requestSyncNow({
@@ -227,7 +227,7 @@ describe('AuthorizationSyncService', () => {
 
   describe('enqueueSyncJob', () => {
     it('should successfully enqueue job for SCHEDULED trigger with SYSTEM createdBy', async () => {
-      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+      (mockUserGroupRepo.findFullyById as jest.Mock).mockResolvedValue({
         id: 'ug-2',
         version: 4,
         projectionVersion: 2,
@@ -296,7 +296,7 @@ describe('AuthorizationSyncService', () => {
       });
 
       expect(result.jobId).toBe('job-sched-bypass');
-      expect(mockUserGroupRepo.findByTenantAndId).not.toHaveBeenCalled();
+      expect(mockUserGroupRepo.findFullyById).not.toHaveBeenCalled();
       expect(mockRoleRepo.findById).not.toHaveBeenCalled();
     });
 
@@ -338,7 +338,7 @@ describe('AuthorizationSyncService', () => {
 
   describe('retryFailedSync', () => {
     it('should throw BadRequestException if entity is already completed (version <= projectionVersion)', async () => {
-      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+      (mockUserGroupRepo.findFullyById as jest.Mock).mockResolvedValue({
         id: 'ug-1',
         version: 2,
         projectionVersion: 2,
@@ -350,7 +350,7 @@ describe('AuthorizationSyncService', () => {
     });
 
     it('should return existing in-flight job if already running', async () => {
-      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+      (mockUserGroupRepo.findFullyById as jest.Mock).mockResolvedValue({
         id: 'ug-1',
         version: 3,
         projectionVersion: 2,

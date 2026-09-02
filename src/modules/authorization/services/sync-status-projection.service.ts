@@ -74,7 +74,7 @@ export class SyncStatusProjectionService {
     const tenantCode = RequestContextService.getTenantCode();
 
     const [userGroups, roles] = await Promise.all([
-      this.userGroupRepo.findActiveGroups(tenantCode).catch(() => []),
+      this.userGroupRepo.findActiveGroups().catch(() => []),
       this.roleRepo.find({}).catch(() => []),
     ]);
 
@@ -233,7 +233,7 @@ export class SyncStatusProjectionService {
     sourceId: string,
   ): Promise<{ sourceVersion: number; projectionVersion: number }> {
     if (sourceType === SyncSourceType.USER_GROUP) {
-      const group = await this.userGroupRepo.findByTenantAndId(tenantCode, sourceId);
+      const group = await this.userGroupRepo.findFullyById(sourceId);
       if (!group) {
         throw new NotFoundException(
           `User Group with id ${sourceId} not found in tenant ${tenantCode}`,

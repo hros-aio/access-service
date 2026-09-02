@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
-import { DeepPartial, Raw } from 'typeorm';
+import { DeepPartial, In, Raw } from 'typeorm';
 
 import { Role } from '../entities/role.entity';
 import { RoleStatus, SystemRoleKey } from '../interfaces/system-role-template.interface';
@@ -96,5 +96,12 @@ export class RoleRepository extends BaseRepository<Role> {
     ]);
 
     return { assignedUserGroupCount, activeUserReachCount };
+  }
+
+  async findByIds(roleIds: string[]): Promise<Role[]> {
+    if (roleIds.length === 0) return [];
+    return this.find({
+      id: In(roleIds),
+    });
   }
 }

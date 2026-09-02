@@ -10,7 +10,6 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { RequestContextService } from '@new-hros/libs-core';
 
 import {
   CriteriaImpactResponseDto,
@@ -33,14 +32,8 @@ export class UserGroupPopulationController {
     @Param('id', ParseUUIDPipe) id: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
-  ): Promise<{ items: MatchedMemberDto[]; total: number; page: number; limit: number }> {
-    const tenantCode = RequestContextService.getTenantCode()!;
-    return this.populationService.getMatchingPopulation(
-      tenantCode,
-      id,
-      page ? +page : 1,
-      limit ? +limit : 20,
-    );
+  ): Promise<{ data: MatchedMemberDto[]; total: number; page: number; limit: number }> {
+    return this.populationService.getMatchingPopulation(id, page ? +page : 1, limit ? +limit : 20);
   }
 
   @Post('preview-matching')
@@ -48,8 +41,7 @@ export class UserGroupPopulationController {
   @ApiOperation({ summary: 'Preview employee matching population for draft criteria' })
   @ApiResponse({ status: 200, type: PreviewMatchingResponseDto })
   async previewMatching(@Body() dto: DynamicMatchingRuleDto): Promise<PreviewMatchingResponseDto> {
-    const tenantCode = RequestContextService.getTenantCode()!;
-    return this.populationService.previewCriteriaPopulation(tenantCode, dto);
+    return this.populationService.previewCriteriaPopulation(dto);
   }
 
   @Post(':id/criteria-impact')
@@ -60,7 +52,6 @@ export class UserGroupPopulationController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: DynamicMatchingRuleDto,
   ): Promise<CriteriaImpactResponseDto> {
-    const tenantCode = RequestContextService.getTenantCode()!;
-    return this.populationService.estimateCriteriaDiff(tenantCode, id, dto);
+    return this.populationService.estimateCriteriaDiff(id, dto);
   }
 }

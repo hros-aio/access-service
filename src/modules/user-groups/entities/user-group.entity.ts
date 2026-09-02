@@ -3,6 +3,7 @@ import { Column, Entity, OneToMany, Unique } from 'typeorm';
 
 import { UserGroupRole } from './user-group-role.entity';
 import { TableName } from '../../../enums';
+import { UserGroupAggregate } from '../domain/aggregates/user-group.aggregate';
 import { ScopeType, UserGroupStatus } from '../domain/enums';
 import { MatchingRule } from '../domain/value-objects/matching-rule.vo';
 
@@ -42,4 +43,21 @@ export class UserGroup extends BaseEntity {
 
   @OneToMany(() => UserGroupRole, (ugr) => ugr.userGroup, { cascade: true })
   groupRoles?: UserGroupRole[];
+
+  public static fromAggregate(aggregate: UserGroupAggregate): UserGroup {
+    const entity = new UserGroup();
+    entity.tenantCode = aggregate.tenantCode;
+    entity.name = aggregate.name;
+    entity.description = aggregate.description;
+    entity.status = aggregate.status;
+    entity.scopeType = aggregate.scopeType;
+    entity.scopeRefId = aggregate.scopeRefId;
+    entity.matchingRule = aggregate.matchingRule;
+    entity.ruleAttributeKeys = aggregate.ruleAttributeKeys;
+    entity.version = aggregate.version;
+    entity.projectionVersion = aggregate.projectionVersion;
+    entity.createdBy = aggregate.createdBy;
+    entity.updatedBy = aggregate.updatedBy;
+    return entity;
+  }
 }

@@ -26,16 +26,13 @@ export class EmployeeAttributePropagationService {
     if (!employee) return;
 
     // Fetch active user groups in tenant with overlapping attribute keys
-    const candidateGroups = await this.userGroupRepo.findByAttributeKeys(
-      tenantCode,
-      changedAttributeKeys,
-    );
+    const candidateGroups = await this.userGroupRepo.findByAttributeKeys(changedAttributeKeys);
 
     // If no candidate group rules monitor these attributes, skip evaluation
     if (candidateGroups.length === 0) return;
 
     // Fetch all active user groups to accurately evaluate target matching membership set
-    const allActiveGroups = await this.userGroupRepo.findActiveGroups(tenantCode);
+    const allActiveGroups = await this.userGroupRepo.findActiveGroups();
 
     const matchingGroupIds: string[] = [];
     for (const group of allActiveGroups) {

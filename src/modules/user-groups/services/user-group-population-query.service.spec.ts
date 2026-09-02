@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { TransactionService } from '@new-hros/libs-sql';
+import { RequestContextService } from '@new-hros/libs-core';
 
 import { UserGroupMatchingEngine } from './user-group-matching.engine';
 import { UserGroupPopulationQueryService } from './user-group-population-query.service';
@@ -9,23 +9,21 @@ import { UserGroup } from '../entities/user-group.entity';
 import { UserGroupMembershipRepository } from '../repositories/user-group-membership.repository';
 import { UserGroupRepository } from '../repositories/user-group.repository';
 
+import { EmployeeReferenceRepository } from '@/modules/employee/repositories/employee-reference.repository';
+
 describe('UserGroupPopulationQueryService', () => {
   let service: UserGroupPopulationQueryService;
-  let mockTransactionService: jest.Mocked<TransactionService>;
   let mockUserGroupRepo: jest.Mocked<UserGroupRepository>;
   let mockMembershipRepo: jest.Mocked<UserGroupMembershipRepository>;
   let mockMatchingEngine: jest.Mocked<UserGroupMatchingEngine>;
-  let mockManager: { query: jest.Mock };
+  let mockEmployeeRefRepo: jest.Mocked<EmployeeReferenceRepository>;
 
   beforeEach(() => {
-    mockManager = {
-      query: jest.fn(),
-    };
-    mockTransactionService = {
-      getManager: jest.fn().mockReturnValue(mockManager),
-    } as unknown as jest.Mocked<TransactionService>;
+    jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue('TENANT_A');
+
     mockUserGroupRepo = {
-      findByTenantAndId: jest.fn(),
+      findById: jest.fn(),
+      findFullyById: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRepository>;
     mockMembershipRepo = {
       findMembershipsByGroup: jest.fn(),
@@ -34,26 +32,39 @@ describe('UserGroupPopulationQueryService', () => {
     mockMatchingEngine = {
       buildMatchingQuery: jest.fn(),
     } as unknown as jest.Mocked<UserGroupMatchingEngine>;
+    mockEmployeeRefRepo = {
+      getMatchedEmployeeIds: jest.fn(),
+      findByIds: jest.fn(),
+    } as unknown as jest.Mocked<EmployeeReferenceRepository>;
 
     service = new UserGroupPopulationQueryService(
-      mockTransactionService,
       mockUserGroupRepo,
       mockMembershipRepo,
       mockMatchingEngine,
+      mockEmployeeRefRepo,
     );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('getMatchingPopulation', () => {
     it('throws NotFoundException when user group does not exist in tenant', async () => {
-      mockUserGroupRepo.findByTenantAndId.mockResolvedValueOnce(null);
+      mockUserGroupRepo.findById.mockImplementationOnce((id, options) => {
+        if (options?.required) {
+          return Promise.reject(new NotFoundException(`Record not found with ID: ${id}`));
+        }
+        return Promise.resolve(null);
+      });
 
-      await expect(
-        service.getMatchingPopulation('TENANT_A', 'non-existent-group-id', 1, 20),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getMatchingPopulation('non-existent-group-id', 1, 20)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('returns paginated materialized members when group exists', async () => {
-      mockUserGroupRepo.findByTenantAndId.mockResolvedValueOnce({ id: 'grp-1' } as UserGroup);
+      mockUserGroupRepo.findById.mockResolvedValueOnce({ id: 'grp-1' } as UserGroup);
       const fakeMembership = {
         employeeId: 'emp-1',
         matchedAt: new Date('2026-08-29T10:00:00Z'),
@@ -67,24 +78,36 @@ describe('UserGroupPopulationQueryService', () => {
         },
       } as unknown as UserGroupMembership;
 
-      mockMembershipRepo.findMembershipsByGroup.mockResolvedValueOnce([[fakeMembership], 1]);
+      mockMembershipRepo.findMembershipsByGroup.mockResolvedValueOnce({
+        data: [fakeMembership],
+        total: 1,
+        page: 1,
+        limit: 20,
+        totalPages: 1,
+      });
 
-      const result = await service.getMatchingPopulation('TENANT_A', 'grp-1', 1, 20);
+      const result = await service.getMatchingPopulation('grp-1', 1, 20);
       expect(result.total).toBe(1);
       expect(result.page).toBe(1);
       expect(result.limit).toBe(20);
-      expect(result.items.length).toBe(1);
-      expect(result.items[0].employeeCode).toBe('EMP001');
-      expect(result.items[0].reporteesCount).toBe(3);
+      expect(result.data.length).toBe(1);
+      expect(result.data[0].employeeCode).toBe('EMP001');
+      expect(result.data[0].reporteesCount).toBe(3);
     });
 
     it('returns clean empty array when group has 0 materialized members', async () => {
-      mockUserGroupRepo.findByTenantAndId.mockResolvedValueOnce({ id: 'grp-empty' } as UserGroup);
-      mockMembershipRepo.findMembershipsByGroup.mockResolvedValueOnce([[], 0]);
+      mockUserGroupRepo.findById.mockResolvedValueOnce({ id: 'grp-empty' } as UserGroup);
+      mockMembershipRepo.findMembershipsByGroup.mockResolvedValueOnce({
+        data: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+        totalPages: 0,
+      });
 
-      const result = await service.getMatchingPopulation('TENANT_A', 'grp-empty', 1, 20);
+      const result = await service.getMatchingPopulation('grp-empty', 1, 20);
       expect(result.total).toBe(0);
-      expect(result.items).toEqual([]);
+      expect(result.data).toEqual([]);
     });
   });
 
@@ -94,15 +117,16 @@ describe('UserGroupPopulationQueryService', () => {
         sql: 'SELECT employee_id FROM employee_references WHERE ...',
         params: ['DEFAULT'],
       });
-      mockManager.query.mockResolvedValueOnce([{ employee_id: 'emp-1' }]).mockResolvedValueOnce([
+      mockEmployeeRefRepo.getMatchedEmployeeIds.mockResolvedValueOnce(['emp-1']);
+      mockEmployeeRefRepo.findByIds.mockResolvedValueOnce([
         {
-          employee_id: 'emp-1',
-          employee_code: 'EMP001',
-          department_id: 'dept-1',
-          location_id: null,
-          employment_status: 'ACTIVE',
-          reportees_count: 0,
-        },
+          employeeId: 'emp-1',
+          employeeCode: 'EMP001',
+          departmentId: 'dept-1',
+          locationId: null,
+          employmentStatus: 'ACTIVE',
+          reporteesCount: 0,
+        } as never,
       ]);
 
       const rule: MatchingRule = {
@@ -110,7 +134,7 @@ describe('UserGroupPopulationQueryService', () => {
         clauses: [{ attribute: 'departmentId', operator: 'eq', value: 'dept-1' }],
       };
 
-      const res = await service.previewCriteriaPopulation('DEFAULT', rule);
+      const res = await service.previewCriteriaPopulation(rule);
       expect(res.matchedCount).toBe(1);
       expect(res.sampleEmployees[0].employeeId).toBe('emp-1');
     });
@@ -120,14 +144,14 @@ describe('UserGroupPopulationQueryService', () => {
         sql: 'SELECT employee_id FROM employee_references WHERE ...',
         params: ['DEFAULT'],
       });
-      mockManager.query.mockResolvedValueOnce([]);
+      mockEmployeeRefRepo.getMatchedEmployeeIds.mockResolvedValueOnce([]);
 
       const rule: MatchingRule = {
         combinator: 'all',
         clauses: [{ attribute: 'departmentId', operator: 'eq', value: 'non-existent-dept' }],
       };
 
-      const res = await service.previewCriteriaPopulation('DEFAULT', rule);
+      const res = await service.previewCriteriaPopulation(rule);
       expect(res.matchedCount).toBe(0);
       expect(res.sampleEmployees).toEqual([]);
     });
@@ -135,20 +159,20 @@ describe('UserGroupPopulationQueryService', () => {
 
   describe('estimateCriteriaDiff', () => {
     it('calculates gaining and losing diffs correctly', async () => {
-      mockUserGroupRepo.findByTenantAndId.mockResolvedValueOnce({ id: 'grp-1' } as UserGroup);
+      mockUserGroupRepo.findById.mockResolvedValueOnce({ id: 'grp-1' } as UserGroup);
       mockMembershipRepo.findMemberEmployeeIdsByGroup.mockResolvedValueOnce(['emp-1', 'emp-2']);
       mockMatchingEngine.buildMatchingQuery.mockReturnValueOnce({
         sql: 'SELECT employee_id FROM employee_references WHERE ...',
         params: ['DEFAULT'],
       });
-      mockManager.query.mockResolvedValueOnce([{ employee_id: 'emp-2' }, { employee_id: 'emp-3' }]);
+      mockEmployeeRefRepo.getMatchedEmployeeIds.mockResolvedValueOnce(['emp-2', 'emp-3']);
 
       const rule: MatchingRule = {
         combinator: 'all',
         clauses: [{ attribute: 'departmentId', operator: 'eq', value: 'dept-2' }],
       };
 
-      const res = await service.estimateCriteriaDiff('DEFAULT', 'grp-1', rule);
+      const res = await service.estimateCriteriaDiff('grp-1', rule);
       expect(res.currentCount).toBe(2);
       expect(res.proposedCount).toBe(2);
       expect(res.gainingCount).toBe(1); // emp-3

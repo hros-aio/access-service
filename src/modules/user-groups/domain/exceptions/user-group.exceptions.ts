@@ -56,7 +56,13 @@ export class HighImpactConfirmationRequiredError extends BadRequestException {
 }
 
 export class InvalidRoleAssignmentError extends BadRequestException {
-  constructor(message: string) {
-    super(message);
+  constructor(
+    message: string,
+    public readonly details?: { invalidRoleIds: string[] },
+  ) {
+    super(message, {
+      description: 'Invalid role assignment',
+      cause: details ? { invalidRoleIds: details.invalidRoleIds } : undefined,
+    });
   }
 }

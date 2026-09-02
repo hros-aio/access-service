@@ -11,13 +11,14 @@ import {
   ConcurrentModificationError,
   HighImpactConfirmationRequiredError,
   InvalidRoleAssignmentError,
-  UserGroupNotFoundError,
 } from '../domain/exceptions/user-group.exceptions';
 import { AssignedRoleItemDto } from '../dto/assigned-role-item.dto';
 import { UpdateUserGroupRolesDto } from '../dto/update-user-group-roles.dto';
 import { UserGroupRole } from '../entities/user-group-role.entity';
 import { UserGroupRoleRepository } from '../repositories/user-group-role.repository';
 import { UserGroupRepository } from '../repositories/user-group.repository';
+
+import { RoleStatus } from '@/modules/roles';
 
 @Injectable()
 export class UserGroupRoleAssignmentService {
@@ -33,14 +34,9 @@ export class UserGroupRoleAssignmentService {
   ) {}
 
   async getAssignedRoles(userGroupId: string): Promise<AssignedRoleItemDto[]> {
-    const tenantCode = RequestContextService.getTenantCode();
+    const group = await this.userGroupRepository.findById(userGroupId, { required: true });
 
-    const group = await this.userGroupRepository.findByTenantAndId(tenantCode, userGroupId);
-    if (!group) {
-      throw new UserGroupNotFoundError(userGroupId);
-    }
-
-    const groupRoles = await this.userGroupRoleRepository.findByGroup(tenantCode, userGroupId);
+    const groupRoles = await this.userGroupRoleRepository.findRolesByGroupId(group.id);
     return groupRoles
       .filter((gr) => !!gr.role)
       .map((gr) => AssignedRoleItemDto.fromUserGroupRole(gr));
@@ -53,24 +49,23 @@ export class UserGroupRoleAssignmentService {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
-    const existingGroup = await this.userGroupRepository.findByTenantAndId(tenantCode, userGroupId);
-    if (!existingGroup) {
-      throw new UserGroupNotFoundError(userGroupId);
-    }
-
+    const existingGroup = await this.userGroupRepository.findById(userGroupId, { required: true });
     if (existingGroup.version !== dto.expectedVersion) {
       throw new ConcurrentModificationError();
     }
 
     // Validate target roles existence, status, and tenant scoping
     const targetRoleIds = Array.from(new Set(dto.roleIds));
-    for (const roleId of targetRoleIds) {
-      const role = await this.roleRepository.findById(roleId, { required: true });
-      if (role.status !== 'ACTIVE') {
-        throw new InvalidRoleAssignmentError(
-          `Role "${role.name}" (${roleId}) is inactive and cannot be assigned to a User Group`,
-        );
-      }
+    const roles = await this.roleRepository.findByIds(targetRoleIds);
+    const validRoleIds = roles.filter((role) => role.status === RoleStatus.ACTIVE);
+    if (validRoleIds.length !== targetRoleIds.length) {
+      const invalidRoleIds = targetRoleIds.filter(
+        (id) => !validRoleIds.some((role) => role.id === id),
+      );
+      throw new InvalidRoleAssignmentError(
+        `Some roles are inactive and cannot be assigned to a User Group`,
+        { invalidRoleIds },
+      );
     }
 
     // Impact blast radius estimation and confirmation check
@@ -87,24 +82,9 @@ export class UserGroupRoleAssignmentService {
       });
     }
 
-    const currentRoles = await this.userGroupRoleRepository.findByGroup(tenantCode, userGroupId);
-    const currentRoleIds = currentRoles.map((r) => r.roleId);
+    const currentRoleIds = await this.userGroupRoleRepository.findRoleIdsByGroupId(userGroupId);
 
-    const aggregate = UserGroupAggregate.reconstruct({
-      id: existingGroup.id,
-      tenantCode: existingGroup.tenantCode,
-      name: existingGroup.name,
-      description: existingGroup.description,
-      status: existingGroup.status,
-      scopeType: existingGroup.scopeType,
-      scopeRefId: existingGroup.scopeRefId,
-      matchingRule: existingGroup.matchingRule,
-      ruleAttributeKeys: existingGroup.ruleAttributeKeys,
-      version: existingGroup.version,
-      projectionVersion: existingGroup.projectionVersion,
-      assignedRoleIds: currentRoleIds,
-    });
-
+    const aggregate = UserGroupAggregate.reconstruct(existingGroup, currentRoleIds);
     const { addedRoleIds, removedRoleIds } = aggregate.replaceRoles(targetRoleIds, userId);
 
     return this.transactionService.runInTransaction(async () => {
@@ -114,7 +94,7 @@ export class UserGroupRoleAssignmentService {
       const savedGroup = await this.userGroupRepository.save(existingGroup);
 
       if (removedRoleIds.length > 0) {
-        await this.userGroupRoleRepository.batchDelete(tenantCode, userGroupId, removedRoleIds);
+        await this.userGroupRoleRepository.batchDelete(userGroupId, removedRoleIds);
       }
 
       if (addedRoleIds.length > 0) {

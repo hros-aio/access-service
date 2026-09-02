@@ -23,7 +23,7 @@ describe('EffectiveRoleProjectionService', () => {
 
   beforeEach(async () => {
     userGroupRepo = {
-      findByTenantAndId: jest.fn(),
+      findFullyById: jest.fn(),
     };
     userGroupRoleRepo = {
       findRolesByGroupId: jest.fn(),
@@ -61,39 +61,35 @@ describe('EffectiveRoleProjectionService', () => {
         { tenantCode, employeeId, groupId: 'group-b' } as UserGroupMembership,
       ]);
 
-    userGroupRepo.findByTenantAndId = jest
-      .fn()
-      .mockImplementation((_tenant: string, id: string) => {
-        if (id === 'group-a') {
-          return Promise.resolve({
-            id: 'group-a',
-            status: 'ACTIVE',
-            scopeType: 'SELF',
-            scopeRefId: null,
-          } as unknown as UserGroup);
-        }
-        if (id === 'group-b') {
-          return Promise.resolve({
-            id: 'group-b',
-            status: 'ACTIVE',
-            scopeType: 'DIRECT_REPORTEES',
-            scopeRefId: null,
-          } as unknown as UserGroup);
-        }
-        return Promise.resolve(null);
-      });
+    userGroupRepo.findFullyById = jest.fn().mockImplementation((id: string) => {
+      if (id === 'group-a') {
+        return Promise.resolve({
+          id: 'group-a',
+          status: 'ACTIVE',
+          scopeType: 'SELF',
+          scopeRefId: null,
+        } as unknown as UserGroup);
+      }
+      if (id === 'group-b') {
+        return Promise.resolve({
+          id: 'group-b',
+          status: 'ACTIVE',
+          scopeType: 'DIRECT_REPORTEES',
+          scopeRefId: null,
+        } as unknown as UserGroup);
+      }
+      return Promise.resolve(null);
+    });
 
-    userGroupRoleRepo.findRolesByGroupId = jest
-      .fn()
-      .mockImplementation((_tenant: string, id: string) => {
-        if (id === 'group-a') {
-          return Promise.resolve([{ roleId: 'role-employee' } as UserGroupRole]);
-        }
-        if (id === 'group-b') {
-          return Promise.resolve([{ roleId: 'role-manager' } as UserGroupRole]);
-        }
-        return Promise.resolve([]);
-      });
+    userGroupRoleRepo.findRolesByGroupId = jest.fn().mockImplementation((id: string) => {
+      if (id === 'group-a') {
+        return Promise.resolve([{ roleId: 'role-employee' } as UserGroupRole]);
+      }
+      if (id === 'group-b') {
+        return Promise.resolve([{ roleId: 'role-manager' } as UserGroupRole]);
+      }
+      return Promise.resolve([]);
+    });
 
     const result = await service.recomputeUserEffectiveRoles(tenantCode, employeeId);
 

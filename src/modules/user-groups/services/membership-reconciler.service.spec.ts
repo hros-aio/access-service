@@ -23,6 +23,8 @@ describe('MembershipReconciler', () => {
       getManager: jest.fn(),
     } as unknown as jest.Mocked<TransactionService>;
     mockUserGroupRepo = {
+      findById: jest.fn(),
+      findFullyById: jest.fn(),
       findByTenantAndId: jest.fn(),
       updateProjectionVersion: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRepository>;
@@ -56,7 +58,7 @@ describe('MembershipReconciler', () => {
 
   it('reconcileSingleEmployee adds new groups and syncs roles', async () => {
     mockMembershipRepo.findMembershipsByEmployee.mockResolvedValueOnce([]);
-    mockUserGroupRepo.findByTenantAndId.mockResolvedValueOnce({
+    mockUserGroupRepo.findFullyById.mockResolvedValueOnce({
       id: 'grp-1',
       status: 'ACTIVE',
       scopeType: 'DEPARTMENT',
@@ -69,23 +71,15 @@ describe('MembershipReconciler', () => {
     const result = await reconciler.reconcileSingleEmployee('DEFAULT', 'emp-1', ['grp-1']);
 
     expect(result.addedGroupIds).toEqual(['grp-1']);
-    expect(mockMembershipRepo.insertSingleMembership).toHaveBeenCalledWith(
-      'DEFAULT',
-      'emp-1',
-      'grp-1',
-    );
-    expect(mockEffectiveRoleRepo.syncEffectiveRolesForEmployee).toHaveBeenCalledWith(
-      'DEFAULT',
-      'emp-1',
-      [
-        {
-          roleId: 'role-1',
-          sourceGroupId: 'grp-1',
-          scopeType: 'DEPARTMENT',
-          scopeEntityId: 'dept-1',
-        },
-      ],
-    );
+    expect(mockMembershipRepo.insertSingleMembership).toHaveBeenCalledWith('emp-1', 'grp-1');
+    expect(mockEffectiveRoleRepo.syncEffectiveRolesForEmployee).toHaveBeenCalledWith('emp-1', [
+      {
+        roleId: 'role-1',
+        sourceGroupId: 'grp-1',
+        scopeType: 'DEPARTMENT',
+        scopeEntityId: 'dept-1',
+      },
+    ]);
     expect(mockOutboxRepo.create).toHaveBeenCalled();
   });
 });

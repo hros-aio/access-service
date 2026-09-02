@@ -96,7 +96,7 @@ export class UserGroupDetailsDto {
 
 export class PaginatedUserGroupDto {
   @ApiProperty({ type: [UserGroupDetailsDto] })
-  items: UserGroupDetailsDto[];
+  data: UserGroupDetailsDto[];
 
   @ApiProperty({ example: 42 })
   total: number;

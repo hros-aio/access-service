@@ -1,7 +1,6 @@
 import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
-import { UserGroupImpactService } from './user-group-impact.service';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { ScopeType, UserGroupStatus } from '../domain/enums';
@@ -9,9 +8,9 @@ import {
   ConcurrentModificationError,
   DuplicateUserGroupNameError,
   InvalidStateTransitionError,
-  UserGroupNotFoundError,
 } from '../domain/exceptions/user-group.exceptions';
 import { CreateUserGroupDto, UpdateUserGroupDto } from '../dto';
+import { UserGroupImpactService } from './user-group-impact.service';
 import { UserGroupLifecycleService } from './user-group-lifecycle.service';
 import { UserGroup } from '../entities/user-group.entity';
 import { UserGroupMembershipRepository } from '../repositories/user-group-membership.repository';
@@ -42,9 +41,10 @@ describe('UserGroupLifecycleService', () => {
     });
 
     userGroupRepository = {
-      findByTenantAndId: jest.fn(),
-      findByTenantAndName: jest.fn(),
-      listByTenant: jest.fn(),
+      findById: jest.fn(),
+      findFullyById: jest.fn(),
+      findByName: jest.fn(),
+      list: jest.fn(),
       create: jest
         .fn()
         .mockImplementation((entity: Partial<UserGroup>) =>
@@ -100,8 +100,8 @@ describe('UserGroupLifecycleService', () => {
     };
 
     it('should create group with version 1, projectionVersion 0 and outbox events', async () => {
-      userGroupRepository.findByTenantAndName.mockResolvedValue(null);
-      userGroupRepository.findByTenantAndId.mockResolvedValue({
+      userGroupRepository.findByName.mockResolvedValue(null);
+      userGroupRepository.create.mockResolvedValue({
         id: 'group-uuid-1',
         tenantCode: mockTenantCode,
         name: validDto.name,
@@ -115,7 +115,7 @@ describe('UserGroupLifecycleService', () => {
         projectionVersion: 0,
       } as UserGroup);
 
-      const result = await service.createUserGroup(validDto);
+      const result = await service.create(validDto);
 
       expect(result.id).toEqual('group-uuid-1');
       expect(result.version).toEqual(1);
@@ -124,9 +124,9 @@ describe('UserGroupLifecycleService', () => {
     });
 
     it('should reject creation if group name already exists in tenant', async () => {
-      userGroupRepository.findByTenantAndName.mockResolvedValue({ id: 'existing-id' } as UserGroup);
+      userGroupRepository.findByName.mockResolvedValue({ id: 'existing-id' } as UserGroup);
 
-      await expect(service.createUserGroup(validDto)).rejects.toThrow(DuplicateUserGroupNameError);
+      await expect(service.create(validDto)).rejects.toThrow(DuplicateUserGroupNameError);
     });
   });
 
@@ -161,8 +161,8 @@ describe('UserGroupLifecycleService', () => {
         groupRoles: [{ roleId: 'role-uuid-1' }],
       } as unknown as UserGroup;
 
-      userGroupRepository.findByTenantAndId.mockResolvedValue(existingGroup);
-      userGroupRepository.findByTenantAndName.mockResolvedValue(null);
+      userGroupRepository.findById.mockResolvedValue(existingGroup);
+      userGroupRepository.findByName.mockResolvedValue(null);
 
       await service.updateById('group-uuid-1', updateDto, 1);
 
@@ -171,7 +171,7 @@ describe('UserGroupLifecycleService', () => {
     });
 
     it('should throw ConcurrentModificationError if version token does not match', async () => {
-      userGroupRepository.findByTenantAndId.mockResolvedValue({
+      userGroupRepository.findById.mockResolvedValue({
         id: 'group-uuid-1',
         tenantCode: mockTenantCode,
         version: 2,
@@ -182,11 +182,16 @@ describe('UserGroupLifecycleService', () => {
       );
     });
 
-    it('should throw UserGroupNotFoundError if group does not exist', async () => {
-      userGroupRepository.findByTenantAndId.mockResolvedValue(null);
+    it('should throw error if group does not exist', async () => {
+      userGroupRepository.findById.mockImplementation(async (id, options) => {
+        if (options?.required) {
+          throw new Error(`Record not found with ID: ${id}`);
+        }
+        return null;
+      });
 
       await expect(service.updateById('group-uuid-1', updateDto, 1)).rejects.toThrow(
-        UserGroupNotFoundError,
+        'Record not found with ID: group-uuid-1',
       );
     });
   });
@@ -206,7 +211,7 @@ describe('UserGroupLifecycleService', () => {
         projectionVersion: 0,
       } as unknown as UserGroup;
 
-      userGroupRepository.findByTenantAndId.mockResolvedValue(existingGroup);
+      userGroupRepository.findById.mockResolvedValue(existingGroup);
 
       await service.deactivate('group-uuid-1', 2);
 
@@ -222,7 +227,7 @@ describe('UserGroupLifecycleService', () => {
         version: 1,
       } as unknown as UserGroup;
 
-      userGroupRepository.findByTenantAndId.mockResolvedValue(existingGroup);
+      userGroupRepository.findById.mockResolvedValue(existingGroup);
 
       await expect(service.deactivate('group-uuid-1', 1)).rejects.toThrow(
         InvalidStateTransitionError,
@@ -243,7 +248,8 @@ describe('UserGroupLifecycleService', () => {
         projectionVersion: 0,
       } as unknown as UserGroup;
 
-      userGroupRepository.findByTenantAndId.mockResolvedValue(existingGroup);
+      userGroupRepository.findById.mockResolvedValue(existingGroup);
+      userGroupRepository.findFullyById.mockResolvedValue(existingGroup);
 
       await service.reactivate('group-uuid-1', 3);
 

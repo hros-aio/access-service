@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RequestContextService } from '@new-hros/libs-core';
 
 import { ScopeType } from '../domain/enums/scope-type.enum';
-import { UserGroupNotFoundError } from '../domain/exceptions/user-group.exceptions';
 import { UserGroupScopeValidator } from '../domain/validators/user-group-scope.validator';
 import { RoleAssignmentImpactEstimateDto } from '../dto/estimate-role-assignment-impact.dto';
 import { ScopeImpactEstimateDto } from '../dto/scope-impact-estimate.dto';
@@ -28,10 +26,9 @@ export class UserGroupImpactService {
     targetRoleIds: string[],
     threshold = HIGH_IMPACT_ROLE_ASSIGNMENT_THRESHOLD,
   ): Promise<RoleAssignmentImpactEstimateDto> {
-    const tenantCode = RequestContextService.getTenantCode();
-
-    const existingGroup = await this.userGroupRepository.findByTenantAndId(tenantCode, userGroupId);
+    const existingGroup = await this.userGroupRepository.findById(userGroupId);
     if (!existingGroup) {
+      this.logger.warn(`User group not found for impact estimation: ${userGroupId}`);
       return {
         affectedUserCount: 0,
         zeroRoleUserCount: 0,
@@ -40,8 +37,7 @@ export class UserGroupImpactService {
       };
     }
 
-    const currentRoles = await this.userGroupRoleRepository.findByGroup(tenantCode, userGroupId);
-    const currentRoleIds = currentRoles.map((r) => r.roleId);
+    const currentRoleIds = await this.userGroupRoleRepository.findRoleIdsByGroupId(userGroupId);
 
     const targetSet = new Set(targetRoleIds);
     const currentSet = new Set(currentRoleIds);
@@ -60,18 +56,13 @@ export class UserGroupImpactService {
     }
 
     // Query materialized members of this user group
-    const memberEmployeeIds = await this.userGroupMembershipRepository.findMemberEmployeeIdsByGroup(
-      tenantCode,
-      userGroupId,
-    );
-
-    const affectedUserCount = memberEmployeeIds.length;
+    const affectedUserCount =
+      await this.userGroupMembershipRepository.countMemberEmployeeIdsByGroup(userGroupId);
 
     let zeroRoleUserCount = 0;
     if (removedRoleIds.length > 0 && affectedUserCount > 0) {
       zeroRoleUserCount =
         await this.userGroupMembershipRepository.countZeroRoleMembersAfterUnassign(
-          tenantCode,
           userGroupId,
           targetRoleIds.length,
         );
@@ -93,20 +84,12 @@ export class UserGroupImpactService {
     proposedScopeRefId?: string | null,
     threshold = HIGH_IMPACT_SCOPE_THRESHOLD,
   ): Promise<ScopeImpactEstimateDto> {
-    const tenantCode = RequestContextService.getTenantCode();
-
-    const group = await this.userGroupRepository.findByTenantAndId(tenantCode, userGroupId);
-    if (!group) {
-      throw new UserGroupNotFoundError(userGroupId);
-    }
+    const group = await this.userGroupRepository.findById(userGroupId, { required: true });
 
     // Validate proposed scope parameters
     const validated = UserGroupScopeValidator.validate(proposedScopeType, proposedScopeRefId);
 
-    const affectedUserCount = await this.userGroupMembershipRepository.countByGroup(
-      tenantCode,
-      userGroupId,
-    );
+    const affectedUserCount = await this.userGroupMembershipRepository.countByGroup(userGroupId);
     const requiresConfirmation = affectedUserCount >= threshold;
 
     return {

@@ -7,7 +7,6 @@ import { RoleRepository } from '../../roles/repositories/role.repository';
 import {
   HighImpactConfirmationRequiredError,
   InvalidRoleAssignmentError,
-  UserGroupNotFoundError,
 } from '../domain/exceptions/user-group.exceptions';
 import { UserGroupRoleRepository } from '../repositories/user-group-role.repository';
 import { UserGroupRepository } from '../repositories/user-group.repository';
@@ -27,18 +26,27 @@ describe('UserGroupRoleAssignmentService', () => {
     } as unknown as jest.Mocked<TransactionService>;
 
     mockUserGroupRepo = {
+      findById: jest.fn(),
+      findFullyById: jest.fn(),
       findByTenantAndId: jest.fn(),
       save: jest.fn().mockImplementation((group) => Promise.resolve(group)),
     } as unknown as jest.Mocked<UserGroupRepository>;
 
     mockUserGroupRoleRepo = {
       findByGroup: jest.fn(),
+      findRolesByGroupId: jest.fn().mockResolvedValue([]),
+      findRoleIdsByGroupId: jest.fn().mockResolvedValue([]),
       batchDelete: jest.fn(),
       bulkSave: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRoleRepository>;
 
     mockRoleRepo = {
       findById: jest.fn(),
+      findByIds: jest
+        .fn()
+        .mockImplementation((ids: string[]) =>
+          Promise.resolve(ids.map((id) => ({ id, status: 'ACTIVE' }))),
+        ),
     } as unknown as jest.Mocked<RoleRepository>;
 
     mockOutboxRepo = {
@@ -59,27 +67,18 @@ describe('UserGroupRoleAssignmentService', () => {
     );
   });
 
-  it('should throw UserGroupNotFoundError when group does not exist', async () => {
-    mockUserGroupRepo.findByTenantAndId.mockResolvedValue(null);
-
-    await expect(
-      service.updateRoleAssignments('group-1', {
-        roleIds: ['role-1'],
-        expectedVersion: 1,
-      }),
-    ).rejects.toThrow(UserGroupNotFoundError);
-  });
-
   it('should throw InvalidRoleAssignmentError when role is inactive', async () => {
-    mockUserGroupRepo.findByTenantAndId.mockResolvedValue({
+    mockUserGroupRepo.findById.mockResolvedValue({
       id: 'group-1',
       version: 1,
     } as never);
-    mockRoleRepo.findById.mockResolvedValue({
-      id: 'role-1',
-      name: 'Role 1',
-      status: 'INACTIVE',
-    } as never);
+    mockRoleRepo.findByIds.mockResolvedValue([
+      {
+        id: 'role-1',
+        name: 'Role 1',
+        status: 'INACTIVE',
+      } as never,
+    ]);
 
     await expect(
       service.updateRoleAssignments('group-1', {
@@ -90,15 +89,17 @@ describe('UserGroupRoleAssignmentService', () => {
   });
 
   it('should throw HighImpactConfirmationRequiredError when impact requires confirmation and confirmed !== true', async () => {
-    mockUserGroupRepo.findByTenantAndId.mockResolvedValue({
+    mockUserGroupRepo.findById.mockResolvedValue({
       id: 'group-1',
       version: 1,
     } as never);
-    mockRoleRepo.findById.mockResolvedValue({
-      id: 'role-1',
-      name: 'Role 1',
-      status: 'ACTIVE',
-    } as never);
+    mockRoleRepo.findByIds.mockResolvedValue([
+      {
+        id: 'role-1',
+        name: 'Role 1',
+        status: 'ACTIVE',
+      } as never,
+    ]);
     mockImpactService.estimateRoleAssignmentImpact.mockResolvedValue({
       affectedUserCount: 150,
       zeroRoleUserCount: 0,
@@ -127,12 +128,14 @@ describe('UserGroupRoleAssignmentService', () => {
       version: 1,
       projectionVersion: 0,
     };
-    mockUserGroupRepo.findByTenantAndId.mockResolvedValue(existingGroup as never);
-    mockRoleRepo.findById.mockResolvedValue({
-      id: 'role-1',
-      name: 'Role 1',
-      status: 'ACTIVE',
-    } as never);
+    mockUserGroupRepo.findById.mockResolvedValue(existingGroup as never);
+    mockRoleRepo.findByIds.mockResolvedValue([
+      {
+        id: 'role-1',
+        name: 'Role 1',
+        status: 'ACTIVE',
+      } as never,
+    ]);
     mockImpactService.estimateRoleAssignmentImpact.mockResolvedValue({
       affectedUserCount: 150,
       zeroRoleUserCount: 0,

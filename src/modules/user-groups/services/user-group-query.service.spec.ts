@@ -2,7 +2,6 @@ import { RequestContextService } from '@new-hros/libs-core';
 
 import { UserGroupQueryService } from './user-group-query.service';
 import { ScopeType, UserGroupStatus } from '../domain/enums';
-import { UserGroupNotFoundError } from '../domain/exceptions/user-group.exceptions';
 import { UserGroup } from '../entities/user-group.entity';
 import { UserGroupRepository } from '../repositories/user-group.repository';
 
@@ -16,8 +15,9 @@ describe('UserGroupQueryService', () => {
     jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue(mockTenantCode);
 
     userGroupRepository = {
-      findByTenantAndId: jest.fn(),
-      listByTenant: jest.fn(),
+      findById: jest.fn(),
+      findFullyById: jest.fn(),
+      list: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRepository>;
 
     service = new UserGroupQueryService(userGroupRepository);
@@ -40,7 +40,7 @@ describe('UserGroupQueryService', () => {
       groupRoles: [],
     } as unknown as UserGroup;
 
-    userGroupRepository.findByTenantAndId.mockResolvedValue(mockGroup);
+    userGroupRepository.findById.mockResolvedValue(mockGroup);
 
     const result = await service.findById('group-1');
 
@@ -50,10 +50,17 @@ describe('UserGroupQueryService', () => {
     expect(result.assignedRoles).toEqual([]);
   });
 
-  it('should throw UserGroupNotFoundError when group is not found', async () => {
-    userGroupRepository.findByTenantAndId.mockResolvedValue(null);
+  it('should throw error when group is not found', async () => {
+    userGroupRepository.findById.mockImplementation(async (id, options) => {
+      if (options?.required) {
+        throw new Error(`Record not found with ID: ${id}`);
+      }
+      return null;
+    });
 
-    await expect(service.findById('non-existent')).rejects.toThrow(UserGroupNotFoundError);
+    await expect(service.findById('non-existent')).rejects.toThrow(
+      'Record not found with ID: non-existent',
+    );
   });
 
   it('should list paginated user groups with search and status filters', async () => {
@@ -80,14 +87,20 @@ describe('UserGroupQueryService', () => {
       },
     ] as unknown as UserGroup[];
 
-    userGroupRepository.listByTenant.mockResolvedValue({ items: mockGroups, total: 1 });
+    userGroupRepository.list.mockResolvedValue({
+      data: mockGroups,
+      total: 1,
+      page: 1,
+      limit: 20,
+      totalPages: 1,
+    });
 
     const result = await service.list({ page: 1, limit: 20, search: 'Engineering' });
 
     expect(result.total).toBe(1);
-    expect(result.items.length).toBe(1);
-    expect(result.items[0].hasNoAssignedRoles).toBe(false);
-    expect(result.items[0].isPendingSync).toBe(false);
-    expect(result.items[0].assignedRoles[0].name).toBe('Engineer');
+    expect(result.data.length).toBe(1);
+    expect(result.data[0].hasNoAssignedRoles).toBe(false);
+    expect(result.data[0].isPendingSync).toBe(false);
+    expect(result.data[0].assignedRoles[0].name).toBe('Engineer');
   });
 });

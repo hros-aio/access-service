@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
+import {
+  BaseRepository,
+  PaginatedResult,
+  PaginationOptions,
+  TransactionService,
+} from '@new-hros/libs-sql';
 import { In } from 'typeorm';
 
 import { UserGroupMembership } from '../entities/user-group-membership.entity';
@@ -10,51 +15,53 @@ export class UserGroupMembershipRepository extends BaseRepository<UserGroupMembe
     super(UserGroupMembership, transactionService);
   }
 
-  async findMembershipsByEmployee(
-    tenantCode: string,
-    employeeId: string,
-  ): Promise<UserGroupMembership[]> {
-    return this.repository.find({
-      where: { tenantCode, employeeId },
-      relations: ['userGroup'],
-    });
+  async findMembershipsByEmployee(employeeId: string): Promise<UserGroupMembership[]> {
+    return this.find(
+      {
+        employeeId,
+      },
+      {
+        relations: ['userGroup'],
+      },
+    );
   }
 
   async findMembershipsByGroup(
-    tenantCode: string,
     groupId: string,
-    skip = 0,
-    take = 20,
-  ): Promise<[UserGroupMembership[], number]> {
-    return this.repository.findAndCount({
-      where: { tenantCode, groupId },
-      relations: ['employee'],
-      skip,
-      take,
-      order: { matchedAt: 'DESC' },
+    pagination: PaginationOptions,
+  ): Promise<PaginatedResult<UserGroupMembership>> {
+    return this.find(
+      { tenantCode: this.tenantCode, groupId },
+      {
+        relations: ['employee'],
+        pagination,
+      },
+    );
+  }
+
+  async countByGroup(groupId: string): Promise<number> {
+    const count = await this.repository.count({
+      where: { tenantCode: this.tenantCode, groupId },
     });
+    return count;
   }
 
-  async countByGroup(tenantCode: string, groupId: string): Promise<number> {
-    return this.repository.count({
-      where: { tenantCode, groupId },
-    });
-  }
-
-  async countUserGroupMembers(tenantCode: string, userGroupId: string): Promise<number> {
-    return this.countByGroup(tenantCode, userGroupId);
-  }
-
-  async findMemberEmployeeIdsByGroup(tenantCode: string, groupId: string): Promise<string[]> {
+  async findMemberEmployeeIdsByGroup(groupId: string): Promise<string[]> {
     const rows = await this.repository.find({
-      where: { tenantCode, groupId },
+      where: { tenantCode: this.tenantCode, groupId },
       select: ['employeeId'],
     });
     return rows.map((r) => r.employeeId);
   }
 
+  async countMemberEmployeeIdsByGroup(groupId: string): Promise<number> {
+    const count = await this.repository.count({
+      where: { tenantCode: this.tenantCode, groupId },
+    });
+    return count;
+  }
+
   async countZeroRoleMembersAfterUnassign(
-    tenantCode: string,
     groupId: string,
     targetRoleCount: number,
   ): Promise<number> {
@@ -88,19 +95,19 @@ export class UserGroupMembershipRepository extends BaseRepository<UserGroupMembe
         WHERE COALESCE(ogr.other_role_count, 0) = 0
           AND $3 = 0;
         `,
-        [tenantCode, groupId, targetRoleCount],
+        [this.tenantCode, groupId, targetRoleCount],
       )
       .catch(() => []);
 
     return queryResult.length;
   }
 
-  async batchInsert(tenantCode: string, groupId: string, employeeIds: string[]): Promise<void> {
+  async batchInsert(groupId: string, employeeIds: string[]): Promise<void> {
     if (employeeIds.length === 0) return;
 
     const entities = employeeIds.map((employeeId) =>
       this.repository.create({
-        tenantCode,
+        tenantCode: this.tenantCode,
         groupId,
         employeeId,
         matchedAt: new Date(),
@@ -110,31 +117,23 @@ export class UserGroupMembershipRepository extends BaseRepository<UserGroupMembe
     await this.repository.save(entities);
   }
 
-  async batchDelete(tenantCode: string, groupId: string, employeeIds: string[]): Promise<void> {
+  async batchDelete(groupId: string, employeeIds: string[]): Promise<void> {
     if (employeeIds.length === 0) return;
 
     await this.repository.delete({
-      tenantCode,
+      tenantCode: this.tenantCode,
       groupId,
       employeeId: In(employeeIds),
     });
   }
 
-  async deleteSingleMembership(
-    tenantCode: string,
-    employeeId: string,
-    groupId: string,
-  ): Promise<void> {
-    await this.repository.delete({ tenantCode, employeeId, groupId });
+  async deleteSingleMembership(employeeId: string, groupId: string): Promise<void> {
+    await this.repository.delete({ tenantCode: this.tenantCode, employeeId, groupId });
   }
 
-  async insertSingleMembership(
-    tenantCode: string,
-    employeeId: string,
-    groupId: string,
-  ): Promise<void> {
+  async insertSingleMembership(employeeId: string, groupId: string): Promise<void> {
     const entity = this.repository.create({
-      tenantCode,
+      tenantCode: this.tenantCode,
       groupId,
       employeeId,
       matchedAt: new Date(),
