@@ -39,13 +39,8 @@ export class SyncStatusProjectionService {
       sourceId,
     );
 
-    const latestJob = await this.syncJobRepo.findLatestJobBySource(
-      tenantCode,
-      sourceType,
-      sourceId,
-    );
+    const latestJob = await this.syncJobRepo.findLatestJobBySource(sourceType, sourceId);
     const latestCompletedJob = await this.syncJobRepo.findLatestCompletedJobBySource(
-      tenantCode,
       sourceType,
       sourceId,
     );
@@ -105,7 +100,6 @@ export class SyncStatusProjectionService {
 
     for (const entity of entities) {
       const latestJob = await this.syncJobRepo.findLatestJobBySource(
-        tenantCode,
         entity.sourceType,
         entity.sourceId,
       );
@@ -233,7 +227,7 @@ export class SyncStatusProjectionService {
     sourceId: string,
   ): Promise<{ sourceVersion: number; projectionVersion: number }> {
     if (sourceType === SyncSourceType.USER_GROUP) {
-      const group = await this.userGroupRepo.findFullyById(sourceId);
+      const group = await this.userGroupRepo.findById(sourceId);
       if (!group) {
         throw new NotFoundException(
           `User Group with id ${sourceId} not found in tenant ${tenantCode}`,

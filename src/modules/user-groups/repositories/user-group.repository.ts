@@ -5,7 +5,7 @@ import {
   QueryOneOptions,
   TransactionService,
 } from '@new-hros/libs-sql';
-import { DeepPartial, FindOptionsWhere, Raw } from 'typeorm';
+import { FindOptionsWhere, Raw } from 'typeorm';
 
 import { UserGroupStatus } from '../domain/enums';
 import { UserGroup } from '../entities/user-group.entity';
@@ -14,11 +14,6 @@ import { UserGroup } from '../entities/user-group.entity';
 export class UserGroupRepository extends BaseRepository<UserGroup> {
   constructor(transactionService: TransactionService) {
     super(UserGroup, transactionService);
-  }
-
-  async create(data: DeepPartial<UserGroup>): Promise<UserGroup> {
-    const entity = this.repository.create(data);
-    return this.repository.save(entity);
   }
 
   async save(userGroup: UserGroup): Promise<UserGroup> {

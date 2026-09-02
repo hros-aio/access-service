@@ -42,7 +42,6 @@ describe('UserGroupLifecycleService', () => {
 
     userGroupRepository = {
       findById: jest.fn(),
-      findFullyById: jest.fn(),
       findByName: jest.fn(),
       list: jest.fn(),
       create: jest
@@ -249,7 +248,6 @@ describe('UserGroupLifecycleService', () => {
       } as unknown as UserGroup;
 
       userGroupRepository.findById.mockResolvedValue(existingGroup);
-      userGroupRepository.findFullyById.mockResolvedValue(existingGroup);
 
       await service.reactivate('group-uuid-1', 3);
 

@@ -36,7 +36,7 @@ export class UserGroupRoleAssignmentService {
   async getAssignedRoles(userGroupId: string): Promise<AssignedRoleItemDto[]> {
     const group = await this.userGroupRepository.findById(userGroupId, { required: true });
 
-    const groupRoles = await this.userGroupRoleRepository.findRolesByGroupId(group.id);
+    const groupRoles = await this.userGroupRoleRepository.findByGroup(group.id);
     return groupRoles
       .filter((gr) => !!gr.role)
       .map((gr) => AssignedRoleItemDto.fromUserGroupRole(gr));

@@ -45,6 +45,15 @@ describe('AuthorizationSyncJobRepository', () => {
       findOne: jest.fn(),
       find: jest.fn(),
       update: jest.fn(),
+      merge: jest.fn().mockImplementation((entity, patch) => {
+        const merged = { ...entity };
+        for (const key of Object.keys(patch)) {
+          if (patch[key] !== undefined) {
+            merged[key] = patch[key];
+          }
+        }
+        return merged;
+      }),
       createQueryBuilder: jest.fn().mockReturnValue(qb),
     };
 
@@ -70,7 +79,6 @@ describe('AuthorizationSyncJobRepository', () => {
   describe('create', () => {
     it('should create and save a sync job entity', async () => {
       const jobData = {
-        tenantCode: 'TEST_TENANT',
         sourceType: SyncSourceType.USER_GROUP,
         sourceId: '550e8400-e29b-41d4-a716-446655440000',
         sourceVersion: 2,
@@ -78,27 +86,36 @@ describe('AuthorizationSyncJobRepository', () => {
         status: SyncJobStatus.PENDING,
       };
 
-      const createdEntity = { ...jobData, id: 'job-1' } as AuthorizationSyncJob;
+      const createdEntity = {
+        ...jobData,
+        id: 'job-1',
+        tenantCode: '000000',
+      } as AuthorizationSyncJob;
       (mockTypeormRepo.create as jest.Mock).mockReturnValue(createdEntity);
       (mockTypeormRepo.save as jest.Mock).mockResolvedValue(createdEntity);
 
       const result = await repository.create(jobData);
 
-      expect(mockTypeormRepo.create).toHaveBeenCalledWith(jobData);
+      expect(mockTypeormRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...jobData,
+          tenantCode: '000000',
+        }),
+      );
       expect(mockTypeormRepo.save).toHaveBeenCalledWith(createdEntity);
       expect(result).toEqual(createdEntity);
     });
   });
 
-  describe('findByIdAndTenant', () => {
-    it('should find job by tenantCode and id', async () => {
-      const mockJob = { id: 'job-1', tenantCode: 'TENANT_A' } as AuthorizationSyncJob;
+  describe('findById', () => {
+    it('should find job by id', async () => {
+      const mockJob = { id: 'job-1', tenantCode: '000000' } as AuthorizationSyncJob;
       (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(mockJob);
 
-      const result = await repository.findByIdAndTenant('TENANT_A', 'job-1');
+      const result = await repository.findById('job-1');
 
       expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
-        where: { tenantCode: 'TENANT_A', id: 'job-1' },
+        where: { id: 'job-1', tenantCode: '000000' },
       });
       expect(result).toEqual(mockJob);
     });
@@ -106,18 +123,14 @@ describe('AuthorizationSyncJobRepository', () => {
 
   describe('findLatestJobBySource', () => {
     it('should find latest job by source ordered by createdAt DESC', async () => {
-      const mockJob = { id: 'job-latest', tenantCode: 'TENANT_A' } as AuthorizationSyncJob;
+      const mockJob = { id: 'job-latest', tenantCode: '000000' } as AuthorizationSyncJob;
       (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(mockJob);
 
-      const result = await repository.findLatestJobBySource(
-        'TENANT_A',
-        SyncSourceType.USER_GROUP,
-        'ug-1',
-      );
+      const result = await repository.findLatestJobBySource(SyncSourceType.USER_GROUP, 'ug-1');
 
       expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
         where: {
-          tenantCode: 'TENANT_A',
+          tenantCode: '000000',
           sourceType: SyncSourceType.USER_GROUP,
           sourceId: 'ug-1',
         },
@@ -134,18 +147,15 @@ describe('AuthorizationSyncJobRepository', () => {
       const mockJob = {
         id: 'job-completed',
         status: SyncJobStatus.COMPLETED,
+        tenantCode: '000000',
       } as AuthorizationSyncJob;
       (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(mockJob);
 
-      const result = await repository.findLatestCompletedJobBySource(
-        'TENANT_A',
-        SyncSourceType.ROLE,
-        'role-1',
-      );
+      const result = await repository.findLatestCompletedJobBySource(SyncSourceType.ROLE, 'role-1');
 
       expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
         where: {
-          tenantCode: 'TENANT_A',
+          tenantCode: '000000',
           sourceType: SyncSourceType.ROLE,
           sourceId: 'role-1',
           status: SyncJobStatus.COMPLETED,
@@ -164,18 +174,15 @@ describe('AuthorizationSyncJobRepository', () => {
       const mockJob = {
         id: 'job-active',
         status: SyncJobStatus.PROCESSING,
+        tenantCode: '000000',
       } as AuthorizationSyncJob;
       (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(mockJob);
 
-      const result = await repository.findActiveJobBySource(
-        'TENANT_A',
-        SyncSourceType.USER_GROUP,
-        'ug-1',
-      );
+      const result = await repository.findActiveJobBySource(SyncSourceType.USER_GROUP, 'ug-1');
 
       expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
         where: {
-          tenantCode: 'TENANT_A',
+          tenantCode: '000000',
           sourceType: SyncSourceType.USER_GROUP,
           sourceId: 'ug-1',
           status: In([SyncJobStatus.PENDING, SyncJobStatus.PROCESSING]),
@@ -227,23 +234,23 @@ describe('AuthorizationSyncJobRepository', () => {
 
   describe('findInFlightJob', () => {
     it('should find in-flight job using findOne', async () => {
-      const mockJob = { id: 'job-1', status: SyncJobStatus.PENDING } as AuthorizationSyncJob;
+      const mockJob = {
+        id: 'job-1',
+        status: SyncJobStatus.PENDING,
+        tenantCode: '000000',
+      } as AuthorizationSyncJob;
       (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(mockJob);
 
-      const result = await repository.findInFlightJob(
-        'TENANT_A',
-        SyncSourceType.USER_GROUP,
-        'ug-1',
-        2,
-      );
+      const result = await repository.findInFlightJob(SyncSourceType.USER_GROUP, 'ug-1', 2);
 
       expect(mockTypeormRepo.findOne).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            tenantCode: 'TENANT_A',
+            tenantCode: '000000',
             sourceType: SyncSourceType.USER_GROUP,
             sourceId: 'ug-1',
             sourceVersion: 2,
+            status: In([SyncJobStatus.PENDING, SyncJobStatus.PROCESSING]),
           }),
         }),
       );
@@ -272,11 +279,19 @@ describe('AuthorizationSyncJobRepository', () => {
 
   describe('markCompleted & markFailed', () => {
     it('should update job status to COMPLETED with completedAt', async () => {
+      const existingJob = { id: 'job-1', tenantCode: '000000' } as AuthorizationSyncJob;
+      (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(existingJob);
+      (mockTypeormRepo.save as jest.Mock).mockResolvedValue({
+        ...existingJob,
+        status: SyncJobStatus.COMPLETED,
+        processedUsers: 100,
+      });
+
       await repository.markCompleted('job-1', 100);
 
-      expect(mockTypeormRepo.update).toHaveBeenCalledWith(
-        { id: 'job-1' },
+      expect(mockTypeormRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
+          id: 'job-1',
           status: SyncJobStatus.COMPLETED,
           processedUsers: 100,
         }),
@@ -284,12 +299,21 @@ describe('AuthorizationSyncJobRepository', () => {
     });
 
     it('should update job status to FAILED with errorDetails', async () => {
+      const existingJob = { id: 'job-1', tenantCode: '000000' } as AuthorizationSyncJob;
+      (mockTypeormRepo.findOne as jest.Mock).mockResolvedValue(existingJob);
       const errorDetails = { error: 'Rebuild failed' };
+      (mockTypeormRepo.save as jest.Mock).mockResolvedValue({
+        ...existingJob,
+        status: SyncJobStatus.FAILED,
+        errorDetails,
+        processedUsers: 50,
+      });
+
       await repository.markFailed('job-1', errorDetails, 50);
 
-      expect(mockTypeormRepo.update).toHaveBeenCalledWith(
-        { id: 'job-1' },
+      expect(mockTypeormRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
+          id: 'job-1',
           status: SyncJobStatus.FAILED,
           errorDetails,
           processedUsers: 50,

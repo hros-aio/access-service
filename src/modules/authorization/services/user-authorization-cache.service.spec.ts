@@ -94,7 +94,7 @@ describe('UserAuthorizationCacheService', () => {
 
     const result = await service.getUserAuthorizationProfile(tenantCode, userId);
 
-    expect(repoMock.findByEmployee).toHaveBeenCalledWith(tenantCode, userId);
+    expect(repoMock.findByEmployee).toHaveBeenCalledWith(userId);
     expect(result.roles).toHaveLength(1);
   });
 

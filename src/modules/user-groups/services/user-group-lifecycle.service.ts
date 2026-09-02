@@ -243,7 +243,7 @@ export class UserGroupLifecycleService {
       await this.outboxRepository.save(reactivatedOutbox);
       await this.outboxRepository.save(syncOutbox);
 
-      return (await this.userGroupRepository.findFullyById(id))!;
+      return savedGroup;
     });
   }
 

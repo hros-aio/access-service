@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { RequestContextService } from '@new-hros/libs-core';
 
 import { UserAuthorizationCacheService } from './user-authorization-cache.service';
 import { RoleRepository } from '../../roles/repositories/role.repository';
@@ -15,10 +16,10 @@ export class BootstrapAuthorizationService {
     private readonly roleRepo: RoleRepository,
   ) {}
 
-  async getBootstrapCapabilities(
-    tenantCode: string,
-    userId: string,
-  ): Promise<BootstrapCapabilitiesResponseDto> {
+  async getBootstrapCapabilities(): Promise<BootstrapCapabilitiesResponseDto> {
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
+
     const userProfile = await this.userAuthCacheService.getUserAuthorizationProfile(
       tenantCode,
       userId,
@@ -38,7 +39,7 @@ export class BootstrapAuthorizationService {
 
     for (const roleAssignment of userProfile.roles) {
       // Fetch role details & permissions from Redis / DB
-      let cachedRole = null;
+      let cachedRole;
       try {
         cachedRole = await this.roleCacheService.getRole(tenantCode, roleAssignment.roleId);
       } catch (err) {

@@ -27,7 +27,6 @@ describe('UserGroupRoleAssignmentService', () => {
 
     mockUserGroupRepo = {
       findById: jest.fn(),
-      findFullyById: jest.fn(),
       findByTenantAndId: jest.fn(),
       save: jest.fn().mockImplementation((group) => Promise.resolve(group)),
     } as unknown as jest.Mocked<UserGroupRepository>;

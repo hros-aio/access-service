@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { RequestContextService } from '@new-hros/libs-core';
 
 import { BootstrapAuthorizationService } from './bootstrap-authorization.service';
 import { UserAuthorizationCacheService } from './user-authorization-cache.service';
@@ -17,6 +18,12 @@ describe('BootstrapAuthorizationService', () => {
   const userId = 'user-boot';
 
   beforeEach(async () => {
+    jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue(tenantCode);
+    jest.spyOn(RequestContextService, 'getUser').mockReturnValue({
+      userId,
+      tenantCode,
+    } as unknown as ReturnType<typeof RequestContextService.getUser>);
+
     userAuthCacheService = {
       getUserAuthorizationProfile: jest.fn(),
     };
@@ -39,6 +46,10 @@ describe('BootstrapAuthorizationService', () => {
     }).compile();
 
     service = module.get<BootstrapAuthorizationService>(BootstrapAuthorizationService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   it('should return cumulative deduplicated permissions, modules, and version', async () => {
@@ -70,7 +81,7 @@ describe('BootstrapAuthorizationService', () => {
       return Promise.resolve(null);
     });
 
-    const result = await service.getBootstrapCapabilities(tenantCode, userId);
+    const result = await service.getBootstrapCapabilities();
 
     expect(result.authorizationVersion).toBe(4);
     expect(result.permissions.sort()).toEqual(
@@ -86,7 +97,7 @@ describe('BootstrapAuthorizationService', () => {
       roles: [],
     });
 
-    const result = await service.getBootstrapCapabilities(tenantCode, userId);
+    const result = await service.getBootstrapCapabilities();
 
     expect(result.authorizationVersion).toBe(1);
     expect(result.permissions).toEqual([]);

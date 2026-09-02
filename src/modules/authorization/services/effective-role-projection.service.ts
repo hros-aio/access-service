@@ -10,6 +10,8 @@ import {
   UserEffectiveRoleRepository,
 } from '../repositories/user-effective-role.repository';
 
+import { UserGroupStatus } from '@/modules/user-groups';
+
 export interface RecomputeResult {
   inserted: number;
   deleted: number;
@@ -38,18 +40,18 @@ export class EffectiveRoleProjectionService {
     const memoryRoles: EffectiveUserRole[] = [];
 
     for (const membership of activeMemberships) {
-      const group = await this.userGroupRepo.findFullyById(membership.groupId);
-      if (!group || group.status !== 'ACTIVE') {
+      const group = await this.userGroupRepo.findById(membership.groupId);
+      if (!group || group.status !== UserGroupStatus.ACTIVE) {
         continue;
       }
 
-      const roles = await this.userGroupRoleRepo.findRolesByGroupId(membership.groupId);
-      for (const role of roles) {
+      const userGroupRoles = await this.userGroupRoleRepo.findByGroup(membership.groupId);
+      for (const ugRole of userGroupRoles) {
         const scopeType = group.scopeType as EffectiveUserRole['scope']['type'];
         const scopeRefId = group.scopeRefId || null;
 
         targetEntries.push({
-          roleId: role.roleId,
+          roleId: ugRole.roleId,
           sourceGroupId: group.id,
           scope: {
             type: scopeType,
@@ -58,7 +60,7 @@ export class EffectiveRoleProjectionService {
         });
 
         memoryRoles.push({
-          roleId: role.roleId,
+          roleId: ugRole.roleId,
           sourceGroupId: group.id,
           scope: {
             type: scopeType,
@@ -72,14 +74,10 @@ export class EffectiveRoleProjectionService {
 
     if (targetEntries.length === 0) {
       // Zero matching active groups: remove all effective roles
-      const deletedCount = await this.effectiveRoleRepo.deleteByEmployee(tenantCode, employeeId);
+      const deletedCount = await this.effectiveRoleRepo.deleteByEmployee(employeeId);
       diff = { inserted: 0, deleted: deletedCount };
     } else {
-      diff = await this.effectiveRoleRepo.syncUserEffectiveRoles(
-        tenantCode,
-        employeeId,
-        targetEntries,
-      );
+      diff = await this.effectiveRoleRepo.syncUserEffectiveRoles(employeeId, targetEntries);
     }
 
     // Sync to Redis user authorization cache

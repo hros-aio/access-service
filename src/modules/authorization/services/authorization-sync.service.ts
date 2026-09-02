@@ -33,16 +33,7 @@ export class AuthorizationSyncService {
     triggerType: SyncTriggerType = SyncTriggerType.MANUAL,
   ): Promise<SyncJobResponseDto> {
     const tenantCode = RequestContextService.getTenantCode();
-    let userId: string | undefined;
-    try {
-      userId = RequestContextService.getUser()?.userId;
-    } catch {
-      userId = undefined;
-    }
-
-    if (!tenantCode) {
-      throw new Error('Tenant code is missing from active RequestContext');
-    }
+    const userId = RequestContextService.getUser().userId;
 
     return this.enqueueSyncJob({
       tenantCode,
@@ -81,33 +72,24 @@ export class AuthorizationSyncService {
     let projectionVersion = 0;
 
     if (!ignoreValidateSource) {
-      const versions = await this.validateAndResolveSourceVersions(
-        tenantCode,
-        sourceType,
-        sourceId,
-      );
+      const versions = await this.validateAndResolveSourceVersions(sourceType, sourceId);
       sourceVersion = versions.sourceVersion;
       projectionVersion = versions.projectionVersion;
+
+      // Idempotent No-Op check: already synchronized
+      if (sourceVersion <= projectionVersion) {
+        return SyncJobResponseDto.completedValue({
+          tenantCode,
+          sourceType,
+          sourceId,
+          sourceVersion,
+          triggerType,
+        });
+      }
     }
 
-    // 1. Idempotent No-Op check: already synchronized
-    if (sourceVersion <= projectionVersion) {
-      return SyncJobResponseDto.completedValue({
-        tenantCode,
-        sourceType,
-        sourceId,
-        sourceVersion,
-        triggerType,
-      });
-    }
-
-    // 2. Check for in-flight job
-    const inFlightJob = await this.syncJobRepo.findInFlightJob(
-      tenantCode,
-      sourceType,
-      sourceId,
-      sourceVersion,
-    );
+    // Check for in-flight job
+    const inFlightJob = await this.syncJobRepo.findInFlightJob(sourceType, sourceId, sourceVersion);
 
     if (inFlightJob) {
       return SyncJobResponseDto.fromEntity(
@@ -188,7 +170,6 @@ export class AuthorizationSyncService {
         `Unique constraint race condition caught for sync job: ${tenantCode}/${sourceType}/${sourceId}/${sourceVersion}`,
       );
       const existingJob = await this.syncJobRepo.findInFlightJob(
-        tenantCode,
         sourceType,
         sourceId,
         sourceVersion,
@@ -205,16 +186,7 @@ export class AuthorizationSyncService {
   }
 
   async getJobStatus(jobId: string): Promise<SyncJobResponseDto> {
-    const tenantCode = RequestContextService.getTenantCode();
-    if (!tenantCode) {
-      throw new Error('Tenant code is missing from active RequestContext');
-    }
-
-    const job = await this.syncJobRepo.findByIdAndTenant(tenantCode, jobId);
-    if (!job) {
-      throw new NotFoundException(`Sync job with id ${jobId} not found`);
-    }
-
+    const job = await this.syncJobRepo.findById(jobId, { required: true });
     return SyncJobResponseDto.fromEntity(job, false, 'Job status retrieved successfully');
   }
 
@@ -227,7 +199,6 @@ export class AuthorizationSyncService {
     }
 
     const { sourceVersion, projectionVersion } = await this.validateAndResolveSourceVersions(
-      tenantCode,
       sourceType,
       sourceId,
     );
@@ -236,12 +207,7 @@ export class AuthorizationSyncService {
       throw new BadRequestException('No failed synchronization found for this entity');
     }
 
-    const inFlightJob = await this.syncJobRepo.findInFlightJob(
-      tenantCode,
-      sourceType,
-      sourceId,
-      sourceVersion,
-    );
+    const inFlightJob = await this.syncJobRepo.findInFlightJob(sourceType, sourceId, sourceVersion);
     if (inFlightJob) {
       return SyncJobResponseDto.fromEntity(
         inFlightJob,
@@ -262,15 +228,11 @@ export class AuthorizationSyncService {
   }
 
   async validateAndResolveSourceVersions(
-    tenantCode: string,
     sourceType: SyncSourceType,
     sourceId: string,
   ): Promise<{ sourceVersion: number; projectionVersion: number }> {
     if (sourceType === SyncSourceType.USER_GROUP) {
-      const group = await this.userGroupRepo.findFullyById(sourceId);
-      if (!group) {
-        throw new NotFoundException(`User Group with id ${sourceId} not found`);
-      }
+      const group = await this.userGroupRepo.findById(sourceId, { required: true });
       return {
         sourceVersion: group.version,
         projectionVersion: group.projectionVersion ?? 0,
@@ -278,10 +240,7 @@ export class AuthorizationSyncService {
     }
 
     if (sourceType === SyncSourceType.ROLE) {
-      const role = await this.roleRepo.findById(sourceId);
-      if (!role) {
-        throw new NotFoundException(`Role with id ${sourceId} not found`);
-      }
+      const role = await this.roleRepo.findById(sourceId, { required: true });
       return {
         sourceVersion: role.version,
         projectionVersion: role.projectionVersion ?? 0,
