@@ -1,6 +1,5 @@
-import { Controller, Get, Req, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { RequestContext } from '@new-hros/libs-core';
 
 import { BootstrapCapabilitiesResponseDto } from '../dto/bootstrap-capabilities-response.dto';
 import { BootstrapAuthorizationService } from '../services/bootstrap-authorization.service';
@@ -24,20 +23,7 @@ export class BootstrapAuthorizationController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 503, description: 'Authorization store unavailable' })
-  async getCapabilities(
-    @Req() request: RequestContext,
-  ): Promise<{ success: boolean; data: BootstrapCapabilitiesResponseDto }> {
-    const tenantCode = request.tenantCode;
-    const userId = request.user?.userId;
-
-    if (!tenantCode || !userId) {
-      throw new UnauthorizedException('Authentication context is missing or invalid.');
-    }
-
-    const data = await this.bootstrapService.getBootstrapCapabilities(tenantCode, userId);
-    return {
-      success: true,
-      data,
-    };
+  async getCapabilities(): Promise<BootstrapCapabilitiesResponseDto> {
+    return this.bootstrapService.getBootstrapCapabilities();
   }
 }

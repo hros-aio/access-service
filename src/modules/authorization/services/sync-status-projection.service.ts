@@ -39,13 +39,8 @@ export class SyncStatusProjectionService {
       sourceId,
     );
 
-    const latestJob = await this.syncJobRepo.findLatestJobBySource(
-      tenantCode,
-      sourceType,
-      sourceId,
-    );
+    const latestJob = await this.syncJobRepo.findLatestJobBySource(sourceType, sourceId);
     const latestCompletedJob = await this.syncJobRepo.findLatestCompletedJobBySource(
-      tenantCode,
       sourceType,
       sourceId,
     );
@@ -105,7 +100,6 @@ export class SyncStatusProjectionService {
 
     for (const entity of entities) {
       const latestJob = await this.syncJobRepo.findLatestJobBySource(
-        tenantCode,
         entity.sourceType,
         entity.sourceId,
       );

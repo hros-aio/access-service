@@ -25,7 +25,7 @@ export class UserAuthorizationCacheService {
   ): Promise<UserAuthorizationProfile> {
     let roles = explicitRoles;
     if (!roles) {
-      const dbRows = await this.effectiveRoleRepo.findByEmployee(tenantCode, userId);
+      const dbRows = await this.effectiveRoleRepo.findByEmployee(userId);
       roles = dbRows.map((r) => ({
         roleId: r.roleId,
         sourceGroupId: r.sourceGroupId,

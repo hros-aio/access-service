@@ -26,7 +26,7 @@ describe('EffectiveRoleProjectionService', () => {
       findFullyById: jest.fn(),
     };
     userGroupRoleRepo = {
-      findRolesByGroupId: jest.fn(),
+      findByGroup: jest.fn(),
     };
     membershipRepo = {
       findMembershipsByEmployee: jest.fn(),
@@ -61,7 +61,7 @@ describe('EffectiveRoleProjectionService', () => {
         { tenantCode, employeeId, groupId: 'group-b' } as UserGroupMembership,
       ]);
 
-    userGroupRepo.findFullyById = jest.fn().mockImplementation((id: string) => {
+    userGroupRepo.findById = jest.fn().mockImplementation((id: string) => {
       if (id === 'group-a') {
         return Promise.resolve({
           id: 'group-a',
@@ -81,7 +81,7 @@ describe('EffectiveRoleProjectionService', () => {
       return Promise.resolve(null);
     });
 
-    userGroupRoleRepo.findRolesByGroupId = jest.fn().mockImplementation((id: string) => {
+    userGroupRoleRepo.findByGroup = jest.fn().mockImplementation((id: string) => {
       if (id === 'group-a') {
         return Promise.resolve([{ roleId: 'role-employee' } as UserGroupRole]);
       }
@@ -94,7 +94,7 @@ describe('EffectiveRoleProjectionService', () => {
     const result = await service.recomputeUserEffectiveRoles(tenantCode, employeeId);
 
     expect(result.activeRolesCount).toBe(2);
-    expect(effectiveRoleRepo.syncUserEffectiveRoles).toHaveBeenCalledWith(tenantCode, employeeId, [
+    expect(effectiveRoleRepo.syncUserEffectiveRoles).toHaveBeenCalledWith(employeeId, [
       {
         roleId: 'role-employee',
         sourceGroupId: 'group-a',
@@ -122,7 +122,7 @@ describe('EffectiveRoleProjectionService', () => {
     const result = await service.recomputeUserEffectiveRoles(tenantCode, employeeId);
 
     expect(result.activeRolesCount).toBe(0);
-    expect(effectiveRoleRepo.deleteByEmployee).toHaveBeenCalledWith(tenantCode, employeeId);
+    expect(effectiveRoleRepo.deleteByEmployee).toHaveBeenCalledWith(employeeId);
     expect(cacheService.syncUserCache).toHaveBeenCalledWith(tenantCode, employeeId, []);
   });
 });

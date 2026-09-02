@@ -29,7 +29,7 @@ describe('MembershipReconciler', () => {
       updateProjectionVersion: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRepository>;
     mockUserGroupRoleRepo = {
-      findRolesByGroupId: jest.fn(),
+      findByGroup: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRoleRepository>;
     mockMembershipRepo = {
       findMembershipsByEmployee: jest.fn(),
@@ -58,13 +58,13 @@ describe('MembershipReconciler', () => {
 
   it('reconcileSingleEmployee adds new groups and syncs roles', async () => {
     mockMembershipRepo.findMembershipsByEmployee.mockResolvedValueOnce([]);
-    mockUserGroupRepo.findFullyById.mockResolvedValueOnce({
+    mockUserGroupRepo.findById.mockResolvedValueOnce({
       id: 'grp-1',
       status: 'ACTIVE',
       scopeType: 'DEPARTMENT',
       scopeRefId: 'dept-1',
     } as unknown as UserGroup);
-    mockUserGroupRoleRepo.findRolesByGroupId.mockResolvedValueOnce([
+    mockUserGroupRoleRepo.findByGroup.mockResolvedValueOnce([
       { roleId: 'role-1' } as UserGroupRole,
     ]);
 

@@ -204,7 +204,7 @@ describe('SyncStatusProjectionService', () => {
 
       // Return mock jobs for each entity
       (mockSyncJobRepo.findLatestJobBySource as jest.Mock).mockImplementation(
-        async (_tenant, _sourceType, sourceId) => {
+        async (sourceType, sourceId) => {
           if (sourceId === 'ug-1') {
             return { id: 'j1', status: SyncJobStatus.COMPLETED } as unknown as AuthorizationSyncJob;
           }

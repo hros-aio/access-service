@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
-import { DeepPartial, In, LessThan } from 'typeorm';
+import { In, LessThan } from 'typeorm';
 
 import {
   AuthorizationSyncJob,
@@ -14,86 +14,71 @@ export class AuthorizationSyncJobRepository extends BaseRepository<Authorization
     super(AuthorizationSyncJob, transactionService);
   }
 
-  async create(data: DeepPartial<AuthorizationSyncJob>): Promise<AuthorizationSyncJob> {
-    const entity = this.repository.create(data);
-    return this.repository.save(entity);
-  }
-
-  async findByIdAndTenant(tenantCode: string, id: string): Promise<AuthorizationSyncJob | null> {
-    return this.repository.findOne({
-      where: { tenantCode, id },
-    });
-  }
-
   async findInFlightJob(
-    tenantCode: string,
     sourceType: SyncSourceType,
     sourceId: string,
     sourceVersion: number,
   ): Promise<AuthorizationSyncJob | null> {
-    return this.repository.findOne({
-      where: {
-        tenantCode,
-        sourceType,
-        sourceId,
-        sourceVersion,
-        status: In([SyncJobStatus.PENDING, SyncJobStatus.PROCESSING]),
-      },
+    return this.findOne({
+      sourceType,
+      sourceId,
+      sourceVersion,
+      status: In([SyncJobStatus.PENDING, SyncJobStatus.PROCESSING]),
     });
   }
 
   async findLatestJobBySource(
-    tenantCode: string,
     sourceType: SyncSourceType,
     sourceId: string,
   ): Promise<AuthorizationSyncJob | null> {
-    return this.repository.findOne({
-      where: {
-        tenantCode,
+    return this.findOne(
+      {
         sourceType,
         sourceId,
       },
-      order: {
-        createdAt: 'DESC',
+      {
+        order: {
+          createdAt: 'DESC',
+        },
       },
-    });
+    );
   }
 
   async findLatestCompletedJobBySource(
-    tenantCode: string,
     sourceType: SyncSourceType,
     sourceId: string,
   ): Promise<AuthorizationSyncJob | null> {
-    return this.repository.findOne({
-      where: {
-        tenantCode,
+    return this.findOne(
+      {
         sourceType,
         sourceId,
         status: SyncJobStatus.COMPLETED,
       },
-      order: {
-        completedAt: 'DESC',
-        createdAt: 'DESC',
+      {
+        order: {
+          completedAt: 'DESC',
+          createdAt: 'DESC',
+        },
       },
-    });
+    );
   }
 
   async findActiveJobBySource(
-    tenantCode: string,
     sourceType: SyncSourceType,
     sourceId: string,
   ): Promise<AuthorizationSyncJob | null> {
-    return this.repository.findOne({
-      where: {
-        tenantCode,
+    return this.findOne(
+      {
         sourceType,
         sourceId,
         status: In([SyncJobStatus.PENDING, SyncJobStatus.PROCESSING]),
       },
-      order: {
-        createdAt: 'DESC',
+      {
+        order: {
+          createdAt: 'DESC',
+        },
       },
-    });
+    );
   }
 
   async claimNextPendingJob(tenantCode: string): Promise<AuthorizationSyncJob | null> {
@@ -129,24 +114,22 @@ export class AuthorizationSyncJobRepository extends BaseRepository<Authorization
   }
 
   async updateProgress(id: string, processedUsers: number, totalUsers?: number): Promise<void> {
-    const updateData: Record<string, unknown> = {
-      processedUsers,
-    };
+    const updateData = new AuthorizationSyncJob();
+    updateData.processedUsers = processedUsers;
     if (totalUsers !== undefined) {
       updateData.totalUsers = totalUsers;
     }
-    await this.repository.update({ id }, updateData as object);
+    await this.update(id, updateData);
   }
 
   async markCompleted(id: string, processedUsers?: number): Promise<void> {
-    const updateData: Record<string, unknown> = {
-      status: SyncJobStatus.COMPLETED,
-      completedAt: new Date(),
-    };
+    const updateData = new AuthorizationSyncJob();
+    updateData.status = SyncJobStatus.COMPLETED;
+    updateData.completedAt = new Date();
     if (processedUsers !== undefined) {
       updateData.processedUsers = processedUsers;
     }
-    await this.repository.update({ id }, updateData as object);
+    await this.update(id, updateData);
   }
 
   async markFailed(
@@ -154,15 +137,14 @@ export class AuthorizationSyncJobRepository extends BaseRepository<Authorization
     errorDetails: Record<string, unknown>,
     processedUsers?: number,
   ): Promise<void> {
-    const updateData: Record<string, unknown> = {
-      status: SyncJobStatus.FAILED,
-      completedAt: new Date(),
-      errorDetails,
-    };
+    const updateData = new AuthorizationSyncJob();
+    updateData.status = SyncJobStatus.FAILED;
+    updateData.completedAt = new Date();
+    updateData.errorDetails = errorDetails;
     if (processedUsers !== undefined) {
       updateData.processedUsers = processedUsers;
     }
-    await this.repository.update({ id }, updateData as object);
+    await this.update(id, updateData);
   }
 
   async findStuckProcessingJobs(timeoutMinutes = 10): Promise<AuthorizationSyncJob[]> {
@@ -179,13 +161,10 @@ export class AuthorizationSyncJobRepository extends BaseRepository<Authorization
   }
 
   async reclaimStuckJob(id: string, nextRetryCount: number): Promise<void> {
-    await this.repository.update(
-      { id },
-      {
-        status: SyncJobStatus.PENDING,
-        retryCount: nextRetryCount,
-        startedAt: null,
-      },
-    );
+    const updateData = new AuthorizationSyncJob();
+    updateData.status = SyncJobStatus.PENDING;
+    updateData.retryCount = nextRetryCount;
+    updateData.startedAt = null;
+    await this.update(id, updateData);
   }
 }

@@ -18,33 +18,32 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
     super(UserEffectiveRoleEntity, transactionService);
   }
 
-  async findByEmployee(tenantCode: string, employeeId: string): Promise<UserEffectiveRoleEntity[]> {
-    return this.repository.find({
-      where: { tenantCode, employeeId },
+  async findByEmployee(employeeId: string): Promise<UserEffectiveRoleEntity[]> {
+    return this.find({
+      employeeId,
     });
   }
 
-  async deleteByEmployee(tenantCode: string, employeeId: string): Promise<number> {
-    const result = await this.repository.delete({ tenantCode, employeeId });
+  async deleteByEmployee(employeeId: string): Promise<number> {
+    const result = await this.repository.delete({ tenantCode: this.tenantCode, employeeId });
     return result.affected || 0;
   }
 
-  async deleteByTenantAndIds(tenantCode: string, ids: string[]): Promise<void> {
+  async deleteByIds(ids: string[]): Promise<void> {
     if (!ids || ids.length === 0) return;
 
     await this.repository.delete({
-      tenantCode,
+      tenantCode: this.tenantCode,
       id: In(ids),
     });
   }
 
   async syncUserEffectiveRoles(
-    tenantCode: string,
     employeeId: string,
     targetEntries: PersistUserEffectiveRoleEntry[],
   ): Promise<{ inserted: number; deleted: number }> {
-    const currentRows = await this.repository.find({
-      where: { tenantCode, employeeId },
+    const currentRows = await this.find({
+      employeeId,
     });
 
     const currentMap = new Map(currentRows.map((r) => [GenerateUserEffectiveRoleKey(r), r]));
@@ -76,12 +75,12 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
     }
 
     if (toDeleteIds.length > 0) {
-      await this.deleteByTenantAndIds(tenantCode, toDeleteIds);
+      await this.deleteByIds(toDeleteIds);
     }
 
     if (toInsert.length > 0) {
       const entities = toInsert.map((item) => ({
-        tenantCode,
+        tenantCode: this.tenantCode,
         employeeId,
         roleId: item.roleId,
         sourceGroupId: item.sourceGroupId,

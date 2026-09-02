@@ -3,6 +3,7 @@ import { TransactionService } from '@new-hros/libs-sql';
 
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { UserGroupStatus } from '../domain/enums';
 import {
   UserEffectiveRoleEntry,
   UserEffectiveRoleRepository,
@@ -84,10 +85,10 @@ export class MembershipReconciler {
     // Recalculate effective roles across all currently matching groups
     const targetRoles: UserEffectiveRoleEntry[] = [];
     for (const gid of targetMatchingGroupIds) {
-      const group = await this.userGroupRepo.findFullyById(gid);
-      if (!group || group.status !== 'ACTIVE') continue;
+      const group = await this.userGroupRepo.findById(gid);
+      if (!group || group.status !== UserGroupStatus.ACTIVE) continue;
 
-      const roles = await this.userGroupRoleRepo.findRolesByGroupId(gid);
+      const roles = await this.userGroupRoleRepo.findByGroup(gid);
       for (const r of roles) {
         targetRoles.push({
           roleId: r.roleId,
@@ -172,9 +173,9 @@ export class MembershipReconciler {
         const targetRoles: UserEffectiveRoleEntry[] = [];
         for (const m of empMemberships) {
           const g = await this.userGroupRepo.findFullyById(m.groupId);
-          if (!g || g.status !== 'ACTIVE') continue;
+          if (!g || g.status !== UserGroupStatus.ACTIVE) continue;
 
-          const gRoles = await this.userGroupRoleRepo.findRolesByGroupId(m.groupId);
+          const gRoles = await this.userGroupRoleRepo.findByGroup(m.groupId);
           for (const gr of gRoles) {
             targetRoles.push({
               roleId: gr.roleId,
