@@ -35,24 +35,24 @@ export class RoleRepository extends BaseRepository<Role> {
     return this.findOne({ name });
   }
 
-  async countActiveUserReach(roleId: string, tenantCode: string): Promise<number> {
+  async countActiveUserReach(roleId: string): Promise<number> {
     const result = await this.transactionService
       .getManager()
       .query(
         `SELECT COUNT(DISTINCT user_id) as count FROM user_effective_roles WHERE role_id = $1 AND tenant_code = $2`,
-        [roleId, tenantCode],
+        [roleId, this.tenantCode],
       )
       .catch(() => [{ count: 0 }]);
 
     return parseInt(result[0]?.count ?? '0', 10);
   }
 
-  async countAssignedUserGroups(roleId: string, tenantCode: string): Promise<number> {
+  async countAssignedUserGroups(roleId: string): Promise<number> {
     const result = await this.transactionService
       .getManager()
       .query(
         `SELECT COUNT(DISTINCT user_group_id) as count FROM user_group_roles WHERE role_id = $1 AND tenant_code = $2`,
-        [roleId, tenantCode],
+        [roleId, this.tenantCode],
       )
       .catch(() => [{ count: 0 }]);
 
@@ -88,11 +88,10 @@ export class RoleRepository extends BaseRepository<Role> {
 
   async countAssignedUserGroupAndUser(
     roleId: string,
-    tenantCode: string,
   ): Promise<{ assignedUserGroupCount: number; activeUserReachCount: number }> {
     const [assignedUserGroupCount, activeUserReachCount] = await Promise.all([
-      this.countAssignedUserGroups(roleId, tenantCode),
-      this.countActiveUserReach(roleId, tenantCode),
+      this.countAssignedUserGroups(roleId),
+      this.countActiveUserReach(roleId),
     ]);
 
     return { assignedUserGroupCount, activeUserReachCount };

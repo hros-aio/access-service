@@ -72,7 +72,7 @@ describe('ImpactAnalysisService', () => {
       const result = await service.previewRoleImpact('role-1', {});
 
       expect(result.targetType).toBe('ROLE');
-      expect(roleRepoMock.countActiveUserReach).toHaveBeenCalledWith('role-1', 'TENANT_A');
+      expect(roleRepoMock.countActiveUserReach).toHaveBeenCalledWith('role-1');
       expect(result.estimate.totalAffected).toBe(150);
       expect(result.estimate.isHighImpact).toBe(true);
       expect(result.requiresConfirmation).toBe(true);

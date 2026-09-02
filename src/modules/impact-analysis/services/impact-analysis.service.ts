@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RequestContextService } from '@new-hros/libs-core';
 
 import { RoleRepository } from '../../roles/repositories/role.repository';
 import { MatchingRuleValidator } from '../../user-groups/domain/validators/matching-rule.validator';
@@ -39,11 +38,9 @@ export class ImpactAnalysisService {
     dto: PreviewRoleImpactDto,
     threshold = DEFAULT_HIGH_IMPACT_THRESHOLD,
   ): Promise<ImpactAnalysisResult> {
-    const tenantCode = RequestContextService.getTenantCode();
-
     const role = await this.roleRepo.findById(roleId, { required: true });
 
-    const reachCount = await this.roleRepo.countActiveUserReach(role.id, tenantCode);
+    const reachCount = await this.roleRepo.countActiveUserReach(role.id);
     const coverageLoss = await this.checkCriticalCapabilityCoverageLoss(role.id);
 
     const estimate: ImpactEstimate = {

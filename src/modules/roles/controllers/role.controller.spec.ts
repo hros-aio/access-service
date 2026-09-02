@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { RoleController } from './role.controller';
 import { RoleResponseDto } from '../dto/role.dto';
+import { Role } from '../entities/role.entity';
 import { RoleStatus, RoleType } from '../interfaces/system-role-template.interface';
 import { RoleApplicationService } from '../services/role.application.service';
 
@@ -59,76 +60,110 @@ describe('RoleController', () => {
 
   describe('getRoleById', () => {
     it('should delegate to roleApplicationService.getById', async () => {
-      const mockRole = { id: 'role-1', name: 'Admin' } as RoleResponseDto;
+      const mockRole = {
+        id: 'role-1',
+        name: 'Admin',
+        tenantCode: 'tenant-1',
+        type: RoleType.SYSTEM,
+        status: RoleStatus.ACTIVE,
+        version: 1,
+        permissions: [],
+        assignedUserGroupCount: 0,
+        activeUserReachCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as Role;
       mockRoleApplicationService.getById!.mockResolvedValue(mockRole);
 
       const result = await controller.getRoleById('role-1');
 
       expect(mockRoleApplicationService.getById).toHaveBeenCalledWith('role-1');
-      expect(result).toEqual(mockRole);
+      expect(result).toEqual(RoleResponseDto.fromRole(mockRole));
     });
   });
 
   describe('createCustomRole', () => {
     it('should delegate to roleApplicationService.createCustom', async () => {
       const dto = { name: 'Custom', permissionCodes: ['perm.1'] };
-      const mockRole = { id: 'role-1', name: 'Custom' } as RoleResponseDto;
+      const mockRole = {
+        id: 'role-1',
+        name: 'Custom',
+        tenantCode: 'tenant-1',
+        type: RoleType.CUSTOM,
+        status: RoleStatus.ACTIVE,
+        version: 1,
+        permissions: [],
+        assignedUserGroupCount: 0,
+        activeUserReachCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as Role;
       mockRoleApplicationService.createCustom!.mockResolvedValue(mockRole);
 
       const result = await controller.createCustomRole(dto);
 
       expect(mockRoleApplicationService.createCustom).toHaveBeenCalledWith(dto);
-      expect(result).toEqual(mockRole);
+      expect(result).toEqual(RoleResponseDto.fromRole(mockRole));
     });
   });
 
   describe('copyRole', () => {
     it('should delegate to roleApplicationService.copy', async () => {
       const dto = { name: 'Cloned Role' };
-      const mockRole = { id: 'role-2', name: 'Cloned Role' } as RoleResponseDto;
+      const mockRole = {
+        id: 'role-2',
+        name: 'Cloned Role',
+        tenantCode: 'tenant-1',
+        type: RoleType.CUSTOM,
+        status: RoleStatus.ACTIVE,
+        version: 1,
+        permissions: [],
+        assignedUserGroupCount: 0,
+        activeUserReachCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as Role;
       mockRoleApplicationService.copy!.mockResolvedValue(mockRole);
 
       const result = await controller.copyRole('role-1', dto);
 
       expect(mockRoleApplicationService.copy).toHaveBeenCalledWith('role-1', dto);
-      expect(result).toEqual(mockRole);
+      expect(result).toEqual(RoleResponseDto.fromRole(mockRole));
     });
   });
 
   describe('estimateImpact', () => {
     it('should delegate to roleApplicationService.estimateImpact', async () => {
-      const mockImpact = {
-        roleId: 'role-1',
-        assignedUserGroupCount: 1,
-        activeUserReachCount: 10,
-        isUnassigned: false,
-      };
+      const mockImpact: [number, number] = [1, 10];
       mockRoleApplicationService.estimateImpact!.mockResolvedValue(mockImpact);
 
       const result = await controller.estimateImpact('role-1');
 
       expect(mockRoleApplicationService.estimateImpact).toHaveBeenCalledWith('role-1');
-      expect(result).toEqual(mockImpact);
+      expect(result).toEqual({
+        assignedUserGroupCount: 1,
+        activeUserReachCount: 10,
+      });
     });
   });
 
   describe('updateRolePermissions', () => {
     it('should delegate to roleApplicationService.updatePermissions', async () => {
-      const mockResult = {
-        role: {
-          id: 'role-1',
-          name: 'Custom Admin',
-          tenantCode: 'TENANT_01',
-          type: RoleType.CUSTOM,
-          status: RoleStatus.ACTIVE,
-          version: 2,
-          permissions: [{ permissionCode: 'users.read', isProtected: false }],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        } as RoleResponseDto,
-      };
+      const mockRole = {
+        id: 'role-1',
+        name: 'Custom Admin',
+        tenantCode: 'TENANT_01',
+        type: RoleType.CUSTOM,
+        status: RoleStatus.ACTIVE,
+        version: 2,
+        permissions: [{ permissionCode: 'users.read', isProtected: false }],
+        assignedUserGroupCount: 1,
+        activeUserReachCount: 5,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as Role;
 
-      mockRoleApplicationService.updatePermissions!.mockResolvedValue(mockResult);
+      mockRoleApplicationService.updatePermissions!.mockResolvedValue(mockRole);
 
       const result = await controller.updateRolePermissions('role-1', {
         permissionCodes: ['users.read'],
@@ -139,7 +174,7 @@ describe('RoleController', () => {
         permissionCodes: ['users.read'],
         version: 1,
       });
-      expect(result).toEqual(mockResult);
+      expect(result).toEqual(RoleResponseDto.fromRole(mockRole));
     });
   });
 
