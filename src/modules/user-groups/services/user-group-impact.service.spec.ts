@@ -25,6 +25,7 @@ describe('UserGroupImpactService', () => {
     jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue(tenantCode);
 
     userGroupRepo = {
+      findById: jest.fn(),
       findByTenantAndId: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRepository>;
 
@@ -47,7 +48,7 @@ describe('UserGroupImpactService', () => {
 
   describe('estimateRoleAssignmentImpact', () => {
     it('should return 0 impact if group does not exist', async () => {
-      userGroupRepo.findByTenantAndId.mockResolvedValue(null);
+      userGroupRepo.findById.mockResolvedValue(null);
 
       const result = await service.estimateRoleAssignmentImpact(userGroupId, ['role-1']);
 
@@ -62,7 +63,7 @@ describe('UserGroupImpactService', () => {
     it('should return 0 impact if target roles match current roles exactly', async () => {
       const mockGroup = new UserGroup();
       mockGroup.id = userGroupId;
-      userGroupRepo.findByTenantAndId.mockResolvedValue(mockGroup);
+      userGroupRepo.findById.mockResolvedValue(mockGroup);
 
       const ugr1 = new UserGroupRole();
       ugr1.roleId = 'role-1';
@@ -81,7 +82,7 @@ describe('UserGroupImpactService', () => {
     it('should calculate affected users and zero-role users on role unassignment', async () => {
       const mockGroup = new UserGroup();
       mockGroup.id = userGroupId;
-      userGroupRepo.findByTenantAndId.mockResolvedValue(mockGroup);
+      userGroupRepo.findById.mockResolvedValue(mockGroup);
 
       const ugr1 = new UserGroupRole();
       ugr1.roleId = 'role-1';
@@ -103,7 +104,7 @@ describe('UserGroupImpactService', () => {
 
   describe('estimateScopeImpact', () => {
     it('should throw UserGroupNotFoundError if user group does not exist', async () => {
-      userGroupRepo.findByTenantAndId.mockResolvedValue(null);
+      userGroupRepo.findById.mockResolvedValue(null);
 
       await expect(
         service.estimateScopeImpact(userGroupId, ScopeType.DEPARTMENT, 'dept-1'),
@@ -114,7 +115,7 @@ describe('UserGroupImpactService', () => {
       const mockGroup = new UserGroup();
       mockGroup.id = userGroupId;
       mockGroup.scopeType = ScopeType.SELF;
-      userGroupRepo.findByTenantAndId.mockResolvedValue(mockGroup);
+      userGroupRepo.findById.mockResolvedValue(mockGroup);
 
       await expect(
         service.estimateScopeImpact(userGroupId, ScopeType.DEPARTMENT, null),
@@ -126,7 +127,7 @@ describe('UserGroupImpactService', () => {
       mockGroup.id = userGroupId;
       mockGroup.scopeType = ScopeType.SELF;
       mockGroup.scopeRefId = undefined;
-      userGroupRepo.findByTenantAndId.mockResolvedValue(mockGroup);
+      userGroupRepo.findById.mockResolvedValue(mockGroup);
       membershipRepo.countByGroup.mockResolvedValue(45);
 
       const result = await service.estimateScopeImpact(userGroupId, ScopeType.COMPANY, 'comp-10');
@@ -152,7 +153,7 @@ describe('UserGroupImpactService', () => {
       mockGroup.id = userGroupId;
       mockGroup.scopeType = ScopeType.DEPARTMENT;
       mockGroup.scopeRefId = 'dept-01';
-      userGroupRepo.findByTenantAndId.mockResolvedValue(mockGroup);
+      userGroupRepo.findById.mockResolvedValue(mockGroup);
       membershipRepo.countByGroup.mockResolvedValue(5000);
 
       const result = await service.estimateScopeImpact(userGroupId, ScopeType.TENANT_WIDE);

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
+import { In } from 'typeorm';
 
 import { UserGroupRole } from '../entities/user-group-role.entity';
 
@@ -9,36 +10,42 @@ export class UserGroupRoleRepository extends BaseRepository<UserGroupRole> {
     super(UserGroupRole, transactionService);
   }
 
-  async findByGroup(tenantCode: string, userGroupId: string): Promise<UserGroupRole[]> {
-    return this.repository.find({
-      where: { tenantCode, userGroupId },
-      relations: ['role'],
-    });
+  async findRoleIdsByGroupId(userGroupId: string): Promise<string[]> {
+    return this.find(
+      {
+        userGroupId,
+      },
+      { onlyIds: true },
+    );
   }
 
-  async findRolesByGroupId(tenantCode: string, userGroupId: string): Promise<UserGroupRole[]> {
-    return this.findByGroup(tenantCode, userGroupId);
+  async findByGroup(userGroupId: string): Promise<UserGroupRole[]> {
+    return this.find(
+      {
+        userGroupId,
+      },
+      {
+        relations: ['role'],
+      },
+    );
   }
 
-  async deleteByGroup(tenantCode: string, userGroupId: string): Promise<void> {
-    await this.repository.delete({ tenantCode, userGroupId });
+  async findRolesByGroupId(userGroupId: string): Promise<UserGroupRole[]> {
+    return this.findByGroup(userGroupId);
   }
 
-  async batchDelete(tenantCode: string, userGroupId: string, roleIds: string[]): Promise<void> {
+  async deleteByGroup(userGroupId: string): Promise<void> {
+    await this.repository.delete({ tenantCode: this.tenantCode, userGroupId });
+  }
+
+  async batchDelete(userGroupId: string, roleIds: string[]): Promise<void> {
     if (roleIds.length === 0) return;
 
-    await this.repository
-      .createQueryBuilder()
-      .delete()
-      .where(
-        'tenantCode = :tenantCode AND userGroupId = :userGroupId AND roleId IN (:...roleIds)',
-        {
-          tenantCode,
-          userGroupId,
-          roleIds,
-        },
-      )
-      .execute();
+    await this.repository.delete({
+      tenantCode: this.tenantCode,
+      userGroupId,
+      roleId: In(roleIds),
+    });
   }
 
   async bulkSave(roles: UserGroupRole[]): Promise<UserGroupRole[]> {

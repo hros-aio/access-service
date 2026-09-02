@@ -1,3 +1,4 @@
+import { UserGroup } from '../../entities';
 import { ScopeType, UserGroupStatus } from '../enums';
 import {
   InvalidScopeError,
@@ -82,8 +83,21 @@ export class UserGroupAggregate {
     });
   }
 
-  public static reconstruct(props: UserGroupProps): UserGroupAggregate {
-    return new UserGroupAggregate(props);
+  public static reconstruct(userGroup: UserGroup, currentRoleIds?: string[]): UserGroupAggregate {
+    return new UserGroupAggregate({
+      id: userGroup.id,
+      tenantCode: userGroup.tenantCode,
+      name: userGroup.name,
+      description: userGroup.description,
+      status: userGroup.status,
+      scopeType: userGroup.scopeType,
+      scopeRefId: userGroup.scopeRefId,
+      matchingRule: userGroup.matchingRule,
+      ruleAttributeKeys: userGroup.ruleAttributeKeys,
+      version: userGroup.version,
+      projectionVersion: userGroup.projectionVersion,
+      assignedRoleIds: currentRoleIds,
+    });
   }
 
   public updateConfiguration(

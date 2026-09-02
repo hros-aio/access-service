@@ -23,7 +23,7 @@ describe('EffectiveRoleProjectionService - Unassignment & Partial Revocation', (
 
   beforeEach(async () => {
     userGroupRepo = {
-      findByTenantAndId: jest.fn(),
+      findFullyById: jest.fn(),
     };
     userGroupRoleRepo = {
       findRolesByGroupId: jest.fn(),
@@ -59,7 +59,7 @@ describe('EffectiveRoleProjectionService - Unassignment & Partial Revocation', (
       .fn()
       .mockResolvedValue([{ tenantCode, employeeId, groupId: 'group-a' } as UserGroupMembership]);
 
-    userGroupRepo.findByTenantAndId = jest.fn().mockResolvedValue({
+    userGroupRepo.findFullyById = jest.fn().mockResolvedValue({
       id: 'group-a',
       status: 'ACTIVE',
       scopeType: 'SELF',

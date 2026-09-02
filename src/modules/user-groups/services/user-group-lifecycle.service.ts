@@ -9,7 +9,6 @@ import {
   ConcurrentModificationError,
   DuplicateUserGroupNameError,
   HighImpactConfirmationRequiredError,
-  UserGroupNotFoundError,
 } from '../domain/exceptions/user-group.exceptions';
 import { MatchingRuleValidator } from '../domain/validators/matching-rule.validator';
 import { CreateUserGroupDto, UpdateUserGroupDto } from '../dto';
@@ -34,17 +33,11 @@ export class UserGroupLifecycleService {
     private readonly userGroupImpactService: UserGroupImpactService,
   ) {}
 
-  async createUserGroup(dto: CreateUserGroupDto): Promise<UserGroup> {
+  async create(dto: CreateUserGroupDto): Promise<UserGroup> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
-    const existing = await this.userGroupRepository.findByTenantAndName(
-      tenantCode,
-      dto.name.trim(),
-    );
-    if (existing) {
-      throw new DuplicateUserGroupNameError(dto.name.trim());
-    }
+    await this.validateName(dto.name, tenantCode);
 
     const aggregate = UserGroupAggregate.create({
       tenantCode,
@@ -59,20 +52,7 @@ export class UserGroupLifecycleService {
     });
 
     return this.transactionService.runInTransaction(async () => {
-      const entity = new UserGroup();
-      entity.tenantCode = aggregate.tenantCode;
-      entity.name = aggregate.name;
-      entity.description = aggregate.description;
-      entity.status = aggregate.status;
-      entity.scopeType = aggregate.scopeType;
-      entity.scopeRefId = aggregate.scopeRefId;
-      entity.matchingRule = aggregate.matchingRule;
-      entity.ruleAttributeKeys = aggregate.ruleAttributeKeys;
-      entity.version = aggregate.version;
-      entity.projectionVersion = aggregate.projectionVersion;
-      entity.createdBy = aggregate.createdBy;
-      entity.updatedBy = aggregate.updatedBy;
-
+      const entity = UserGroup.fromAggregate(aggregate);
       const savedGroup = await this.userGroupRepository.create(entity);
 
       const roleIds = dto.roleIds ?? [];
@@ -101,7 +81,7 @@ export class UserGroupLifecycleService {
       await this.outboxRepository.save(createdOutbox);
       await this.outboxRepository.save(syncOutbox);
 
-      return (await this.userGroupRepository.findByTenantAndId(tenantCode, savedGroup.id))!;
+      return savedGroup;
     });
   }
 
@@ -113,20 +93,16 @@ export class UserGroupLifecycleService {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
-    const existing = await this.userGroupRepository.findByTenantAndId(tenantCode, id);
-    if (!existing) {
-      throw new UserGroupNotFoundError(id);
-    }
-
+    const existing = await this.userGroupRepository.findById(id, {
+      required: true,
+      relations: ['groupRoles'],
+    });
     if (existing.version !== expectedVersion) {
       throw new ConcurrentModificationError();
     }
 
     if (dto.name.trim() !== existing.name) {
-      const nameConflict = await this.userGroupRepository.findByTenantAndName(
-        tenantCode,
-        dto.name.trim(),
-      );
+      const nameConflict = await this.userGroupRepository.findByName(dto.name.trim());
       if (nameConflict && nameConflict.id !== id) {
         throw new DuplicateUserGroupNameError(dto.name.trim());
       }
@@ -135,10 +111,7 @@ export class UserGroupLifecycleService {
     const { ruleAttributeKeys } = MatchingRuleValidator.validate(dto.matchingRule);
 
     // Impact blast radius check
-    const currentMemberCount = await this.userGroupMembershipRepository.countByGroup(
-      tenantCode,
-      id,
-    );
+    const currentMemberCount = await this.userGroupMembershipRepository.countByGroup(id);
     if (currentMemberCount >= this.HIGH_IMPACT_THRESHOLD && dto.confirmed !== true) {
       throw new HighImpactConfirmationRequiredError({
         affectedUserCount: currentMemberCount,
@@ -166,7 +139,7 @@ export class UserGroupLifecycleService {
       const removedRoleIds = currentRoleIds.filter((r) => !newRoleIds.includes(r));
 
       if (removedRoleIds.length > 0) {
-        await this.userGroupRoleRepository.batchDelete(tenantCode, id, removedRoleIds);
+        await this.userGroupRoleRepository.batchDelete(id, removedRoleIds);
       }
 
       if (addedRoleIds.length > 0) {
@@ -194,7 +167,7 @@ export class UserGroupLifecycleService {
       await this.outboxRepository.save(updatedOutbox);
       await this.outboxRepository.save(syncOutbox);
 
-      return existing;
+      return savedGroup;
     });
   }
 
@@ -202,16 +175,12 @@ export class UserGroupLifecycleService {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
-    const existing = await this.userGroupRepository.findByTenantAndId(tenantCode, id);
-    if (!existing) {
-      throw new UserGroupNotFoundError(id);
-    }
-
+    const existing = await this.userGroupRepository.findById(id, { required: true });
     if (existing.version !== expectedVersion) {
       throw new ConcurrentModificationError();
     }
 
-    const memberCount = await this.userGroupMembershipRepository.countByGroup(tenantCode, id);
+    const memberCount = await this.userGroupMembershipRepository.countByGroup(id);
     if (memberCount >= this.HIGH_IMPACT_THRESHOLD && !confirmed) {
       throw new HighImpactConfirmationRequiredError({
         affectedUserCount: memberCount,
@@ -219,20 +188,7 @@ export class UserGroupLifecycleService {
       });
     }
 
-    const aggregate = UserGroupAggregate.reconstruct({
-      id: existing.id,
-      tenantCode: existing.tenantCode,
-      name: existing.name,
-      description: existing.description,
-      status: existing.status,
-      scopeType: existing.scopeType,
-      scopeRefId: existing.scopeRefId,
-      matchingRule: existing.matchingRule,
-      ruleAttributeKeys: existing.ruleAttributeKeys,
-      version: existing.version,
-      projectionVersion: existing.projectionVersion,
-    });
-
+    const aggregate = UserGroupAggregate.reconstruct(existing);
     aggregate.deactivate(userId);
 
     return this.transactionService.runInTransaction(async () => {
@@ -253,7 +209,7 @@ export class UserGroupLifecycleService {
       await this.outboxRepository.save(deactivatedOutbox);
       await this.outboxRepository.save(syncOutbox);
 
-      return (await this.userGroupRepository.findByTenantAndId(tenantCode, id))!;
+      return savedGroup;
     });
   }
 
@@ -261,29 +217,12 @@ export class UserGroupLifecycleService {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser().userId;
 
-    const existing = await this.userGroupRepository.findByTenantAndId(tenantCode, id);
-    if (!existing) {
-      throw new UserGroupNotFoundError(id);
-    }
-
+    const existing = await this.userGroupRepository.findById(id, { required: true });
     if (existing.version !== expectedVersion) {
       throw new ConcurrentModificationError();
     }
 
-    const aggregate = UserGroupAggregate.reconstruct({
-      id: existing.id,
-      tenantCode: existing.tenantCode,
-      name: existing.name,
-      description: existing.description,
-      status: existing.status,
-      scopeType: existing.scopeType,
-      scopeRefId: existing.scopeRefId,
-      matchingRule: existing.matchingRule,
-      ruleAttributeKeys: existing.ruleAttributeKeys,
-      version: existing.version,
-      projectionVersion: existing.projectionVersion,
-    });
-
+    const aggregate = UserGroupAggregate.reconstruct(existing);
     aggregate.reactivate(userId);
 
     return this.transactionService.runInTransaction(async () => {
@@ -304,7 +243,15 @@ export class UserGroupLifecycleService {
       await this.outboxRepository.save(reactivatedOutbox);
       await this.outboxRepository.save(syncOutbox);
 
-      return (await this.userGroupRepository.findByTenantAndId(tenantCode, id))!;
+      return (await this.userGroupRepository.findFullyById(id))!;
     });
+  }
+
+  private async validateName(name: string, tenantCode: string): Promise<void> {
+    const existing = await this.userGroupRepository.findByName(name.trim());
+    if (existing) {
+      this.logger.warn(`Duplicate user group name detected for tenant ${tenantCode}: ${name}`);
+      throw new DuplicateUserGroupNameError(name.trim());
+    }
   }
 }

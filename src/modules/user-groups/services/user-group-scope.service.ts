@@ -9,7 +9,6 @@ import { UserGroupAggregate } from '../domain/aggregates/user-group.aggregate';
 import {
   ConcurrentModificationError,
   HighImpactConfirmationRequiredError,
-  UserGroupNotFoundError,
 } from '../domain/exceptions/user-group.exceptions';
 import { UpdateUserGroupScopeDto } from '../dto/update-user-group-scope.dto';
 import { UserGroupScopeDetailsDto } from '../dto/user-group-scope-details.dto';
@@ -26,39 +25,23 @@ export class UserGroupScopeService {
     private readonly impactService: UserGroupImpactService,
   ) {}
 
-  async getScope(userGroupId: string): Promise<UserGroupScopeDetailsDto> {
-    const tenantCode = RequestContextService.getTenantCode();
-
-    const group = await this.userGroupRepository.findByTenantAndId(tenantCode, userGroupId);
-    if (!group) {
-      throw new UserGroupNotFoundError(userGroupId);
-    }
+  async getScope(id: string): Promise<UserGroupScopeDetailsDto> {
+    const group = await this.userGroupRepository.findById(id, { required: true });
 
     return UserGroupScopeDetailsDto.fromEntity(group);
   }
 
-  async updateScope(
-    userGroupId: string,
-    dto: UpdateUserGroupScopeDto,
-  ): Promise<UserGroupScopeDetailsDto> {
+  async updateScope(id: string, dto: UpdateUserGroupScopeDto): Promise<UserGroupScopeDetailsDto> {
     const tenantCode = RequestContextService.getTenantCode();
     const userId = RequestContextService.getUser()?.userId;
 
-    const existingGroup = await this.userGroupRepository.findByTenantAndId(tenantCode, userGroupId);
-    if (!existingGroup) {
-      throw new UserGroupNotFoundError(userGroupId);
-    }
-
+    const existingGroup = await this.userGroupRepository.findById(id, { required: true });
     if (existingGroup.version !== dto.expectedVersion) {
       throw new ConcurrentModificationError();
     }
 
     // Impact blast radius estimation and confirmation check
-    const impact = await this.impactService.estimateScopeImpact(
-      userGroupId,
-      dto.scopeType,
-      dto.scopeRefId,
-    );
+    const impact = await this.impactService.estimateScopeImpact(id, dto.scopeType, dto.scopeRefId);
 
     if (impact.requiresConfirmation && dto.confirmed !== true) {
       throw new HighImpactConfirmationRequiredError({
@@ -67,20 +50,7 @@ export class UserGroupScopeService {
       });
     }
 
-    const aggregate = UserGroupAggregate.reconstruct({
-      id: existingGroup.id,
-      tenantCode: existingGroup.tenantCode,
-      name: existingGroup.name,
-      description: existingGroup.description,
-      status: existingGroup.status,
-      scopeType: existingGroup.scopeType,
-      scopeRefId: existingGroup.scopeRefId,
-      matchingRule: existingGroup.matchingRule,
-      ruleAttributeKeys: existingGroup.ruleAttributeKeys,
-      version: existingGroup.version,
-      projectionVersion: existingGroup.projectionVersion,
-    });
-
+    const aggregate = UserGroupAggregate.reconstruct(existingGroup);
     const { previousScope, newScope } = aggregate.updateScope(
       {
         scopeType: dto.scopeType,

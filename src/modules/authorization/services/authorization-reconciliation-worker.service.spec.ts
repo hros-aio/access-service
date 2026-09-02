@@ -39,7 +39,7 @@ describe('AuthorizationReconciliationWorker', () => {
     };
 
     mockUserGroupRepo = {
-      findByTenantAndId: jest.fn().mockResolvedValue({
+      findFullyById: jest.fn().mockResolvedValue({
         id: 'ug-1',
         matchingRule: { clauses: [] },
       }),
@@ -53,6 +53,7 @@ describe('AuthorizationReconciliationWorker', () => {
     mockEmployeeRepo = {
       countEmployeesByTenant: jest.fn(),
       findEmployeesBatch: jest.fn(),
+      getMatchedEmployeeIds: jest.fn().mockResolvedValue([]),
     };
 
     mockUserGroupMatchingEngine = {
@@ -159,11 +160,7 @@ describe('AuthorizationReconciliationWorker', () => {
       expect(mockEffectiveRoleProjectionService.recomputeUserEffectiveRoles).toHaveBeenCalledTimes(
         2,
       );
-      expect(mockUserGroupRepo.updateProjectionVersion).toHaveBeenCalledWith(
-        'TEST_TENANT',
-        'ug-1',
-        3,
-      );
+      expect(mockUserGroupRepo.updateProjectionVersion).toHaveBeenCalledWith('ug-1', 3);
       expect(mockSyncJobRepo.markCompleted).toHaveBeenCalledWith('job-1', 2);
       expect(mockOutboxRepo.create).toHaveBeenCalled();
       expect(mockLockAdapter.releaseLock).toHaveBeenCalledWith(

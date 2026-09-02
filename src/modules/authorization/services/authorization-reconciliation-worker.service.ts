@@ -77,16 +77,14 @@ export class AuthorizationReconciliationWorker {
 
     // 2. If User Group sync, perform dynamic matching and membership reconciliation
     if (job.sourceType === SyncSourceType.USER_GROUP) {
-      const group = await this.userGroupRepo.findByTenantAndId(job.tenantCode, job.sourceId);
+      const group = await this.userGroupRepo.findById(job.sourceId);
       if (group && group.matchingRule) {
         const { sql, params } = this.userGroupMatchingEngine.buildMatchingQuery(
           job.tenantCode,
           group.matchingRule,
         );
-        const rows = await this.transactionService.getManager().query(sql, params);
-        const matchedEmployeeIds = (rows || []).map((r: { employee_id: string }) => r.employee_id);
+        const matchedEmployeeIds = await this.employeeRepo.getMatchedEmployeeIds(sql, params);
         await this.membershipReconciler.reconcileGroupPopulation(
-          job.tenantCode,
           job.sourceId,
           matchedEmployeeIds,
           job.sourceVersion,
@@ -121,11 +119,7 @@ export class AuthorizationReconciliationWorker {
     await this.transactionService.runInTransaction(async () => {
       // Advance projection version on source entity
       if (job.sourceType === SyncSourceType.USER_GROUP) {
-        await this.userGroupRepo.updateProjectionVersion(
-          job.tenantCode,
-          job.sourceId,
-          job.sourceVersion,
-        );
+        await this.userGroupRepo.updateProjectionVersion(job.sourceId, job.sourceVersion);
       } else if (job.sourceType === SyncSourceType.ROLE) {
         await this.roleRepo
           .updateProjectionVersion(job.tenantCode, job.sourceId, job.sourceVersion)

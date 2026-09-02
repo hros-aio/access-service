@@ -32,21 +32,18 @@ export class EffectiveRoleProjectionService {
     tenantCode: string,
     employeeId: string,
   ): Promise<RecomputeResult> {
-    const activeMemberships = await this.membershipRepo.findMembershipsByEmployee(
-      tenantCode,
-      employeeId,
-    );
+    const activeMemberships = await this.membershipRepo.findMembershipsByEmployee(employeeId);
 
     const targetEntries: PersistUserEffectiveRoleEntry[] = [];
     const memoryRoles: EffectiveUserRole[] = [];
 
     for (const membership of activeMemberships) {
-      const group = await this.userGroupRepo.findByTenantAndId(tenantCode, membership.groupId);
+      const group = await this.userGroupRepo.findFullyById(membership.groupId);
       if (!group || group.status !== 'ACTIVE') {
         continue;
       }
 
-      const roles = await this.userGroupRoleRepo.findRolesByGroupId(tenantCode, membership.groupId);
+      const roles = await this.userGroupRoleRepo.findRolesByGroupId(membership.groupId);
       for (const role of roles) {
         const scopeType = group.scopeType as EffectiveUserRole['scope']['type'];
         const scopeRefId = group.scopeRefId || null;

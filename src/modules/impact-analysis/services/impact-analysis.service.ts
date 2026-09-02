@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { RequestContextService } from '@new-hros/libs-core';
 
 import { RoleRepository } from '../../roles/repositories/role.repository';
@@ -10,11 +10,14 @@ import { UserGroupRepository } from '../../user-groups/repositories/user-group.r
 import { UserGroupPopulationQueryService } from '../../user-groups/services/user-group-population-query.service';
 import { PreviewRoleImpactDto, PreviewUserGroupImpactDto } from '../dto';
 import {
-  DEFAULT_HIGH_IMPACT_THRESHOLD,
   CoverageLossWarning,
+  DEFAULT_HIGH_IMPACT_THRESHOLD,
   ImpactAnalysisResult,
   ImpactEstimate,
 } from '../interfaces/impact-analysis.interface';
+
+import { RoleStatus } from '@/modules/roles';
+import { UserGroupStatus } from '@/modules/user-groups';
 
 @Injectable()
 export class ImpactAnalysisService {
@@ -38,17 +41,14 @@ export class ImpactAnalysisService {
   ): Promise<ImpactAnalysisResult> {
     const tenantCode = RequestContextService.getTenantCode();
 
-    const role = await this.roleRepo.findById(roleId);
-    if (!role || role.tenantCode !== tenantCode) {
-      throw new NotFoundException(`Role with ID ${roleId} not found`);
-    }
+    const role = await this.roleRepo.findById(roleId, { required: true });
 
-    const reachCount = await this.roleRepo.countActiveUserReach(roleId, tenantCode);
-    const coverageLoss = await this.checkCriticalCapabilityCoverageLoss(tenantCode, roleId);
+    const reachCount = await this.roleRepo.countActiveUserReach(role.id, tenantCode);
+    const coverageLoss = await this.checkCriticalCapabilityCoverageLoss(role.id);
 
     const estimate: ImpactEstimate = {
       usersGaining: 0,
-      usersLosing: dto.status === 'INACTIVE' ? reachCount : 0,
+      usersLosing: dto.status === RoleStatus.INACTIVE ? reachCount : 0,
       totalAffected: reachCount,
       isHighImpact: reachCount >= threshold,
       threshold,
@@ -72,13 +72,7 @@ export class ImpactAnalysisService {
     dto: PreviewUserGroupImpactDto,
     threshold = DEFAULT_HIGH_IMPACT_THRESHOLD,
   ): Promise<ImpactAnalysisResult> {
-    const tenantCode = RequestContextService.getTenantCode();
-
-    const group = await this.userGroupRepo.findByTenantAndId(tenantCode, userGroupId);
-    if (!group) {
-      throw new NotFoundException(`User group with ID ${userGroupId} not found`);
-    }
-
+    const group = await this.userGroupRepo.findById(userGroupId, { required: true });
     if (dto.matchingRule) {
       MatchingRuleValidator.validate(dto.matchingRule);
     }
@@ -93,29 +87,21 @@ export class ImpactAnalysisService {
 
     if (dto.matchingRule) {
       const diff = await this.populationQueryService.estimateCriteriaDiff(
-        tenantCode,
-        userGroupId,
+        group.id,
         dto.matchingRule,
       );
       usersGaining = diff.gainingCount;
       usersLosing = diff.losingCount;
       totalAffected = diff.gainingCount + diff.losingCount;
     } else {
-      const memberCount = await this.userGroupMembershipRepo.countUserGroupMembers(
-        tenantCode,
-        userGroupId,
-      );
+      const memberCount = await this.userGroupMembershipRepo.countByGroup(group.id);
       totalAffected = memberCount;
-      if (dto.status === 'INACTIVE') {
+      if (dto.status === UserGroupStatus.INACTIVE) {
         usersLosing = memberCount;
       }
     }
 
-    const coverageLoss = await this.checkCriticalCapabilityCoverageLoss(
-      tenantCode,
-      undefined,
-      userGroupId,
-    );
+    const coverageLoss = await this.checkCriticalCapabilityCoverageLoss(undefined, group.id);
 
     const estimate: ImpactEstimate = {
       usersGaining,
@@ -139,7 +125,6 @@ export class ImpactAnalysisService {
    * Detects single-holder coverage loss for critical built-in administrative capabilities.
    */
   async checkCriticalCapabilityCoverageLoss(
-    tenantCode: string,
     targetRoleId?: string,
     userGroupIdToRemove?: string,
   ): Promise<CoverageLossWarning | null> {
@@ -152,7 +137,6 @@ export class ImpactAnalysisService {
 
     for (const adminRole of adminRoles) {
       const priorHoldersCount = await this.userEffectiveRoleRepo.countActiveHoldersByRoleId(
-        tenantCode,
         adminRole.id,
       );
 
@@ -170,7 +154,6 @@ export class ImpactAnalysisService {
       if (userGroupIdToRemove && priorHoldersCount > 0) {
         const projectedHoldersCount =
           await this.userEffectiveRoleRepo.countActiveHoldersExcludingSourceGroup(
-            tenantCode,
             adminRole.id,
             userGroupIdToRemove,
           );
@@ -187,12 +170,5 @@ export class ImpactAnalysisService {
     }
 
     return null;
-  }
-
-  /**
-   * Checks if an operation is high impact.
-   */
-  isHighImpact(totalAffected: number, threshold = DEFAULT_HIGH_IMPACT_THRESHOLD): boolean {
-    return totalAffected >= threshold;
   }
 }

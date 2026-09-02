@@ -32,7 +32,7 @@ describe('SyncStatusProjectionService', () => {
     };
 
     mockUserGroupRepo = {
-      findByTenantAndId: jest.fn(),
+      findFullyById: jest.fn(),
       findActiveGroups: jest.fn(),
     };
 
@@ -54,7 +54,7 @@ describe('SyncStatusProjectionService', () => {
 
   describe('getEntitySyncStatus', () => {
     it('should throw NotFoundException if entity is not found', async () => {
-      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue(null);
+      (mockUserGroupRepo.findFullyById as jest.Mock).mockResolvedValue(null);
 
       await expect(
         service.getEntitySyncStatus(SyncSourceType.USER_GROUP, userGroupId),
@@ -62,7 +62,7 @@ describe('SyncStatusProjectionService', () => {
     });
 
     it('should return COMPLETED status when version == projectionVersion and no active job', async () => {
-      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+      (mockUserGroupRepo.findFullyById as jest.Mock).mockResolvedValue({
         id: userGroupId,
         tenantCode,
         version: 3,
@@ -89,7 +89,7 @@ describe('SyncStatusProjectionService', () => {
     });
 
     it('should return PENDING status with SCHEDULED_DAILY when version > projectionVersion and no active job', async () => {
-      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+      (mockUserGroupRepo.findFullyById as jest.Mock).mockResolvedValue({
         id: userGroupId,
         tenantCode,
         version: 4,
@@ -148,7 +148,7 @@ describe('SyncStatusProjectionService', () => {
     });
 
     it('should return FAILED status with error details and retryable=true when latest job failed', async () => {
-      (mockUserGroupRepo.findByTenantAndId as jest.Mock).mockResolvedValue({
+      (mockUserGroupRepo.findFullyById as jest.Mock).mockResolvedValue({
         id: userGroupId,
         tenantCode,
         version: 3,

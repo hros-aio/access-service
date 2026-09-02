@@ -32,11 +32,11 @@ describe('ImpactAnalysisService', () => {
     } as unknown as jest.Mocked<RoleRepository>;
 
     userGroupRepoMock = {
-      findByTenantAndId: jest.fn(),
+      findById: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRepository>;
 
     userGroupMembershipRepoMock = {
-      countUserGroupMembers: jest.fn(),
+      countByGroup: jest.fn(),
     } as unknown as jest.Mocked<UserGroupMembershipRepository>;
 
     userEffectiveRoleRepoMock = {
@@ -115,7 +115,7 @@ describe('ImpactAnalysisService', () => {
 
   describe('previewUserGroupImpact', () => {
     it('should call populationQueryService.estimateCriteriaDiff directly when matching rule is provided', async () => {
-      userGroupRepoMock.findByTenantAndId.mockResolvedValueOnce({
+      userGroupRepoMock.findById.mockResolvedValueOnce({
         id: 'group-1',
         tenantCode: 'TENANT_A',
       } as UserGroup);
@@ -154,35 +154,32 @@ describe('ImpactAnalysisService', () => {
       expect(result.estimate.isHighImpact).toBe(true);
     });
 
-    it('should query userGroupMembershipRepo.countUserGroupMembers when deactivating group without rule changes', async () => {
-      userGroupRepoMock.findByTenantAndId.mockResolvedValueOnce({
+    it('should query userGroupMembershipRepo.countByGroup when deactivating group without rule changes', async () => {
+      userGroupRepoMock.findById.mockResolvedValueOnce({
         id: 'group-1',
         tenantCode: 'TENANT_A',
       } as UserGroup);
 
-      userGroupMembershipRepoMock.countUserGroupMembers.mockResolvedValueOnce(45);
+      userGroupMembershipRepoMock.countByGroup.mockResolvedValueOnce(45);
       roleRepoMock.findActiveBuiltInAdminRoles.mockResolvedValueOnce([]);
 
       const result = await service.previewUserGroupImpact('group-1', {
         status: UserGroupStatus.INACTIVE,
       });
 
-      expect(userGroupMembershipRepoMock.countUserGroupMembers).toHaveBeenCalledWith(
-        'TENANT_A',
-        'group-1',
-      );
+      expect(userGroupMembershipRepoMock.countByGroup).toHaveBeenCalledWith('group-1');
       expect(result.estimate.totalAffected).toBe(45);
       expect(result.estimate.usersLosing).toBe(45);
       expect(result.estimate.isHighImpact).toBe(false);
     });
 
     it('should detect coverage loss when user group deactivation leaves 0 active admin holders', async () => {
-      userGroupRepoMock.findByTenantAndId.mockResolvedValueOnce({
+      userGroupRepoMock.findById.mockResolvedValueOnce({
         id: 'group-admin',
         tenantCode: 'TENANT_A',
       } as UserGroup);
 
-      userGroupMembershipRepoMock.countUserGroupMembers.mockResolvedValueOnce(1);
+      userGroupMembershipRepoMock.countByGroup.mockResolvedValueOnce(1);
       roleRepoMock.findActiveBuiltInAdminRoles.mockResolvedValueOnce([
         {
           id: 'role-admin',

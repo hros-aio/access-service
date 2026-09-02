@@ -36,6 +36,7 @@ describe('UserGroupScopeService', () => {
     } as unknown as jest.Mocked<TransactionService>;
 
     userGroupRepo = {
+      findById: jest.fn(),
       findByTenantAndId: jest.fn(),
       save: jest.fn((entity) => Promise.resolve(entity)),
     } as unknown as jest.Mocked<UserGroupRepository>;
@@ -62,7 +63,7 @@ describe('UserGroupScopeService', () => {
 
   describe('getScope', () => {
     it('should throw UserGroupNotFoundError if group is missing', async () => {
-      userGroupRepo.findByTenantAndId.mockResolvedValue(null);
+      userGroupRepo.findById.mockResolvedValue(null);
 
       await expect(service.getScope(userGroupId)).rejects.toThrow(UserGroupNotFoundError);
     });
@@ -74,7 +75,7 @@ describe('UserGroupScopeService', () => {
       mockGroup.scopeRefId = 'dept-01';
       mockGroup.version = 3;
       mockGroup.projectionVersion = 2;
-      userGroupRepo.findByTenantAndId.mockResolvedValue(mockGroup);
+      userGroupRepo.findById.mockResolvedValue(mockGroup);
 
       const result = await service.getScope(userGroupId);
 
@@ -94,7 +95,7 @@ describe('UserGroupScopeService', () => {
       const mockGroup = new UserGroup();
       mockGroup.id = userGroupId;
       mockGroup.version = 2;
-      userGroupRepo.findByTenantAndId.mockResolvedValue(mockGroup);
+      userGroupRepo.findById.mockResolvedValue(mockGroup);
 
       await expect(
         service.updateScope(userGroupId, {
@@ -109,7 +110,7 @@ describe('UserGroupScopeService', () => {
       const mockGroup = new UserGroup();
       mockGroup.id = userGroupId;
       mockGroup.version = 2;
-      userGroupRepo.findByTenantAndId.mockResolvedValue(mockGroup);
+      userGroupRepo.findById.mockResolvedValue(mockGroup);
 
       impactService.estimateScopeImpact.mockResolvedValue({
         userGroupId,
@@ -140,7 +141,7 @@ describe('UserGroupScopeService', () => {
       mockGroup.ruleAttributeKeys = [];
       mockGroup.version = 2;
       mockGroup.projectionVersion = 2;
-      userGroupRepo.findByTenantAndId.mockResolvedValue(mockGroup);
+      userGroupRepo.findById.mockResolvedValue(mockGroup);
 
       impactService.estimateScopeImpact.mockResolvedValue({
         userGroupId,

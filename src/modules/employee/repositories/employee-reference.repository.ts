@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
-import { FindOneOptions, Repository } from 'typeorm';
+import { FindOneOptions, In, Repository } from 'typeorm';
 
 import { EmployeeReference } from '../entities/employee-reference.entity';
 
@@ -134,5 +134,27 @@ export class EmployeeReferenceRepository {
       `,
       [delta, tenantCode, employeeId],
     );
+  }
+
+  async getMatchedEmployeeIds(sql: string, params: unknown[]): Promise<string[]> {
+    const manager = this.transactionService.getManager();
+    const rows = (await manager.query(sql, params)) as Array<{ employee_id: string }>;
+    const matchedEmployeeIds: string[] = rows.map((r) => r.employee_id);
+
+    if (matchedEmployeeIds.length === 0) {
+      return [];
+    }
+
+    return matchedEmployeeIds;
+  }
+
+  async findByIds(tenantCode: string, employeeIds: string[]): Promise<EmployeeReference[]> {
+    if (employeeIds.length === 0) {
+      return [];
+    }
+
+    return this.repository.find({
+      where: { tenantCode, employeeId: In(employeeIds) },
+    });
   }
 }

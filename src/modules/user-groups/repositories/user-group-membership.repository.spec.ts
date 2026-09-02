@@ -1,3 +1,4 @@
+import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { UserGroupMembershipRepository } from './user-group-membership.repository';
@@ -15,6 +16,7 @@ describe('UserGroupMembershipRepository', () => {
   };
 
   beforeEach(() => {
+    jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue('TENANT1');
     mockTypeormRepo = {
       find: jest.fn(),
       findAndCount: jest.fn(),
@@ -32,8 +34,12 @@ describe('UserGroupMembershipRepository', () => {
     repository = new UserGroupMembershipRepository(mockTransactionService);
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('batchInsert creates and saves membership entities for given employee ids', async () => {
-    await repository.batchInsert('TENANT1', 'grp-1', ['emp-1', 'emp-2']);
+    await repository.batchInsert('grp-1', ['emp-1', 'emp-2']);
 
     expect(mockTypeormRepo.create).toHaveBeenCalledTimes(2);
     expect(mockTypeormRepo.create).toHaveBeenCalledWith(
@@ -59,7 +65,7 @@ describe('UserGroupMembershipRepository', () => {
   });
 
   it('batchDelete deletes given employee ids using TypeORM In operator', async () => {
-    await repository.batchDelete('TENANT1', 'grp-1', ['emp-1', 'emp-2']);
+    await repository.batchDelete('grp-1', ['emp-1', 'emp-2']);
 
     expect(mockTypeormRepo.delete).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -70,7 +76,7 @@ describe('UserGroupMembershipRepository', () => {
   });
 
   it('insertSingleMembership creates and saves single record', async () => {
-    await repository.insertSingleMembership('TENANT1', 'emp-1', 'grp-1');
+    await repository.insertSingleMembership('emp-1', 'grp-1');
 
     expect(mockTypeormRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({

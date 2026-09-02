@@ -45,8 +45,8 @@ export class UserGroupAdminController {
   @ApiResponse({ status: 400, description: 'Invalid matching rule or scope configuration' })
   @ApiResponse({ status: 409, description: 'Duplicate user group name in tenant' })
   async createUserGroup(@Body() dto: CreateUserGroupDto): Promise<UserGroupDetailsDto> {
-    const group = await this.userGroupLifecycleService.createUserGroup(dto);
-    return this.userGroupQueryService.findById(group.id);
+    const group = await this.userGroupLifecycleService.create(dto);
+    return UserGroupDetailsDto.mapToDetailsDto(group);
   }
 
   @Get(':id')
@@ -70,7 +70,7 @@ export class UserGroupAdminController {
     @Body() dto: UpdateUserGroupDto,
   ): Promise<UserGroupDetailsDto> {
     const group = await this.userGroupLifecycleService.updateById(id, dto, dto.version);
-    return this.userGroupQueryService.findById(group.id);
+    return UserGroupDetailsDto.mapToDetailsDto(group);
   }
 
   @Post(':id/deactivate')
@@ -85,7 +85,7 @@ export class UserGroupAdminController {
     @Body() dto: LifecycleTransitionDto,
   ): Promise<UserGroupDetailsDto> {
     const group = await this.userGroupLifecycleService.deactivate(id, dto.version);
-    return this.userGroupQueryService.findById(group.id);
+    return UserGroupDetailsDto.mapToDetailsDto(group);
   }
 
   @Post(':id/reactivate')
@@ -100,6 +100,6 @@ export class UserGroupAdminController {
     @Body() dto: LifecycleTransitionDto,
   ): Promise<UserGroupDetailsDto> {
     const group = await this.userGroupLifecycleService.reactivate(id, dto.version);
-    return this.userGroupQueryService.findById(group.id);
+    return UserGroupDetailsDto.mapToDetailsDto(group);
   }
 }

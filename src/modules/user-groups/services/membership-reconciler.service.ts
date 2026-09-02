@@ -44,10 +44,7 @@ export class MembershipReconciler {
     employeeId: string,
     targetMatchingGroupIds: string[],
   ): Promise<SingleEmployeeReconciliationResult> {
-    const currentMemberships = await this.membershipRepo.findMembershipsByEmployee(
-      tenantCode,
-      employeeId,
-    );
+    const currentMemberships = await this.membershipRepo.findMembershipsByEmployee(employeeId);
     const currentGroupIds = new Set(currentMemberships.map((m) => m.groupId));
     const targetGroupIdSet = new Set(targetMatchingGroupIds);
 
@@ -77,20 +74,20 @@ export class MembershipReconciler {
 
     // Apply membership diffs
     for (const gid of addedGroupIds) {
-      await this.membershipRepo.insertSingleMembership(tenantCode, employeeId, gid);
+      await this.membershipRepo.insertSingleMembership(employeeId, gid);
     }
 
     for (const gid of removedGroupIds) {
-      await this.membershipRepo.deleteSingleMembership(tenantCode, employeeId, gid);
+      await this.membershipRepo.deleteSingleMembership(employeeId, gid);
     }
 
     // Recalculate effective roles across all currently matching groups
     const targetRoles: UserEffectiveRoleEntry[] = [];
     for (const gid of targetMatchingGroupIds) {
-      const group = await this.userGroupRepo.findByTenantAndId(tenantCode, gid);
+      const group = await this.userGroupRepo.findFullyById(gid);
       if (!group || group.status !== 'ACTIVE') continue;
 
-      const roles = await this.userGroupRoleRepo.findRolesByGroupId(tenantCode, gid);
+      const roles = await this.userGroupRoleRepo.findRolesByGroupId(gid);
       for (const r of roles) {
         targetRoles.push({
           roleId: r.roleId,
@@ -102,7 +99,6 @@ export class MembershipReconciler {
     }
 
     const roleDiff = await this.effectiveRoleRepo.syncEffectiveRolesForEmployee(
-      tenantCode,
       employeeId,
       targetRoles,
     );
@@ -134,15 +130,11 @@ export class MembershipReconciler {
    * Reconciles entire tenant population for a specific user group (e.g. on group criteria update or sync).
    */
   async reconcileGroupPopulation(
-    tenantCode: string,
     groupId: string,
     matchedEmployeeIds: string[],
     groupVersion: number,
   ): Promise<GroupPopulationReconciliationResult> {
-    const currentMemberIds = await this.membershipRepo.findMemberEmployeeIdsByGroup(
-      tenantCode,
-      groupId,
-    );
+    const currentMemberIds = await this.membershipRepo.findMemberEmployeeIdsByGroup(groupId);
 
     const currentSet = new Set(currentMemberIds);
     const matchedSet = new Set(matchedEmployeeIds);
@@ -163,29 +155,26 @@ export class MembershipReconciler {
     }
 
     if (addedEmployeeIds.length > 0) {
-      await this.membershipRepo.batchInsert(tenantCode, groupId, addedEmployeeIds);
+      await this.membershipRepo.batchInsert(groupId, addedEmployeeIds);
     }
 
     if (removedEmployeeIds.length > 0) {
-      await this.membershipRepo.batchDelete(tenantCode, groupId, removedEmployeeIds);
+      await this.membershipRepo.batchDelete(groupId, removedEmployeeIds);
     }
 
-    const group = await this.userGroupRepo.findByTenantAndId(tenantCode, groupId);
+    const group = await this.userGroupRepo.findFullyById(groupId);
     if (group) {
       // Reconcile effective roles for affected employees
       const affectedEmployeeIds = [...addedEmployeeIds, ...removedEmployeeIds];
       for (const empId of affectedEmployeeIds) {
-        const empMemberships = await this.membershipRepo.findMembershipsByEmployee(
-          tenantCode,
-          empId,
-        );
+        const empMemberships = await this.membershipRepo.findMembershipsByEmployee(empId);
 
         const targetRoles: UserEffectiveRoleEntry[] = [];
         for (const m of empMemberships) {
-          const g = await this.userGroupRepo.findByTenantAndId(tenantCode, m.groupId);
+          const g = await this.userGroupRepo.findFullyById(m.groupId);
           if (!g || g.status !== 'ACTIVE') continue;
 
-          const gRoles = await this.userGroupRoleRepo.findRolesByGroupId(tenantCode, m.groupId);
+          const gRoles = await this.userGroupRoleRepo.findRolesByGroupId(m.groupId);
           for (const gr of gRoles) {
             targetRoles.push({
               roleId: gr.roleId,
@@ -196,10 +185,10 @@ export class MembershipReconciler {
           }
         }
 
-        await this.effectiveRoleRepo.syncEffectiveRolesForEmployee(tenantCode, empId, targetRoles);
+        await this.effectiveRoleRepo.syncEffectiveRolesForEmployee(empId, targetRoles);
       }
 
-      await this.userGroupRepo.updateProjectionVersion(tenantCode, groupId, groupVersion);
+      await this.userGroupRepo.updateProjectionVersion(groupId, groupVersion);
     }
 
     return {
