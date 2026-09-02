@@ -39,6 +39,10 @@ describe('AuthorizationReconciliationWorker', () => {
     };
 
     mockUserGroupRepo = {
+      findById: jest.fn().mockResolvedValue({
+        id: 'ug-1',
+        matchingRule: { clauses: [] },
+      }),
       findFullyById: jest.fn().mockResolvedValue({
         id: 'ug-1',
         matchingRule: { clauses: [] },

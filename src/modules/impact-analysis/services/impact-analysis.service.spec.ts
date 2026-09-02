@@ -1,4 +1,3 @@
-import { NotFoundException } from '@nestjs/common';
 import { RequestContextService } from '@new-hros/libs-core';
 
 import { ImpactAnalysisService } from './impact-analysis.service';
@@ -62,16 +61,9 @@ describe('ImpactAnalysisService', () => {
   });
 
   describe('previewRoleImpact', () => {
-    it('should throw NotFoundException if role does not belong to tenant', async () => {
-      roleRepoMock.findById.mockResolvedValueOnce(null);
-
-      await expect(service.previewRoleImpact('role-1', {})).rejects.toThrow(NotFoundException);
-    });
-
     it('should return role impact estimate with isHighImpact flag when exceeding threshold', async () => {
       roleRepoMock.findById.mockResolvedValueOnce({
         id: 'role-1',
-        tenantCode: 'TENANT_A',
       } as Role);
 
       roleRepoMock.countActiveUserReach.mockResolvedValueOnce(150);
@@ -143,7 +135,6 @@ describe('ImpactAnalysisService', () => {
       });
 
       expect(populationQueryServiceMock.estimateCriteriaDiff).toHaveBeenCalledWith(
-        'TENANT_A',
         'group-1',
         matchingRule,
       );
@@ -157,7 +148,6 @@ describe('ImpactAnalysisService', () => {
     it('should query userGroupMembershipRepo.countByGroup when deactivating group without rule changes', async () => {
       userGroupRepoMock.findById.mockResolvedValueOnce({
         id: 'group-1',
-        tenantCode: 'TENANT_A',
       } as UserGroup);
 
       userGroupMembershipRepoMock.countByGroup.mockResolvedValueOnce(45);

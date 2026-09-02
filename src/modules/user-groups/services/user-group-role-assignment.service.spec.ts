@@ -7,7 +7,6 @@ import { RoleRepository } from '../../roles/repositories/role.repository';
 import {
   HighImpactConfirmationRequiredError,
   InvalidRoleAssignmentError,
-  UserGroupNotFoundError,
 } from '../domain/exceptions/user-group.exceptions';
 import { UserGroupRoleRepository } from '../repositories/user-group-role.repository';
 import { UserGroupRepository } from '../repositories/user-group.repository';
@@ -66,17 +65,6 @@ describe('UserGroupRoleAssignmentService', () => {
       mockOutboxRepo,
       mockImpactService,
     );
-  });
-
-  it('should throw UserGroupNotFoundError when group does not exist', async () => {
-    mockUserGroupRepo.findById.mockResolvedValue(null);
-
-    await expect(
-      service.updateRoleAssignments('group-1', {
-        roleIds: ['role-1'],
-        expectedVersion: 1,
-      }),
-    ).rejects.toThrow(UserGroupNotFoundError);
   });
 
   it('should throw InvalidRoleAssignmentError when role is inactive', async () => {

@@ -101,7 +101,7 @@ describe('UserGroupLifecycleService', () => {
 
     it('should create group with version 1, projectionVersion 0 and outbox events', async () => {
       userGroupRepository.findByName.mockResolvedValue(null);
-      userGroupRepository.findFullyById.mockResolvedValue({
+      userGroupRepository.create.mockResolvedValue({
         id: 'group-uuid-1',
         tenantCode: mockTenantCode,
         name: validDto.name,

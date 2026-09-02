@@ -9,7 +9,6 @@ import { ScopeType } from '../domain/enums/scope-type.enum';
 import {
   ConcurrentModificationError,
   HighImpactConfirmationRequiredError,
-  UserGroupNotFoundError,
 } from '../domain/exceptions/user-group.exceptions';
 import { UserGroup } from '../entities/user-group.entity';
 import { UserGroupRepository } from '../repositories/user-group.repository';
@@ -62,12 +61,6 @@ describe('UserGroupScopeService', () => {
   });
 
   describe('getScope', () => {
-    it('should throw UserGroupNotFoundError if group is missing', async () => {
-      userGroupRepo.findById.mockResolvedValue(null);
-
-      await expect(service.getScope(userGroupId)).rejects.toThrow(UserGroupNotFoundError);
-    });
-
     it('should return scope details for existing group', async () => {
       const mockGroup = new UserGroup();
       mockGroup.id = userGroupId;

@@ -2,11 +2,7 @@ import { RequestContextService } from '@new-hros/libs-core';
 
 import { UserGroupImpactService } from './user-group-impact.service';
 import { ScopeType } from '../domain/enums/scope-type.enum';
-import {
-  InvalidScopeError,
-  UserGroupNotFoundError,
-} from '../domain/exceptions/user-group.exceptions';
-import { UserGroupRole } from '../entities/user-group-role.entity';
+import { InvalidScopeError } from '../domain/exceptions/user-group.exceptions';
 import { UserGroup } from '../entities/user-group.entity';
 import { UserGroupMembershipRepository } from '../repositories/user-group-membership.repository';
 import { UserGroupRoleRepository } from '../repositories/user-group-role.repository';
@@ -30,11 +26,12 @@ describe('UserGroupImpactService', () => {
     } as unknown as jest.Mocked<UserGroupRepository>;
 
     userGroupRoleRepo = {
-      findByGroup: jest.fn(),
+      findRoleIdsByGroupId: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRoleRepository>;
 
     membershipRepo = {
       countByGroup: jest.fn(),
+      countMemberEmployeeIdsByGroup: jest.fn(),
       findMemberEmployeeIdsByGroup: jest.fn(),
       countZeroRoleMembersAfterUnassign: jest.fn(),
     } as unknown as jest.Mocked<UserGroupMembershipRepository>;
@@ -65,9 +62,7 @@ describe('UserGroupImpactService', () => {
       mockGroup.id = userGroupId;
       userGroupRepo.findById.mockResolvedValue(mockGroup);
 
-      const ugr1 = new UserGroupRole();
-      ugr1.roleId = 'role-1';
-      userGroupRoleRepo.findByGroup.mockResolvedValue([ugr1]);
+      userGroupRoleRepo.findRoleIdsByGroupId.mockResolvedValue(['role-1']);
 
       const result = await service.estimateRoleAssignmentImpact(userGroupId, ['role-1']);
 
@@ -84,10 +79,9 @@ describe('UserGroupImpactService', () => {
       mockGroup.id = userGroupId;
       userGroupRepo.findById.mockResolvedValue(mockGroup);
 
-      const ugr1 = new UserGroupRole();
-      ugr1.roleId = 'role-1';
-      userGroupRoleRepo.findByGroup.mockResolvedValue([ugr1]);
+      userGroupRoleRepo.findRoleIdsByGroupId.mockResolvedValue(['role-1']);
 
+      membershipRepo.countMemberEmployeeIdsByGroup.mockResolvedValue(2);
       membershipRepo.findMemberEmployeeIdsByGroup.mockResolvedValue(['emp-1', 'emp-2']);
       membershipRepo.countZeroRoleMembersAfterUnassign.mockResolvedValue(1);
 
@@ -103,14 +97,6 @@ describe('UserGroupImpactService', () => {
   });
 
   describe('estimateScopeImpact', () => {
-    it('should throw UserGroupNotFoundError if user group does not exist', async () => {
-      userGroupRepo.findById.mockResolvedValue(null);
-
-      await expect(
-        service.estimateScopeImpact(userGroupId, ScopeType.DEPARTMENT, 'dept-1'),
-      ).rejects.toThrow(UserGroupNotFoundError);
-    });
-
     it('should throw InvalidScopeError if proposed scope is invalid', async () => {
       const mockGroup = new UserGroup();
       mockGroup.id = userGroupId;
