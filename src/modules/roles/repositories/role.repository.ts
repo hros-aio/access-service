@@ -15,11 +15,6 @@ export class RoleRepository extends BaseRepository<Role> {
     return this.repository.save(role);
   }
 
-  async create(data: DeepPartial<Role>): Promise<Role> {
-    const entity = this.repository.create(data);
-    return this.repository.save(entity);
-  }
-
   async findBySystemKey(systemRoleKey: SystemRoleKey): Promise<Role | null> {
     return this.findOne({ systemRoleKey }, { relations: ['permissions'] });
   }
@@ -65,10 +60,6 @@ export class RoleRepository extends BaseRepository<Role> {
     projectionVersion: number,
   ): Promise<void> {
     await this.repository.update({ tenantCode, id }, { projectionVersion } as DeepPartial<Role>);
-  }
-
-  async delete(id: string): Promise<void> {
-    await this.repository.delete(id);
   }
 
   async findDirtyRoles(): Promise<{ tenantCode: string; id: string; version: number }[]> {

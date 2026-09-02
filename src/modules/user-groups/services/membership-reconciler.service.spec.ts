@@ -24,7 +24,6 @@ describe('MembershipReconciler', () => {
     } as unknown as jest.Mocked<TransactionService>;
     mockUserGroupRepo = {
       findById: jest.fn(),
-      findFullyById: jest.fn(),
       findByTenantAndId: jest.fn(),
       updateProjectionVersion: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRepository>;

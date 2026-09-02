@@ -37,7 +37,6 @@ describe('AuthorizationSyncService', () => {
 
     mockUserGroupRepo = {
       findById: jest.fn(),
-      findFullyById: jest.fn(),
     };
 
     mockRoleRepo = {

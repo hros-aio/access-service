@@ -163,7 +163,7 @@ export class MembershipReconciler {
       await this.membershipRepo.batchDelete(groupId, removedEmployeeIds);
     }
 
-    const group = await this.userGroupRepo.findFullyById(groupId);
+    const group = await this.userGroupRepo.findById(groupId);
     if (group) {
       // Reconcile effective roles for affected employees
       const affectedEmployeeIds = [...addedEmployeeIds, ...removedEmployeeIds];
@@ -172,7 +172,7 @@ export class MembershipReconciler {
 
         const targetRoles: UserEffectiveRoleEntry[] = [];
         for (const m of empMemberships) {
-          const g = await this.userGroupRepo.findFullyById(m.groupId);
+          const g = await this.userGroupRepo.findById(m.groupId);
           if (!g || g.status !== UserGroupStatus.ACTIVE) continue;
 
           const gRoles = await this.userGroupRoleRepo.findByGroup(m.groupId);

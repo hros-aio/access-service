@@ -23,7 +23,7 @@ describe('EffectiveRoleProjectionService', () => {
 
   beforeEach(async () => {
     userGroupRepo = {
-      findFullyById: jest.fn(),
+      findById: jest.fn(),
     };
     userGroupRoleRepo = {
       findByGroup: jest.fn(),

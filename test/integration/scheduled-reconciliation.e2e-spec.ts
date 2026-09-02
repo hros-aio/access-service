@@ -37,9 +37,11 @@ describe('Scheduled Authorization Reconciliation (E2E Integration Flow)', () => 
         { tenantCode: 'TENANT_A', id: 'ug-1', version: 3 },
         { tenantCode: 'TENANT_B', id: 'ug-2', version: 2 },
       ]),
-      findFullyById: jest.fn().mockImplementation(async (tenantCode: string, id: string) => {
-        if (id === 'ug-1') return { id: 'ug-1', tenantCode, version: 3, projectionVersion: 1 };
-        if (id === 'ug-2') return { id: 'ug-2', tenantCode, version: 2, projectionVersion: 1 };
+      findById: jest.fn().mockImplementation(async (id: string) => {
+        if (id === 'ug-1')
+          return { id: 'ug-1', tenantCode: 'TENANT_A', version: 3, projectionVersion: 1 };
+        if (id === 'ug-2')
+          return { id: 'ug-2', tenantCode: 'TENANT_B', version: 2, projectionVersion: 1 };
         return null;
       }),
     };

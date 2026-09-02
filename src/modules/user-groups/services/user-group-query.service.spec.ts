@@ -16,7 +16,6 @@ describe('UserGroupQueryService', () => {
 
     userGroupRepository = {
       findById: jest.fn(),
-      findFullyById: jest.fn(),
       list: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRepository>;
 

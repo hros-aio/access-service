@@ -23,7 +23,6 @@ describe('UserGroupPopulationQueryService', () => {
 
     mockUserGroupRepo = {
       findById: jest.fn(),
-      findFullyById: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRepository>;
     mockMembershipRepo = {
       findMembershipsByGroup: jest.fn(),

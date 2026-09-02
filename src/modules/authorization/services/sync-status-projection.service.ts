@@ -227,7 +227,7 @@ export class SyncStatusProjectionService {
     sourceId: string,
   ): Promise<{ sourceVersion: number; projectionVersion: number }> {
     if (sourceType === SyncSourceType.USER_GROUP) {
-      const group = await this.userGroupRepo.findFullyById(sourceId);
+      const group = await this.userGroupRepo.findById(sourceId);
       if (!group) {
         throw new NotFoundException(
           `User Group with id ${sourceId} not found in tenant ${tenantCode}`,
