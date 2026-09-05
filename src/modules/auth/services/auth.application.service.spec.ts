@@ -20,6 +20,14 @@ import {
 } from '../exceptions/auth.exception';
 import { CredentialRepository } from '../repositories/credential.repository';
 
+import { FirebaseSsoApplicationService } from '@/modules/firebase-sso/application/firebase-sso-application.service';
+import {
+  AmbiguousIdentityMappingException,
+  ExternalIdentityNotMappedException,
+  FirebaseProviderUnavailableException,
+  InvalidFirebaseTokenException,
+} from '@/modules/firebase-sso/domain/exceptions/firebase-sso.exceptions';
+
 jest.mock('jsonwebtoken');
 
 describe('AuthApplicationService', () => {
@@ -35,6 +43,7 @@ describe('AuthApplicationService', () => {
   let mockSecurityEventService: any;
   let mockRedisCacheProvider: any;
   let mockConfigService: any;
+  let mockFirebaseSsoApplicationService: any;
 
   const mockUser = {
     id: 'user-uuid',
@@ -100,6 +109,10 @@ describe('AuthApplicationService', () => {
       }),
     };
 
+    mockFirebaseSsoApplicationService = {
+      authenticateSso: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthApplicationService,
@@ -117,6 +130,10 @@ describe('AuthApplicationService', () => {
         { provide: SecurityEventService, useValue: mockSecurityEventService },
         { provide: RedisCacheProvider, useValue: mockRedisCacheProvider },
         { provide: ConfigurationService, useValue: mockConfigService },
+        {
+          provide: FirebaseSsoApplicationService,
+          useValue: mockFirebaseSsoApplicationService,
+        },
       ],
     }).compile();
 
@@ -288,6 +305,71 @@ describe('AuthApplicationService', () => {
 
       expect(result.authState).toBe('MFA_REQUIRED');
       expect(mockRedisCacheProvider.set).toHaveBeenCalled();
+    });
+  });
+
+  describe('loginWithFirebase', () => {
+    const firebaseDto = {
+      tenantCode: 'TENANT_123',
+      idToken: 'valid-firebase-token',
+    };
+
+    it('should successfully authenticate via SSO and return tokens', async () => {
+      mockFirebaseSsoApplicationService.authenticateSso.mockResolvedValue(mockUser);
+      mockUserRepository.findOne.mockResolvedValue(mockUser);
+      (jwt.sign as jest.Mock).mockReturnValue('mock-jwt-token');
+
+      const result = await service.loginWithFirebase(firebaseDto);
+
+      expect(mockFirebaseSsoApplicationService.authenticateSso).toHaveBeenCalledWith(
+        firebaseDto,
+        'unknown',
+        'unknown',
+      );
+      expect(result.authState).toBe('AUTHENTICATED');
+      expect(result.accessToken).toBe('mock-jwt-token');
+      expect(result.refreshToken).toBe('mock-jwt-token');
+      expect(mockRedisCacheProvider.set).toHaveBeenCalled();
+    });
+
+    it('should throw UnauthorizedException when token is invalid or expired', async () => {
+      mockFirebaseSsoApplicationService.authenticateSso.mockRejectedValue(
+        new InvalidFirebaseTokenException(),
+      );
+
+      await expect(service.loginWithFirebase(firebaseDto)).rejects.toThrow(
+        'Authentication failed via Single Sign-On. Please try again or contact your administrator.',
+      );
+    });
+
+    it('should throw UnauthorizedException when external identity is not mapped', async () => {
+      mockFirebaseSsoApplicationService.authenticateSso.mockRejectedValue(
+        new ExternalIdentityNotMappedException(),
+      );
+
+      await expect(service.loginWithFirebase(firebaseDto)).rejects.toThrow(
+        'Authentication failed via Single Sign-On. Please try again or contact your administrator.',
+      );
+    });
+
+    it('should throw ConflictException when identity mapping is ambiguous', async () => {
+      mockFirebaseSsoApplicationService.authenticateSso.mockRejectedValue(
+        new AmbiguousIdentityMappingException(),
+      );
+
+      await expect(service.loginWithFirebase(firebaseDto)).rejects.toThrow(
+        'Authentication failed due to ambiguous identity mappings. Please contact your administrator.',
+      );
+    });
+
+    it('should throw ServiceUnavailableException when Firebase provider is unavailable', async () => {
+      mockFirebaseSsoApplicationService.authenticateSso.mockRejectedValue(
+        new FirebaseProviderUnavailableException(),
+      );
+
+      await expect(service.loginWithFirebase(firebaseDto)).rejects.toThrow(
+        'Single Sign-On service is temporarily unavailable. Please try logging in with your password.',
+      );
     });
   });
 });

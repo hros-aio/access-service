@@ -52,7 +52,7 @@ describe('FirebaseAdminAdapter', () => {
 
     const result = await adapter.verifyIdToken('ANY_TOKEN');
     expect(result.uid).toBe('global_fb_uid');
-    expect(result.tenant_id).toBe('TENANT_GLOBAL');
+    expect(result.tenant_code).toBe('TENANT_GLOBAL');
   });
 
   it('should handle auth/ error code and rethrow InvalidFirebaseTokenException', async () => {

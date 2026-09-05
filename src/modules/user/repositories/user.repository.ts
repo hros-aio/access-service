@@ -10,6 +10,15 @@ export class UserRepository extends BaseRepository<User> {
     super(User, transactionService);
   }
 
+  async findByTenantAndExternalIdentity(
+    tenantCode: string,
+    externalIdentityId: string,
+  ): Promise<User | null> {
+    return this.repository.findOne({
+      where: { tenantCode, externalIdentityId },
+    });
+  }
+
   async findByEmail(email: string): Promise<User | null> {
     const normalizedEmail = email.toLowerCase().trim();
     return this.findOne({ normalizedEmail });

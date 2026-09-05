@@ -1,102 +1,170 @@
+import { Test, TestingModule } from '@nestjs/testing';
+
 import { FirebaseSsoApplicationService } from './firebase-sso-application.service';
-import { ExternalIdentity } from '../../auth/entities/external-identity.entity';
-import { ExternalIdentityRepository } from '../../auth/repositories/external-identity.repository';
 import { SecurityEventService } from '../../security-event/services/security-event.service';
 import {
   AmbiguousIdentityMappingException,
   ExternalIdentityNotMappedException,
 } from '../domain/exceptions/firebase-sso.exceptions';
-import { FirebaseVerifierPort } from '../domain/ports/firebase-verifier.port';
+import {
+  FIREBASE_VERIFIER_PORT,
+  FirebaseVerifierPort,
+} from '../domain/ports/firebase-verifier.port';
+
+import { User } from '@/modules/user/entities/user.entity';
+import { UserRepository } from '@/modules/user/repositories/user.repository';
 
 describe('FirebaseSsoApplicationService', () => {
   let firebaseVerifier: jest.Mocked<FirebaseVerifierPort>;
-  let externalIdentityRepository: jest.Mocked<ExternalIdentityRepository>;
+  let userRepo: jest.Mocked<UserRepository>;
   let securityEventService: jest.Mocked<SecurityEventService>;
   let service: FirebaseSsoApplicationService;
 
-  beforeEach(() => {
-    firebaseVerifier = { verifyIdToken: jest.fn() };
-    externalIdentityRepository = {
-      findMapping: jest.fn(),
-    } as unknown as jest.Mocked<ExternalIdentityRepository>;
+  beforeEach(async () => {
+    firebaseVerifier = {
+      verifyIdToken: jest.fn(),
+    };
+
+    userRepo = {
+      findByTenantAndExternalIdentity: jest.fn(),
+    } as unknown as jest.Mocked<UserRepository>;
+
     securityEventService = {
       logSsoLoginSucceeded: jest.fn(),
       logSsoLoginFailed: jest.fn(),
     } as unknown as jest.Mocked<SecurityEventService>;
-    service = new FirebaseSsoApplicationService(
-      firebaseVerifier,
-      externalIdentityRepository,
-      securityEventService,
-    );
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        FirebaseSsoApplicationService,
+        { provide: FIREBASE_VERIFIER_PORT, useValue: firebaseVerifier },
+        { provide: UserRepository, useValue: userRepo },
+        { provide: SecurityEventService, useValue: securityEventService },
+      ],
+    }).compile();
+
+    service = module.get<FirebaseSsoApplicationService>(FirebaseSsoApplicationService);
   });
 
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
 
-  it('should throw ExternalIdentityNotMappedException when mapping is missing', async () => {
-    firebaseVerifier.verifyIdToken.mockResolvedValue({ uid: 'fb_uid_123' });
-    externalIdentityRepository.findMapping.mockResolvedValue([]);
+  describe('authenticateSso', () => {
+    it('should throw ExternalIdentityNotMappedException when user mapping is missing', async () => {
+      firebaseVerifier.verifyIdToken.mockResolvedValue({
+        uid: 'fb_uid_123',
+        email: 'user@tenant.com',
+      });
+      userRepo.findByTenantAndExternalIdentity.mockResolvedValue(null);
 
-    await expect(
-      service.authenticateSso({ tenantCode: 'TENANT_01', idToken: 'valid_token' }),
-    ).rejects.toThrow(ExternalIdentityNotMappedException);
+      await expect(
+        service.authenticateSso({ tenantCode: 'TENANT_01', idToken: 'valid_token' }),
+      ).rejects.toThrow(ExternalIdentityNotMappedException);
 
-    expect(securityEventService.logSsoLoginFailed).toHaveBeenCalledWith(
-      'TENANT_01',
-      'fb_uid_123',
-      'UNMAPPED_EXTERNAL_IDENTITY',
-      '127.0.0.1',
-      undefined,
-      'unknown',
-    );
-  });
-
-  it('should throw AmbiguousIdentityMappingException when multiple mappings exist', async () => {
-    firebaseVerifier.verifyIdToken.mockResolvedValue({ uid: 'fb_uid_dup' });
-    externalIdentityRepository.findMapping.mockResolvedValue([
-      { userId: 'u1' } as ExternalIdentity,
-      { userId: 'u2' } as ExternalIdentity,
-    ]);
-
-    await expect(
-      service.authenticateSso({ tenantCode: 'TENANT_01', idToken: 'valid_token' }),
-    ).rejects.toThrow(AmbiguousIdentityMappingException);
-
-    expect(securityEventService.logSsoLoginFailed).toHaveBeenCalledWith(
-      'TENANT_01',
-      'fb_uid_dup',
-      'IDENTITY_AMBIGUITY_CONFLICT',
-      '127.0.0.1',
-      undefined,
-      'unknown',
-    );
-  });
-
-  it('should return ACTIVE result and log success event when single mapping exists', async () => {
-    firebaseVerifier.verifyIdToken.mockResolvedValue({ uid: 'fb_uid_ok' });
-    externalIdentityRepository.findMapping.mockResolvedValue([
-      { userId: 'u_active' } as ExternalIdentity,
-    ]);
-
-    const result = await service.authenticateSso({
-      tenantCode: 'TENANT_01',
-      idToken: 'valid_token',
+      expect(userRepo.findByTenantAndExternalIdentity).toHaveBeenCalledWith(
+        'TENANT_01',
+        'fb_uid_123',
+      );
+      expect(securityEventService.logSsoLoginFailed).toHaveBeenCalledWith(
+        'TENANT_01',
+        'fb_uid_123',
+        'UNMAPPED_EXTERNAL_IDENTITY',
+        '127.0.0.1',
+        undefined,
+        'unknown',
+      );
     });
 
-    expect(result).toEqual({
-      authState: 'ACTIVE',
-      accessToken: 'mock_sso_access_token',
-      refreshToken: 'mock_sso_refresh_token',
-      expiresIn: 900,
+    it('should throw ExternalIdentityNotMappedException when user email does not match token email', async () => {
+      firebaseVerifier.verifyIdToken.mockResolvedValue({
+        uid: 'fb_uid_123',
+        email: 'token_email@tenant.com',
+      });
+      userRepo.findByTenantAndExternalIdentity.mockResolvedValue({
+        id: 'user_1',
+        normalizedEmail: 'different_email@tenant.com',
+      } as User);
+
+      await expect(
+        service.authenticateSso(
+          { tenantCode: 'TENANT_01', idToken: 'valid_token' },
+          '192.168.1.1',
+          'custom-agent',
+        ),
+      ).rejects.toThrow(ExternalIdentityNotMappedException);
+
+      expect(securityEventService.logSsoLoginFailed).toHaveBeenCalledWith(
+        'TENANT_01',
+        'fb_uid_123',
+        'UNMAPPED_EXTERNAL_IDENTITY',
+        '192.168.1.1',
+        undefined,
+        'custom-agent',
+      );
     });
-    expect(securityEventService.logSsoLoginSucceeded).toHaveBeenCalledWith(
-      'TENANT_01',
-      'u_active',
-      'fb_uid_ok',
-      'ACTIVE',
-      '127.0.0.1',
-      'unknown',
-    );
+
+    it('should throw AmbiguousIdentityMappingException when token tenant_code mismatches dto tenantCode', async () => {
+      firebaseVerifier.verifyIdToken.mockResolvedValue({
+        uid: 'fb_uid_123',
+        email: 'user@tenant.com',
+        tenant_code: 'OTHER_TENANT',
+      });
+      userRepo.findByTenantAndExternalIdentity.mockResolvedValue({
+        id: 'user_1',
+        normalizedEmail: 'user@tenant.com',
+      } as User);
+
+      await expect(
+        service.authenticateSso(
+          { tenantCode: 'TENANT_01', idToken: 'valid_token' },
+          '192.168.1.1',
+          'custom-agent',
+        ),
+      ).rejects.toThrow(AmbiguousIdentityMappingException);
+
+      expect(securityEventService.logSsoLoginFailed).toHaveBeenCalledWith(
+        'TENANT_01',
+        'fb_uid_123',
+        'IDENTITY_AMBIGUITY_CONFLICT',
+        '192.168.1.1',
+        undefined,
+        'custom-agent',
+      );
+    });
+
+    it('should return authenticated user and log success event when mapping and tenant match', async () => {
+      const mockUser = {
+        id: 'user_123',
+        tenantCode: 'TENANT_01',
+        normalizedEmail: 'user@tenant.com',
+      } as User;
+
+      firebaseVerifier.verifyIdToken.mockResolvedValue({
+        uid: 'fb_uid_123',
+        email: 'user@tenant.com',
+        tenant_code: 'TENANT_01',
+      });
+      userRepo.findByTenantAndExternalIdentity.mockResolvedValue(mockUser);
+
+      const result = await service.authenticateSso(
+        {
+          tenantCode: 'TENANT_01',
+          idToken: 'valid_token',
+        },
+        '10.0.0.1',
+        'test-browser',
+      );
+
+      expect(result).toBe(mockUser);
+      expect(securityEventService.logSsoLoginSucceeded).toHaveBeenCalledWith(
+        'TENANT_01',
+        'user_123',
+        'fb_uid_123',
+        'ACTIVE',
+        '10.0.0.1',
+        'test-browser',
+      );
+    });
   });
 });

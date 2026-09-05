@@ -87,4 +87,42 @@ describe('AuthController', () => {
       });
     });
   });
+
+  describe('loginWithFirebase', () => {
+    it('should call authApplicationService.loginWithFirebase and set cookie when token is present', async () => {
+      const mockResult = {
+        authState: 'AUTHENTICATED',
+        accessToken: 'firebase-access-jwt',
+        refreshToken: 'firebase-refresh-jwt',
+      };
+      mockAuthService.loginWithFirebase = jest.fn().mockResolvedValue(mockResult);
+
+      const mockResponse = {
+        cookie: jest.fn(),
+      } as unknown as Response;
+
+      const dto = {
+        tenantCode: 'TENANT_123',
+        idToken: 'valid-firebase-id-token',
+      };
+
+      const result = await controller.loginWithFirebase(dto, mockResponse);
+
+      expect(mockAuthService.loginWithFirebase).toHaveBeenCalledWith(dto);
+      expect(mockResponse.cookie).toHaveBeenCalledWith(
+        '__Host-refresh-token',
+        'firebase-refresh-jwt',
+        {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'lax',
+          path: '/',
+        },
+      );
+      expect(result).toEqual({
+        authState: 'AUTHENTICATED',
+        accessToken: 'firebase-access-jwt',
+      });
+    });
+  });
 });

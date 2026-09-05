@@ -63,7 +63,7 @@ export class FirebaseAdminAdapter implements FirebaseVerifierPort {
           typeof decodedToken.email_verified === 'boolean'
             ? decodedToken.email_verified
             : undefined,
-        tenant_id:
+        tenant_code:
           typeof (decodedToken.firebase as Record<string, unknown> | undefined)?.tenant === 'string'
             ? ((decodedToken.firebase as Record<string, unknown>).tenant as string)
             : undefined,

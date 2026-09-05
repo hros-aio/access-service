@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
-import { ExternalIdentityRepository } from '../../auth/repositories/external-identity.repository';
+import { LoginWithFirebaseDto } from '../../auth/dto/login-with-firebase.dto';
 import { SecurityEventService } from '../../security-event/services/security-event.service';
 import {
   AmbiguousIdentityMappingException,
@@ -10,17 +10,9 @@ import {
   FIREBASE_VERIFIER_PORT,
   FirebaseVerifierPort,
 } from '../domain/ports/firebase-verifier.port';
-import { LoginWithFirebaseDto } from '../presentation/dto/login-with-firebase.dto';
 
-export interface FirebaseSsoAuthResult {
-  authState: 'ACTIVE' | 'PASSWORD_SETUP_REQUIRED' | 'MFA_REQUIRED';
-  accessToken?: string;
-  refreshToken?: string;
-  flowId?: string;
-  challengeId?: string;
-  allowedMethods?: string[];
-  expiresIn: number;
-}
+import { User } from '@/modules/user/entities/user.entity';
+import { UserRepository } from '@/modules/user/repositories/user.repository';
 
 @Injectable()
 export class FirebaseSsoApplicationService {
@@ -29,7 +21,7 @@ export class FirebaseSsoApplicationService {
   constructor(
     @Inject(FIREBASE_VERIFIER_PORT)
     private readonly firebaseVerifier: FirebaseVerifierPort,
-    private readonly externalIdentityRepository: ExternalIdentityRepository,
+    private readonly userRepo: UserRepository,
     private readonly securityEventService: SecurityEventService,
   ) {}
 
@@ -37,17 +29,16 @@ export class FirebaseSsoApplicationService {
     dto: LoginWithFirebaseDto,
     sourceIp = '127.0.0.1',
     userAgent = 'unknown',
-  ): Promise<FirebaseSsoAuthResult> {
+  ): Promise<User> {
     const decodedToken = await this.firebaseVerifier.verifyIdToken(dto.idToken);
     const providerSubject = decodedToken.uid;
 
-    const mappings = await this.externalIdentityRepository.findMapping(
+    const user = await this.userRepo.findByTenantAndExternalIdentity(
       dto.tenantCode,
-      'firebase',
       providerSubject,
     );
 
-    if (!mappings || mappings.length === 0) {
+    if (!user || user.normalizedEmail !== decodedToken.email) {
       await this.securityEventService.logSsoLoginFailed(
         dto.tenantCode,
         providerSubject,
@@ -59,7 +50,7 @@ export class FirebaseSsoApplicationService {
       throw new ExternalIdentityNotMappedException();
     }
 
-    if (mappings.length > 1) {
+    if (decodedToken.tenant_code !== dto.tenantCode) {
       await this.securityEventService.logSsoLoginFailed(
         dto.tenantCode,
         providerSubject,
@@ -71,23 +62,15 @@ export class FirebaseSsoApplicationService {
       throw new AmbiguousIdentityMappingException();
     }
 
-    const targetUser = mappings[0];
-    this.logger.log(`SSO authenticated user ${targetUser.userId} for tenant ${dto.tenantCode}`);
-
     await this.securityEventService.logSsoLoginSucceeded(
       dto.tenantCode,
-      targetUser.userId,
+      user.id,
       providerSubject,
       'ACTIVE',
       sourceIp,
       userAgent,
     );
 
-    return {
-      authState: 'ACTIVE',
-      accessToken: 'mock_sso_access_token',
-      refreshToken: 'mock_sso_refresh_token',
-      expiresIn: 900,
-    };
+    return user;
   }
 }

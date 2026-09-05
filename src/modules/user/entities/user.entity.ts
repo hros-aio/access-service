@@ -1,7 +1,7 @@
 import { BaseEntity } from '@new-hros/libs-sql';
 import { Column, Entity, JoinColumn, OneToOne, Unique } from 'typeorm';
 
-import { UserStatus, CredentialStatus } from '../../../enums';
+import { CredentialStatus, UserStatus } from '../../../enums';
 import { EmployeeReference } from '../../employee/entities/employee-reference.entity';
 
 @Entity('users')
@@ -36,6 +36,9 @@ export class User extends BaseEntity {
 
   @Column({ name: 'mfa_reenrollment_required', type: 'boolean', default: false })
   mfaReenrollmentRequired: boolean;
+
+  @Column({ name: 'external_identity_id', type: 'varchar', length: 100, nullable: true })
+  externalIdentityId?: string;
 
   @OneToOne(() => EmployeeReference, { onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
   @JoinColumn([

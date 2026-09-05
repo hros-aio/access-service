@@ -1,6 +1,11 @@
 import crypto from 'crypto';
 
-import { Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import {
   ConfigurationService,
   RedisCacheProvider,
@@ -18,7 +23,9 @@ import { SecurityEventService } from '../../security-event/services/security-eve
 import { AuthenticationSettingsRepository } from '../../tenant/repositories/authentication-settings.repository';
 import { TenantRepository } from '../../tenant/repositories/tenant.repository';
 import { UserRepository } from '../../user/repositories/user.repository';
+import { LoginWithFirebaseDto } from '../dto/login-with-firebase.dto';
 import { LoginWithPasswordDto } from '../dto/login-with-password.dto';
+import { LoginResultResponseDto } from '../dto/result.dto';
 import {
   AccountDisabledError,
   AccountLockedError,
@@ -27,6 +34,13 @@ import {
 } from '../exceptions/auth.exception';
 import { CredentialRepository } from '../repositories/credential.repository';
 
+import { FirebaseSsoApplicationService } from '@/modules/firebase-sso/application/firebase-sso-application.service';
+import {
+  AmbiguousIdentityMappingException,
+  ExternalIdentityNotMappedException,
+  FirebaseProviderUnavailableException,
+  InvalidFirebaseTokenException,
+} from '@/modules/firebase-sso/domain/exceptions/firebase-sso.exceptions';
 import { AuthenticationSettings } from '@/modules/tenant/entities/authentication-settings.entity';
 import { User } from '@/modules/user/entities/user.entity';
 
@@ -44,15 +58,57 @@ export class AuthApplicationService {
     private readonly ipRestrictionService: IpRestrictionService,
     private readonly lockoutService: LockoutService,
     private readonly securityEventService: SecurityEventService,
+    private readonly firebaseSsoApplicationService: FirebaseSsoApplicationService,
   ) {}
 
-  async loginWithPassword(dto: LoginWithPasswordDto): Promise<{
-    authState: string;
-    accessToken?: string;
-    refreshToken?: string;
-    challengeId?: string;
-  }> {
+  async loginWithPassword(dto: LoginWithPasswordDto): Promise<LoginResultResponseDto> {
     const { tenantCode, email, password, rememberMe } = dto;
+
+    return this.processLogin(tenantCode, email, password, rememberMe);
+  }
+
+  async loginWithFirebase(dto: LoginWithFirebaseDto): Promise<LoginResultResponseDto> {
+    const currentContext = RequestContextService.current();
+    const sourceIp = currentContext?.clientMetadata?.ip || 'unknown';
+    const userAgent = currentContext?.clientMetadata?.userAgent || 'unknown';
+
+    try {
+      const { normalizedEmail: email } = await this.firebaseSsoApplicationService.authenticateSso(
+        dto,
+        sourceIp,
+        userAgent,
+      );
+
+      return this.processLogin(dto.tenantCode, email);
+    } catch (error) {
+      if (
+        error instanceof InvalidFirebaseTokenException ||
+        error instanceof ExternalIdentityNotMappedException
+      ) {
+        throw new UnauthorizedException(
+          'Authentication failed via Single Sign-On. Please try again or contact your administrator.',
+        );
+      }
+      if (error instanceof AmbiguousIdentityMappingException) {
+        throw new ConflictException(
+          'Authentication failed due to ambiguous identity mappings. Please contact your administrator.',
+        );
+      }
+      if (error instanceof FirebaseProviderUnavailableException) {
+        throw new ServiceUnavailableException(
+          'Single Sign-On service is temporarily unavailable. Please try logging in with your password.',
+        );
+      }
+      throw error;
+    }
+  }
+
+  private async processLogin(
+    tenantCode: string,
+    email: string,
+    password?: string,
+    rememberMe = true,
+  ): Promise<LoginResultResponseDto> {
     const currentContext = RequestContextService.current();
     const sourceIp = currentContext?.clientMetadata?.ip || 'unknown';
     const userAgent = currentContext?.clientMetadata?.userAgent || 'unknown';
@@ -64,18 +120,20 @@ export class AuthApplicationService {
     await this.verifyTenantExistence(tenantCode);
 
     // Step 2 & 3: Fetch and validate user status
-    const user = await this.fetchAndValidateUser(tenantCode, email, password, sourceIp, userAgent);
+    const user = await this.fetchAndValidateUser(tenantCode, email, sourceIp, userAgent);
 
     // Step 4 & 5: Verify password & handle lockout on failure
-    await this.verifyUserPassword(
-      user,
-      password,
-      tenantCode,
-      email,
-      authSettings,
-      sourceIp,
-      userAgent,
-    );
+    if (password) {
+      await this.verifyUserPassword(
+        user,
+        password,
+        tenantCode,
+        email,
+        authSettings,
+        sourceIp,
+        userAgent,
+      );
+    }
 
     // Step 5.5: Check MFA requirements and issue challenge if required
     const mfaResult = await this.evaluateMfa(user, tenantCode, authSettings, rememberMe ?? false);
@@ -95,7 +153,7 @@ export class AuthApplicationService {
       user,
       tenantCode,
       sessionId,
-      rememberMe ?? false,
+      rememberMe,
       sourceIp,
       userAgent,
     );
@@ -145,7 +203,6 @@ export class AuthApplicationService {
   private async fetchAndValidateUser(
     tenantCode: string,
     email: string,
-    password: string,
     sourceIp: string,
     userAgent: string,
   ): Promise<User> {
@@ -153,10 +210,7 @@ export class AuthApplicationService {
     const user = await this.userRepository.findOne({ tenantCode, normalizedEmail });
 
     if (!user) {
-      await this.credentialDomainService.verifyPassword(
-        '$2b$10$e8p.9p56x8P90Q2m7qX67eO0jU5vK.hZl4u/eZzN7cZ5.0J6.y7iW',
-        password,
-      );
+      await this.preventBruteForceAttack();
       await this.securityEventService.logLoginFailed(
         tenantCode,
         email,
@@ -169,10 +223,7 @@ export class AuthApplicationService {
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      await this.credentialDomainService.verifyPassword(
-        '$2b$10$e8p.9p56x8P90Q2m7qX67eO0jU5vK.hZl4u/eZzN7cZ5.0J6.y7iW',
-        password,
-      );
+      await this.preventBruteForceAttack();
       if (user.status === UserStatus.SUSPENDED) {
         await this.securityEventService.logLoginFailed(
           tenantCode,
@@ -384,6 +435,13 @@ export class AuthApplicationService {
       sourceIp,
       userAgent,
       rememberMe,
+    );
+  }
+
+  private async preventBruteForceAttack(): Promise<void> {
+    await this.credentialDomainService.verifyPassword(
+      '$2b$10$e8p.9p56x8P90Q2m7qX67eO0jU5vK.hZl4u/eZzN7cZ5.0J6.y7iW',
+      '12345678@Tc',
     );
   }
 }
