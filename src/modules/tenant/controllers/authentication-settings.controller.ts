@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Patch } from '@nestjs/common';
+import { Body, Controller, Get, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 
 import {
@@ -8,23 +8,21 @@ import {
 import { AuthenticationSettingsService } from '../services/authentication-settings.service';
 
 @ApiTags('Authentication Settings')
-@Controller('admin/settings/authentication')
+@Controller('settings/authentication')
 export class AuthenticationSettingsController {
   constructor(private readonly service: AuthenticationSettingsService) {}
 
   @Get()
-  async getSettings(
-    @Headers('x-tenant-code') tenantCode: string,
-  ): Promise<AuthenticationSettingsResponseDto> {
-    return this.service.getSettings(tenantCode);
+  async getSettings(): Promise<AuthenticationSettingsResponseDto> {
+    const settings = await this.service.getSettings();
+    return AuthenticationSettingsResponseDto.fromSetting(settings);
   }
 
-  @Patch()
+  @Put()
   async updateSettings(
-    @Headers('x-tenant-code') tenantCode: string,
-    @Headers('x-user-id') userId: string,
     @Body() dto: UpdateAuthenticationSettingsDto,
   ): Promise<AuthenticationSettingsResponseDto> {
-    return this.service.updateSettings(tenantCode, dto, userId || 'system');
+    const settings = await this.service.upsertSettings(dto);
+    return AuthenticationSettingsResponseDto.fromSetting(settings);
   }
 }

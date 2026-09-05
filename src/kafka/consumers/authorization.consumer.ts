@@ -40,7 +40,6 @@ export class AuthorizationConsumer {
     const context: RequestContext = {
       traceId: envelope.correlationId || envelope.id,
       requestId: envelope.id,
-      serviceName: 'hrms-access-service',
       tenantCode: payload.tenantCode,
       clientMetadata: {
         ip: '127.0.0.1',

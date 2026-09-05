@@ -10,6 +10,8 @@ import {
   ValidateIf,
 } from 'class-validator';
 
+import { AuthenticationSettings } from '../entities/authentication-settings.entity';
+
 export class UpdateAuthenticationSettingsDto {
   @IsOptional()
   @IsBoolean()
@@ -55,4 +57,20 @@ export class AuthenticationSettingsResponseDto {
   ipAllowList: string[];
   version: number;
   updatedAt: Date;
+
+  static fromSetting(setting: AuthenticationSettings): AuthenticationSettingsResponseDto {
+    return {
+      tenantCode: setting.tenantCode,
+      mfaRequired: setting.restrictedMfaEnabled,
+      selfServicePasswordResetEnabled: setting.needAdminResetPassword,
+      lockoutEnabled: setting.accountLockoutEnabled,
+      lockoutThreshold: setting.maxFailedRetries,
+      ipRestrictionEnabled: setting.ipRestrictionEnabled,
+      ipAllowList: Array.isArray(setting.allowedIpCidrs)
+        ? (setting.allowedIpCidrs as string[])
+        : [],
+      version: setting.version,
+      updatedAt: setting.updatedAt,
+    };
+  }
 }
