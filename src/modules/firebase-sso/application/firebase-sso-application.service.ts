@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { DEFAULT_TENANT_CODE } from '@new-hros/libs-core';
 
-import { LoginWithFirebaseDto } from '../../auth/dto/login-with-firebase.dto';
 import { SecurityEventService } from '../../security-event/services/security-event.service';
 import {
   AmbiguousIdentityMappingException,
@@ -25,22 +25,19 @@ export class FirebaseSsoApplicationService {
     private readonly securityEventService: SecurityEventService,
   ) {}
 
-  async authenticateSso(
-    dto: LoginWithFirebaseDto,
+  async authenticate(
+    idToken: string,
     sourceIp = '127.0.0.1',
     userAgent = 'unknown',
   ): Promise<User> {
-    const decodedToken = await this.firebaseVerifier.verifyIdToken(dto.idToken);
+    const decodedToken = await this.firebaseVerifier.verifyIdToken(idToken);
     const providerSubject = decodedToken.uid;
 
-    const user = await this.userRepo.findByTenantAndExternalIdentity(
-      dto.tenantCode,
-      providerSubject,
-    );
+    const user = await this.userRepo.findByTenantAndExternalIdentity(providerSubject);
 
     if (!user || user.normalizedEmail !== decodedToken.email) {
       await this.securityEventService.logSsoLoginFailed(
-        dto.tenantCode,
+        decodedToken.tenant_code || DEFAULT_TENANT_CODE,
         providerSubject,
         'UNMAPPED_EXTERNAL_IDENTITY',
         sourceIp,
@@ -50,9 +47,9 @@ export class FirebaseSsoApplicationService {
       throw new ExternalIdentityNotMappedException();
     }
 
-    if (decodedToken.tenant_code !== dto.tenantCode) {
+    if (decodedToken.tenant_code !== user.tenantCode) {
       await this.securityEventService.logSsoLoginFailed(
-        dto.tenantCode,
+        user.tenantCode,
         providerSubject,
         'IDENTITY_AMBIGUITY_CONFLICT',
         sourceIp,
@@ -63,7 +60,7 @@ export class FirebaseSsoApplicationService {
     }
 
     await this.securityEventService.logSsoLoginSucceeded(
-      dto.tenantCode,
+      user.tenantCode,
       user.id,
       providerSubject,
       'ACTIVE',

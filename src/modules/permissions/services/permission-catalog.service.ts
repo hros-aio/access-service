@@ -15,7 +15,7 @@ import { PermissionCatalogLoader } from '../loaders/permission-catalog.loader';
 export class PermissionCatalogService implements OnModuleInit {
   private readonly logger = new Logger(PermissionCatalogService.name);
   private definitions: readonly PermissionDefinition[] = [];
-  private graph!: PermissionDependencyGraph;
+  private graph: PermissionDependencyGraph;
 
   constructor(
     private readonly loader: PermissionCatalogLoader,

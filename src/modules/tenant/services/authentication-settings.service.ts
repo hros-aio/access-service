@@ -17,13 +17,10 @@ export class AuthenticationSettingsService {
   }
 
   async upsertSettings(dto: UpdateAuthenticationSettingsDto): Promise<AuthenticationSettings> {
-    let updatedSettings!: AuthenticationSettings;
-
-    await this.transactionService.runInTransaction(async () => {
+    return this.transactionService.runInTransaction(async () => {
       const current = await this.repository.findOne({});
       if (!current) {
-        updatedSettings = await this.repository.create(dto);
-        return updatedSettings;
+        return this.repository.create(dto);
       }
 
       const changes: Record<string, { old: unknown; new: unknown }> = {};
@@ -77,14 +74,7 @@ export class AuthenticationSettingsService {
         fieldsToUpdate.allowedIpCidrs = dto.ipAllowList;
       }
 
-      updatedSettings = await this.repository.updateWithOptimisticLock(
-        current.id,
-        dto.version,
-        fieldsToUpdate,
-      );
-      return updatedSettings;
+      return this.repository.updateWithOptimisticLock(current.id, dto.version, fieldsToUpdate);
     });
-
-    return updatedSettings;
   }
 }

@@ -1,20 +1,31 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { BaseEntity } from '@new-hros/libs-sql';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 import { User } from '../../user/entities/user.entity';
 
-@Entity('mfa_methods')
-export class MfaMethod {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+import { TableName } from '@/enums';
 
+export enum MfaFactorType {
+  TOTP = 'totp',
+  EMAIL = 'email',
+}
+
+export enum MfaFactorStatus {
+  PENDING = 'pending',
+  ACTIVE = 'active',
+  DISABLED = 'disabled',
+}
+
+@Entity(TableName.MFA_METHODS)
+export class MfaMethod extends BaseEntity {
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
   @Column({ name: 'type', type: 'varchar', length: 30 })
-  type: string;
+  type: MfaFactorType;
 
   @Column({ name: 'status', type: 'varchar', length: 30 })
-  status: string;
+  status: MfaFactorStatus;
 
   @Column({ name: 'is_primary', type: 'boolean', default: false })
   isPrimary: boolean;

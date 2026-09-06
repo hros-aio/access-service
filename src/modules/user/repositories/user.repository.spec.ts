@@ -54,7 +54,7 @@ describe('UserRepository', () => {
 
     mockTypeormRepository.findOne.mockResolvedValue(user);
 
-    const result = await repository.findByEmail('TEST@example.com');
+    const result = await repository.findByEmailUnscoped('TEST@example.com');
     expect(result).toEqual(user);
     expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
       where: {

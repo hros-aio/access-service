@@ -18,8 +18,6 @@ import { Invitation } from '../entities/invitation.entity';
 import {
   AuthInvitationInvalidError,
   AuthSessionStoreUnavailableError,
-  CrossTenantAccessDeniedError,
-  InvalidPasswordPolicyError,
   InvitationNotAllowedError,
 } from '../exceptions/invitation.exception';
 import { InvitationRepository } from '../repositories/invitation.repository';

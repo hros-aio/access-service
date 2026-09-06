@@ -2,12 +2,6 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class LoginWithPasswordDto {
-  @ApiProperty({ description: 'The tenant code context', example: 'TENANT_123' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(16)
-  tenantCode: string;
-
   @ApiProperty({ description: 'The email address of the user', example: 'employee@tenant.com' })
   @IsEmail()
   @IsNotEmpty()

@@ -37,3 +37,11 @@ export function GenerateAuthzWorkerLockKey(tenantCode: string): string {
 export function GenerateRoleAuthzCacheKey(tenantCode: string, roleId: string): string {
   return `authz:role:${tenantCode}:${roleId}`;
 }
+
+export function GenerateAuthMfaChallengeKey(
+  tenantCode: string,
+  userId: string,
+  challengeId: string,
+): string {
+  return `auth:mfa-challenge:${tenantCode}:${userId}:${challengeId}`;
+}

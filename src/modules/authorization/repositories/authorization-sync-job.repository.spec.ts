@@ -1,5 +1,5 @@
 import { TransactionService } from '@new-hros/libs-sql';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 
 import { AuthorizationSyncJobRepository } from './authorization-sync-job.repository';
 import {

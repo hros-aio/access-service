@@ -14,7 +14,11 @@ import {
 import * as jwt from 'jsonwebtoken';
 
 import { CredentialDomainService } from './credential.domain.service';
-import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
+import {
+  GenerateAuthMfaChallengeKey,
+  GenerateSessionKey,
+  GenerateUserSessionsKey,
+} from '../../../constants';
 import { UserStatus } from '../../../enums';
 import { IpRestrictionService } from '../../ip-restriction/services/ip-restriction.service';
 import { LockoutService } from '../../lockout/services/lockout.service';
@@ -58,13 +62,24 @@ export class AuthApplicationService {
     private readonly ipRestrictionService: IpRestrictionService,
     private readonly lockoutService: LockoutService,
     private readonly securityEventService: SecurityEventService,
-    private readonly firebaseSsoApplicationService: FirebaseSsoApplicationService,
+    private readonly firebaseSsoAppService: FirebaseSsoApplicationService,
   ) {}
 
   async loginWithPassword(dto: LoginWithPasswordDto): Promise<LoginResultResponseDto> {
-    const { tenantCode, email, password, rememberMe } = dto;
+    const { email, password, rememberMe } = dto;
 
-    return this.processLogin(tenantCode, email, password, rememberMe);
+    const tenantCodes = await this.userRepository.findTenantCodeByEmail(email);
+    let err;
+    for (const tenantCode of tenantCodes) {
+      try {
+        const res = await this.processLogin(tenantCode, email, password, rememberMe);
+        return res;
+      } catch (error) {
+        err = error;
+      }
+    }
+
+    throw err;
   }
 
   async loginWithFirebase(dto: LoginWithFirebaseDto): Promise<LoginResultResponseDto> {
@@ -73,13 +88,13 @@ export class AuthApplicationService {
     const userAgent = currentContext?.clientMetadata?.userAgent || 'unknown';
 
     try {
-      const { normalizedEmail: email } = await this.firebaseSsoApplicationService.authenticateSso(
-        dto,
+      const { normalizedEmail: email, tenantCode } = await this.firebaseSsoAppService.authenticate(
+        dto.idToken,
         sourceIp,
         userAgent,
       );
 
-      return this.processLogin(dto.tenantCode, email);
+      return this.processLogin(tenantCode, email);
     } catch (error) {
       if (
         error instanceof InvalidFirebaseTokenException ||
@@ -107,7 +122,7 @@ export class AuthApplicationService {
     tenantCode: string,
     email: string,
     password?: string,
-    rememberMe = true,
+    rememberMe?: boolean,
   ): Promise<LoginResultResponseDto> {
     const currentContext = RequestContextService.current();
     const sourceIp = currentContext?.clientMetadata?.ip || 'unknown';
@@ -124,39 +139,20 @@ export class AuthApplicationService {
 
     // Step 4 & 5: Verify password & handle lockout on failure
     if (password) {
-      await this.verifyUserPassword(
-        user,
-        password,
-        tenantCode,
-        email,
-        authSettings,
-        sourceIp,
-        userAgent,
-      );
+      await this.verifyUserPassword(user, password, email, authSettings, sourceIp, userAgent);
     }
 
     // Step 5.5: Check MFA requirements and issue challenge if required
-    const mfaResult = await this.evaluateMfa(user, tenantCode, authSettings, rememberMe ?? false);
+    const mfaResult = await this.evaluateMfa(user, authSettings, rememberMe);
     if (mfaResult) {
       return mfaResult;
     }
 
     // Step 6: Generate Access and Refresh JWT Tokens
-    const { sessionId, accessToken, refreshToken } = this.generateAuthTokens(
-      user,
-      tenantCode,
-      rememberMe ?? false,
-    );
+    const { sessionId, accessToken, refreshToken } = this.generateAuthTokens(user, rememberMe);
 
     // Step 7: Store session state and log successful login
-    await this.storeSessionAndLogSuccess(
-      user,
-      tenantCode,
-      sessionId,
-      rememberMe,
-      sourceIp,
-      userAgent,
-    );
+    await this.storeSessionAndLogSuccess(user, sessionId, sourceIp, userAgent, rememberMe);
 
     return {
       authState: 'AUTHENTICATED',
@@ -170,13 +166,12 @@ export class AuthApplicationService {
     email: string,
     sourceIp: string,
     userAgent: string,
-  ): Promise<AuthenticationSettings | null> {
+  ): Promise<AuthenticationSettings | undefined> {
     const authSettings = await this.authenticationSettingsRepository.findByTenantCode(tenantCode);
     try {
       this.ipRestrictionService.evaluate(sourceIp, authSettings || undefined);
     } catch (err) {
-      const normalizedEmail = email.toLowerCase().trim();
-      const user = await this.userRepository.findOne({ tenantCode, normalizedEmail });
+      const user = await this.userRepository.findByEmailUnscoped(email);
       if (user) {
         await this.lockoutService.recordIpFailure(tenantCode, user.id, sourceIp);
       }
@@ -190,7 +185,7 @@ export class AuthApplicationService {
       );
       throw err;
     }
-    return authSettings;
+    return authSettings || undefined;
   }
 
   private async verifyTenantExistence(tenantCode: string): Promise<void> {
@@ -206,9 +201,7 @@ export class AuthApplicationService {
     sourceIp: string,
     userAgent: string,
   ): Promise<User> {
-    const normalizedEmail = email.toLowerCase().trim();
-    const user = await this.userRepository.findOne({ tenantCode, normalizedEmail });
-
+    const user = await this.userRepository.findByEmailWithTenant(email, tenantCode);
     if (!user) {
       await this.preventBruteForceAttack();
       await this.securityEventService.logLoginFailed(
@@ -263,9 +256,8 @@ export class AuthApplicationService {
   private async verifyUserPassword(
     user: User,
     password: string,
-    tenantCode: string,
     email: string,
-    authSettings: AuthenticationSettings | null,
+    authSettings: AuthenticationSettings | undefined,
     sourceIp: string,
     userAgent: string,
   ): Promise<void> {
@@ -281,15 +273,20 @@ export class AuthApplicationService {
 
     if (!isPasswordValid) {
       const locked = await this.lockoutService.handleFailure(
-        tenantCode,
+        user.tenantCode,
         user.id,
         authSettings || undefined,
       );
       if (locked) {
-        await this.securityEventService.logAccountLocked(tenantCode, user.id, sourceIp, userAgent);
+        await this.securityEventService.logAccountLocked(
+          user.tenantCode,
+          user.id,
+          sourceIp,
+          userAgent,
+        );
       }
       await this.securityEventService.logLoginFailed(
-        tenantCode,
+        user.tenantCode,
         email,
         sourceIp,
         'INVALID_CREDENTIALS',
@@ -299,14 +296,13 @@ export class AuthApplicationService {
       throw new InvalidCredentialsError();
     }
 
-    await this.lockoutService.resetFailureCount(tenantCode, user.id);
+    await this.lockoutService.resetFailureCount(user.tenantCode, user.id);
   }
 
   private async evaluateMfa(
     user: User,
-    tenantCode: string,
-    authSettings: AuthenticationSettings | null,
-    rememberMe: boolean,
+    authSettings: AuthenticationSettings | undefined,
+    rememberMe?: boolean,
   ): Promise<{ authState: string; challengeId: string } | null> {
     const mfaMethods = await this.mfaMethodRepository.findActiveByUserId(user.id);
     const mfaRequired =
@@ -317,13 +313,13 @@ export class AuthApplicationService {
 
     if (mfaRequired) {
       const challengeId = crypto.randomUUID();
-      const challengeKey = `auth:mfa-challenge:${challengeId}`;
+      const challengeKey = GenerateAuthMfaChallengeKey(user.tenantCode, user.id, challengeId);
       const challengeData = {
         challengeId,
         userId: user.id,
-        tenantCode,
+        tenantCode: user.tenantCode,
         rememberMe,
-        createdAt: new Date().toISOString(),
+        attemptsLeft: 0,
       };
 
       try {
@@ -344,10 +340,9 @@ export class AuthApplicationService {
     return null;
   }
 
-  private generateAuthTokens(
+  public generateAuthTokens(
     user: User,
-    tenantCode: string,
-    rememberMe: boolean,
+    rememberMe?: boolean,
   ): { sessionId: string; accessToken: string; refreshToken: string } {
     const sessionId = crypto.randomUUID();
     const privateKey = this.configService.get<string>('jwt.privateKey');
@@ -358,14 +353,14 @@ export class AuthApplicationService {
     const payload = {
       sub: user.id,
       sid: sessionId,
-      tenantCode,
+      tenantCode: user.tenantCode,
       type: 'access',
     };
 
     const refreshPayload = {
       sub: user.id,
       sid: sessionId,
-      tenantCode,
+      tenantCode: user.tenantCode,
       type: 'refresh',
     };
 
@@ -389,23 +384,22 @@ export class AuthApplicationService {
     }
   }
 
-  private async storeSessionAndLogSuccess(
+  public async storeSessionAndLogSuccess(
     user: User,
-    tenantCode: string,
     sessionId: string,
-    rememberMe: boolean,
     sourceIp: string,
     userAgent: string,
+    rememberMe?: boolean,
   ): Promise<void> {
     const ttlSeconds = rememberMe ? 2592000 : 604800;
     const sessionKey = GenerateSessionKey(sessionId);
     const sessionData = {
       sessionId,
       userId: user.id,
-      tenantCode,
+      tenantCode: user.tenantCode,
       user: {
         id: user.id,
-        tenantCode,
+        tenantCode: user.tenantCode,
         email: user.displayEmail,
         roles: [],
       },
@@ -417,7 +411,7 @@ export class AuthApplicationService {
 
       const client = this.redisCacheProvider.getClient();
       if (client) {
-        const userSessionsKey = GenerateUserSessionsKey(tenantCode, user.id);
+        const userSessionsKey = GenerateUserSessionsKey(user.tenantCode, user.id);
         await client.sadd(userSessionsKey, sessionId);
         await client.expire(userSessionsKey, ttlSeconds);
       }
@@ -429,7 +423,7 @@ export class AuthApplicationService {
     }
 
     await this.securityEventService.logLoginSucceeded(
-      tenantCode,
+      user.tenantCode,
       user.id,
       sessionId,
       sourceIp,

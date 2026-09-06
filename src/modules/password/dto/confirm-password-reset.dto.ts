@@ -8,12 +8,12 @@ export class ConfirmPasswordResetDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  readonly challengeId!: string;
+  readonly challengeId: string;
 
   @ApiProperty({ description: 'Tenant code associated with challenge', example: 'acme-corp' })
   @IsString()
   @IsNotEmpty()
-  readonly tenantCode!: string;
+  readonly tenantCode: string;
 
   @ApiProperty({
     description: 'User ID associated with challenge',
@@ -21,7 +21,7 @@ export class ConfirmPasswordResetDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  readonly userId!: string;
+  readonly userId: string;
 
   @ApiProperty({
     description: 'Short-lived proof token from verification step',
@@ -29,10 +29,10 @@ export class ConfirmPasswordResetDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  readonly resetToken!: string;
+  readonly resetToken: string;
 
   @ApiProperty({ description: 'New account password', example: 'NewSecurePassword123!' })
   @IsString()
   @IsStrongPassword()
-  readonly newPassword!: string;
+  readonly newPassword: string;
 }

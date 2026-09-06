@@ -22,18 +22,32 @@ export class UserRepository extends BaseRepository<User> {
     });
   }
 
-  async findByTenantAndExternalIdentity(
-    tenantCode: string,
-    externalIdentityId: string,
-  ): Promise<User | null> {
+  async findByTenantAndExternalIdentity(externalIdentityId: string): Promise<User | null> {
     return this.repository.findOne({
-      where: { tenantCode, externalIdentityId },
+      where: { externalIdentityId },
     });
   }
 
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmailUnscoped(email: string): Promise<User | null> {
     const normalizedEmail = email.toLowerCase().trim();
-    return this.findOne({ normalizedEmail });
+    return this.findOne({ normalizedEmail }, { withTenancy: false });
+  }
+
+  async findByEmailWithTenant(email: string, tenantCode: string): Promise<User | null> {
+    const normalizedEmail = email.toLowerCase().trim();
+    return this.findOne({ normalizedEmail, tenantCode });
+  }
+
+  async findTenantCodeByEmail(email: string): Promise<string[]> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const users = await this.find(
+      { normalizedEmail },
+      {
+        withTenancy: false,
+        select: { tenantCode: true },
+      },
+    );
+    return users.map((u) => u.tenantCode);
   }
 
   async findByEmployeeId(employeeRefId: string): Promise<User | null> {
@@ -73,5 +87,20 @@ export class UserRepository extends BaseRepository<User> {
       .execute();
 
     return (result.affected || 0) > 0;
+  }
+
+  async incrementSecurityVersionById(id: string): Promise<number> {
+    const result = await this.repository
+      .createQueryBuilder()
+      .update(this.entityTarget)
+      .set({
+        securityVersion: () => '"security_version" + 1',
+      })
+      .where('id = :id', { id })
+      .andWhere('tenant_code = :tenantCode', { tenantCode: this.tenantCode })
+      .returning(['id'])
+      .execute();
+
+    return result.affected ?? 0;
   }
 }
