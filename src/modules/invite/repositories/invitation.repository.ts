@@ -16,28 +16,31 @@ export class InvitationRepository extends BaseRepository<Invitation> {
   }
 
   async findByTokenHashUnscoped(tokenHash: string): Promise<Invitation> {
-    return this.findOne({ tokenHash }, { withTenancy: false, required: true });
+    const where = { tokenHash };
+    return this.findOne(where, { where, withTenancy: false, required: true });
   }
 
   async findByTokenHashForUpdateUnscoped(tokenHash: string): Promise<Invitation> {
-    return this.findOne(
-      { tokenHash },
-      { withTenancy: false, required: true, lock: { mode: 'pessimistic_write' } },
-    );
+    const where = { tokenHash };
+    return this.findOne(where, {
+      where,
+      withTenancy: false,
+      required: true,
+      lock: { mode: 'pessimistic_write' },
+    });
   }
 
   async findPreviousByUser(userId: string): Promise<Invitation | null> {
-    return this.findOne(
-      {
-        userId,
-        status: In([InvitationStatus.PENDING, InvitationStatus.SENT]),
-      },
-      {
-        lock: { mode: 'pessimistic_write' },
-        order: { sentAt: 'DESC' },
-        withTenancy: false,
-      },
-    );
+    const where = {
+      userId,
+      status: In([InvitationStatus.PENDING, InvitationStatus.SENT]),
+    };
+    return this.findOne(where, {
+      where,
+      lock: { mode: 'pessimistic_write' },
+      order: { sentAt: 'DESC' },
+      withTenancy: false,
+    });
   }
 
   async findActiveByUserId(userId: string): Promise<Invitation | null> {

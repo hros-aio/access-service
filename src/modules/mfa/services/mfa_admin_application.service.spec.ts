@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
@@ -5,6 +6,7 @@ import { TransactionService } from '@new-hros/libs-sql';
 
 import { MfaAdminApplicationService } from './mfa_admin_application.service';
 import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
+import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { MfaMethodRepository } from '../repositories/mfa-method.repository';
 
@@ -15,9 +17,11 @@ describe('MfaAdminApplicationService', () => {
   let mockRedisClient: { smembers: jest.Mock; del: jest.Mock };
   let mockTransactionService: { runInTransaction: jest.Mock };
   let mockUserRepository: { incrementSecurityVersionById: jest.Mock };
+  let mockOutboxRepository: { create: jest.Mock };
 
   beforeEach(async () => {
     jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue('t-1');
+    jest.spyOn(RequestContextService, 'getUser').mockReturnValue({ userId: 'admin-1' } as any);
 
     repository = {
       disableAllUserFactors: jest.fn().mockResolvedValue(undefined),
@@ -40,6 +44,10 @@ describe('MfaAdminApplicationService', () => {
       incrementSecurityVersionById: jest.fn(),
     };
 
+    mockOutboxRepository = {
+      create: jest.fn().mockResolvedValue({}),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MfaAdminApplicationService,
@@ -47,6 +55,7 @@ describe('MfaAdminApplicationService', () => {
         { provide: RedisCacheProvider, useValue: redisCacheProvider },
         { provide: TransactionService, useValue: mockTransactionService },
         { provide: UserRepository, useValue: mockUserRepository },
+        { provide: AuthSecurityEventOutboxRepository, useValue: mockOutboxRepository },
       ],
     }).compile();
 
@@ -63,7 +72,7 @@ describe('MfaAdminApplicationService', () => {
     await expect(service.resetUserMfa('u-1')).rejects.toThrow(NotFoundException);
   });
 
-  it('should reset user MFA, bump security version, and clear redis sessions', async () => {
+  it('should reset user MFA, bump security version, create outbox event, and clear redis sessions', async () => {
     mockUserRepository.incrementSecurityVersionById.mockResolvedValue(1);
 
     const result = await service.resetUserMfa('u-1');
@@ -71,6 +80,18 @@ describe('MfaAdminApplicationService', () => {
     expect(result.revokedSessionsCount).toBe(2);
     expect(result.resetAt).toBeInstanceOf(Date);
     expect(repository.disableAllUserFactors).toHaveBeenCalledWith('u-1');
+    expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+      tenantCode: 't-1',
+      userId: 'u-1',
+      eventType: 'authentication.mfa-reset',
+      sanitizedPayload: {
+        tenantCode: 't-1',
+        targetUserId: 'u-1',
+        adminUserId: 'admin-1',
+        resetAt: expect.any(String),
+      },
+      publishStatus: 'pending',
+    });
     expect(mockRedisClient.smembers).toHaveBeenCalledWith(GenerateUserSessionsKey('t-1', 'u-1'));
     expect(mockRedisClient.del).toHaveBeenCalledWith(GenerateSessionKey('sess-1'));
     expect(mockRedisClient.del).toHaveBeenCalledWith(GenerateSessionKey('sess-2'));

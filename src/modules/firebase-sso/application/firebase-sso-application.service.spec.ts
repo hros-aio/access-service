@@ -59,13 +59,11 @@ describe('FirebaseSsoApplicationService', () => {
       });
       userRepo.findByTenantAndExternalIdentity.mockResolvedValue(null);
 
-      await expect(
-        service.authenticate('valid_token'),
-      ).rejects.toThrow(ExternalIdentityNotMappedException);
-
-      expect(userRepo.findByTenantAndExternalIdentity).toHaveBeenCalledWith(
-        'fb_uid_123',
+      await expect(service.authenticate('valid_token')).rejects.toThrow(
+        ExternalIdentityNotMappedException,
       );
+
+      expect(userRepo.findByTenantAndExternalIdentity).toHaveBeenCalledWith('fb_uid_123');
       expect(securityEventService.logSsoLoginFailed).toHaveBeenCalledWith(
         'TENANT_01',
         'fb_uid_123',
@@ -88,11 +86,7 @@ describe('FirebaseSsoApplicationService', () => {
       } as User);
 
       await expect(
-        service.authenticate(
-          'valid_token',
-          '192.168.1.1',
-          'custom-agent',
-        ),
+        service.authenticate('valid_token', '192.168.1.1', 'custom-agent'),
       ).rejects.toThrow(ExternalIdentityNotMappedException);
 
       expect(securityEventService.logSsoLoginFailed).toHaveBeenCalledWith(
@@ -118,11 +112,7 @@ describe('FirebaseSsoApplicationService', () => {
       } as User);
 
       await expect(
-        service.authenticate(
-          'valid_token',
-          '192.168.1.1',
-          'custom-agent',
-        ),
+        service.authenticate('valid_token', '192.168.1.1', 'custom-agent'),
       ).rejects.toThrow(AmbiguousIdentityMappingException);
 
       expect(securityEventService.logSsoLoginFailed).toHaveBeenCalledWith(
@@ -149,11 +139,7 @@ describe('FirebaseSsoApplicationService', () => {
       });
       userRepo.findByTenantAndExternalIdentity.mockResolvedValue(mockUser);
 
-      const result = await service.authenticate(
-        'valid_token',
-        '10.0.0.1',
-        'test-browser',
-      );
+      const result = await service.authenticate('valid_token', '10.0.0.1', 'test-browser');
 
       expect(result).toBe(mockUser);
       expect(securityEventService.logSsoLoginSucceeded).toHaveBeenCalledWith(

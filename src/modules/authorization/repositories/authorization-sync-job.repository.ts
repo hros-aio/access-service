@@ -19,66 +19,64 @@ export class AuthorizationSyncJobRepository extends BaseRepository<Authorization
     sourceId: string,
     sourceVersion: number,
   ): Promise<AuthorizationSyncJob | null> {
-    return this.findOne({
+    const where = {
       sourceType,
       sourceId,
       sourceVersion,
       status: In([SyncJobStatus.PENDING, SyncJobStatus.PROCESSING]),
-    });
+    };
+    return this.findOne(where, { where });
   }
 
   async findLatestJobBySource(
     sourceType: SyncSourceType,
     sourceId: string,
   ): Promise<AuthorizationSyncJob | null> {
-    return this.findOne(
-      {
-        sourceType,
-        sourceId,
+    const where = {
+      sourceType,
+      sourceId,
+    };
+    return this.findOne(where, {
+      where,
+      order: {
+        createdAt: 'DESC',
       },
-      {
-        order: {
-          createdAt: 'DESC',
-        },
-      },
-    );
+    });
   }
 
   async findLatestCompletedJobBySource(
     sourceType: SyncSourceType,
     sourceId: string,
   ): Promise<AuthorizationSyncJob | null> {
-    return this.findOne(
-      {
-        sourceType,
-        sourceId,
-        status: SyncJobStatus.COMPLETED,
+    const where = {
+      sourceType,
+      sourceId,
+      status: SyncJobStatus.COMPLETED,
+    };
+    return this.findOne(where, {
+      where,
+      order: {
+        completedAt: 'DESC',
+        createdAt: 'DESC',
       },
-      {
-        order: {
-          completedAt: 'DESC',
-          createdAt: 'DESC',
-        },
-      },
-    );
+    });
   }
 
   async findActiveJobBySource(
     sourceType: SyncSourceType,
     sourceId: string,
   ): Promise<AuthorizationSyncJob | null> {
-    return this.findOne(
-      {
-        sourceType,
-        sourceId,
-        status: In([SyncJobStatus.PENDING, SyncJobStatus.PROCESSING]),
+    const where = {
+      sourceType,
+      sourceId,
+      status: In([SyncJobStatus.PENDING, SyncJobStatus.PROCESSING]),
+    };
+    return this.findOne(where, {
+      where,
+      order: {
+        createdAt: 'DESC',
       },
-      {
-        order: {
-          createdAt: 'DESC',
-        },
-      },
-    );
+    });
   }
 
   async claimNextPendingJob(tenantCode: string): Promise<AuthorizationSyncJob | null> {

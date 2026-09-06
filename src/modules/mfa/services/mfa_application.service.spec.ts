@@ -11,6 +11,7 @@ import { VerifyEnrollmentDto } from '../dto/verify_enrollment.dto';
 import { MfaFactorStatus, MfaFactorType, MfaMethod } from '../entities/mfa-method.entity';
 import { MfaMethodRepository } from '../repositories/mfa-method.repository';
 
+import { AuthSecurityEventOutboxRepository } from '@/modules/auth/repositories/auth-security-event-outbox.repository';
 import { AuthApplicationService } from '@/modules/auth/services/auth.application.service';
 import { UserRepository } from '@/modules/user/repositories/user.repository';
 
@@ -22,6 +23,7 @@ describe('MfaApplicationService', () => {
   let challengeAdapter: Record<string, jest.Mock>;
   let transactionService: { runInTransaction: jest.Mock };
   let authApplicationService: Record<string, jest.Mock>;
+  let mockOutboxRepository: { create: jest.Mock };
 
   beforeEach(async () => {
     jest.spyOn(RequestContextService, 'getUser').mockReturnValue({ userId: 'user-1' } as any);
@@ -67,6 +69,10 @@ describe('MfaApplicationService', () => {
       storeSessionAndLogSuccess: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockOutboxRepository = {
+      create: jest.fn().mockResolvedValue({}),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MfaApplicationService,
@@ -76,6 +82,7 @@ describe('MfaApplicationService', () => {
         { provide: RedisMfaChallengeAdapter, useValue: challengeAdapter },
         { provide: TransactionService, useValue: transactionService },
         { provide: AuthApplicationService, useValue: authApplicationService },
+        { provide: AuthSecurityEventOutboxRepository, useValue: mockOutboxRepository },
       ],
     }).compile();
 
@@ -90,9 +97,9 @@ describe('MfaApplicationService', () => {
     it('should throw ConflictException if active primary factor exists', async () => {
       repository.findActivePrimary.mockResolvedValue({ id: 'existing-id' } as unknown as MfaMethod);
 
-      await expect(
-        service.initiateEnrollment({ factorType: MfaFactorType.TOTP }),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.initiateEnrollment({ factorType: MfaFactorType.TOTP })).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should create and return pending enrollment', async () => {
@@ -128,9 +135,7 @@ describe('MfaApplicationService', () => {
         code: '999999',
       };
 
-      await expect(service.verifyAndActivateFactor(dto)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(service.verifyAndActivateFactor(dto)).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException if factor does not belong to user', async () => {
@@ -146,9 +151,7 @@ describe('MfaApplicationService', () => {
         code: '123456',
       };
 
-      await expect(service.verifyAndActivateFactor(dto)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(service.verifyAndActivateFactor(dto)).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw ConflictException if factor is already activated', async () => {
@@ -194,6 +197,19 @@ describe('MfaApplicationService', () => {
           isPrimary: true,
         }),
       );
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'tenant-1',
+        userId: 'user-1',
+        eventType: 'authentication.mfa-enrolled',
+        sanitizedPayload: {
+          tenantCode: 'tenant-1',
+          userId: 'user-1',
+          factorType: MfaFactorType.TOTP,
+          isPrimary: true,
+          enrolledAt: expect.any(String),
+        },
+        publishStatus: 'pending',
+      });
       expect(res).toBeDefined();
     });
   });

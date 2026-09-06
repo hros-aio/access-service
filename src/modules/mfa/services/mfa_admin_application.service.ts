@@ -5,6 +5,7 @@ import { TransactionService } from '@new-hros/libs-sql';
 import { MfaMethodRepository } from '../repositories/mfa-method.repository';
 
 import { GenerateSessionKey, GenerateUserSessionsKey } from '@/constants';
+import { AuthSecurityEventOutboxRepository } from '@/modules/auth/repositories/auth-security-event-outbox.repository';
 import { UserRepository } from '@/modules/user/repositories/user.repository';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class MfaAdminApplicationService {
     private readonly redisCacheProvider: RedisCacheProvider,
     private readonly transactionService: TransactionService,
     private readonly userRepository: UserRepository,
+    private readonly outboxRepository: AuthSecurityEventOutboxRepository,
   ) {}
 
   public async resetUserMfa(targetUserId: string): Promise<{
@@ -21,6 +23,8 @@ export class MfaAdminApplicationService {
     revokedSessionsCount: number;
   }> {
     const tenantCode = RequestContextService.getTenantCode();
+    const adminUserId = RequestContextService.getUser()?.userId;
+
     return this.transactionService.runInTransaction(async () => {
       await this.mfaRepository.disableAllUserFactors(targetUserId);
 
@@ -30,22 +34,19 @@ export class MfaAdminApplicationService {
       }
 
       // 3. Write authentication.mfa-reset outbox event
-      //   const resetAt = new Date();
-      //   await queryRunner.manager.query(
-      //     `INSERT INTO "auth_security_events_outbox" ("tenant_code", "user_id", "event_type", "sanitized_payload", "publish_status", "attempt_count")
-      //      VALUES ($1, $2, $3, $4, 'pending', 0)`,
-      //     [
-      //       tenantCode,
-      //       targetUserId,
-      //       'authentication.mfa-reset',
-      //       JSON.stringify({
-      //         tenantCode,
-      //         targetUserId,
-      //         adminUserId,
-      //         resetAt: resetAt.toISOString(),
-      //       }),
-      //     ],
-      //   );
+      const resetAt = new Date();
+      await this.outboxRepository.create({
+        tenantCode,
+        userId: targetUserId,
+        eventType: 'authentication.mfa-reset',
+        sanitizedPayload: {
+          tenantCode,
+          targetUserId,
+          adminUserId,
+          resetAt: resetAt.toISOString(),
+        },
+        publishStatus: 'pending',
+      });
 
       // 4. Revoke active Redis sessions
       let revokedCount = 0;
@@ -64,7 +65,7 @@ export class MfaAdminApplicationService {
       }
 
       return {
-        resetAt: new Date(),
+        resetAt,
         revokedSessionsCount: revokedCount,
       };
     });

@@ -57,7 +57,7 @@ describe('UserRepository', () => {
     const result = await repository.findByEmailUnscoped('TEST@example.com');
     expect(result).toEqual(user);
     expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
-      where: undefined,
+      where: { normalizedEmail: 'test@example.com' },
       withTenancy: false,
     });
   });
@@ -73,6 +73,7 @@ describe('UserRepository', () => {
     expect(result).toEqual(user);
     expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
       where: {
+        employeeRefId: 'emp-uuid',
         tenantCode: 'TENANT_A',
       },
     });

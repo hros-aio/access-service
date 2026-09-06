@@ -30,7 +30,8 @@ export class UserRepository extends BaseRepository<User> {
 
   async findByEmailUnscoped(email: string): Promise<User | null> {
     const normalizedEmail = email.toLowerCase().trim();
-    return this.findOne({ normalizedEmail }, { withTenancy: false });
+    const where = { normalizedEmail };
+    return this.findOne(where, { where, withTenancy: false });
   }
 
   async findByEmailWithTenant(email: string, tenantCode: string): Promise<User | null> {
@@ -51,7 +52,8 @@ export class UserRepository extends BaseRepository<User> {
   }
 
   async findByEmployeeId(employeeRefId: string): Promise<User | null> {
-    return this.findOne({ employeeRefId });
+    const where = { employeeRefId };
+    return this.findOne(where, { where });
   }
 
   async findOneWithOptions(options: FindOneOptions<User>): Promise<User | null> {

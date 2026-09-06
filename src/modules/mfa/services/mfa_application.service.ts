@@ -16,6 +16,7 @@ import { VerifyEnrollmentDto, VerifyEnrollmentResponseDto } from '../dto/verify_
 import { MfaFactorStatus, MfaFactorType } from '../entities/mfa-method.entity';
 import { MfaMethodRepository } from '../repositories/mfa-method.repository';
 
+import { AuthSecurityEventOutboxRepository } from '@/modules/auth/repositories/auth-security-event-outbox.repository';
 import { AuthApplicationService } from '@/modules/auth/services/auth.application.service';
 import { UserRepository } from '@/modules/user/repositories/user.repository';
 
@@ -28,6 +29,7 @@ export class MfaApplicationService {
     private readonly challengeAdapter: RedisMfaChallengeAdapter,
     private readonly transactionService: TransactionService,
     private readonly authApplicationService: AuthApplicationService,
+    private readonly outboxRepository: AuthSecurityEventOutboxRepository,
   ) {}
 
   public async initiateEnrollment(dto: EnrollMfaDto): Promise<EnrollMfaResponse> {
@@ -63,6 +65,7 @@ export class MfaApplicationService {
     dto: VerifyEnrollmentDto,
   ): Promise<VerifyEnrollmentResponseDto> {
     const userId = RequestContextService.getUser().userId;
+    const tenantCode = RequestContextService.getTenantCode();
     const factor = await this.mfaRepository.findById(dto.factorId, { required: true });
 
     if (factor.userId !== userId) {
@@ -78,36 +81,35 @@ export class MfaApplicationService {
       throw new UnauthorizedException('Invalid or expired MFA verification code');
     }
 
+    const verifiedAt = new Date();
+
     await this.transactionService.runInTransaction(async () => {
       await this.mfaRepository.update(factor.id, {
         status: MfaFactorStatus.ACTIVE,
         isPrimary: true,
-        verifiedAt: new Date(),
+        verifiedAt,
       });
 
       // Record security outbox event
-      // await queryRunner.manager.query(
-      //   `INSERT INTO "auth_security_events_outbox" ("tenant_code", "user_id", "event_type", "sanitized_payload", "publish_status", "attempt_count")
-      //    VALUES ($1, $2, $3, $4, 'pending', 0)`,
-      //   [
-      //     tenantCode,
-      //     userId,
-      //     'authentication.mfa-enrolled',
-      //     JSON.stringify({
-      //       tenantCode,
-      //       userId,
-      //       factorType: factor.type,
-      //       isPrimary: true,
-      //       enrolledAt: new Date().toISOString(),
-      //     }),
-      //   ],
-      // );
+      await this.outboxRepository.create({
+        tenantCode,
+        userId,
+        eventType: 'authentication.mfa-enrolled',
+        sanitizedPayload: {
+          tenantCode,
+          userId,
+          factorType: factor.type,
+          isPrimary: true,
+          enrolledAt: verifiedAt.toISOString(),
+        },
+        publishStatus: 'pending',
+      });
     });
 
     return {
-      status: factor.status,
-      isPrimary: factor.isPrimary,
-      enrolledAt: factor.verifiedAt,
+      status: MfaFactorStatus.ACTIVE,
+      isPrimary: true,
+      enrolledAt: verifiedAt,
     };
   }
 
