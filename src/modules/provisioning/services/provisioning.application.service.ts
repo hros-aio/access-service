@@ -206,7 +206,8 @@ export class ProvisioningApplicationService {
 
         // Revoke active/pending invitations
         const invitations = await this.invitationRepository.find({
-          where: { userId: user.id, status: InvitationStatus.PENDING },
+          userId: user.id,
+          status: InvitationStatus.PENDING,
         });
         if (invitations.length > 0) {
           for (const invite of invitations) {
@@ -243,7 +244,8 @@ export class ProvisioningApplicationService {
 
         // Revoke old active/pending invitations
         const invitations = await this.invitationRepository.find({
-          where: { userId: user.id, status: InvitationStatus.PENDING },
+          userId: user.id,
+          status: InvitationStatus.PENDING,
         });
         if (invitations.length > 0) {
           for (const invite of invitations) {
@@ -261,7 +263,7 @@ export class ProvisioningApplicationService {
         newInvite.tokenHash = crypto.createHash('sha256').update(randomToken).digest('hex');
         newInvite.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
         newInvite.version = 1;
-        const savedInvite = await this.invitationRepository.save(newInvite);
+        const savedInvite = await this.invitationRepository.create(newInvite);
 
         // Write outbox security event (user-invited)
         const outbox = new AuthSecurityEventOutbox();

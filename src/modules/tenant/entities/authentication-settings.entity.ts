@@ -3,7 +3,9 @@ import { Column, Entity, JoinColumn, OneToOne } from 'typeorm';
 
 import { Tenant } from './tenant.entity';
 
-@Entity('authentication_settings')
+import { TableName } from '@/enums';
+
+@Entity(TableName.AUTHENTICATION_SETTINGS)
 export class AuthenticationSettings extends BaseEntity {
   @Column({ name: 'restricted_mfa_enabled', type: 'boolean', default: false })
   restrictedMfaEnabled: boolean;

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test, TestingModule } from '@nestjs/testing';
-import { RedisCacheProvider } from '@new-hros/libs-core';
+import { RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { CredentialPolicy } from './credential.policy';
@@ -264,6 +264,7 @@ describe('PasswordService', () => {
 
   describe('adminInitiateReset', () => {
     it('should initiate reset workflow for target user', async () => {
+      jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue('tenant-1');
       const user = new User();
       user.id = 'user-target';
       user.displayEmail = 'target@example.com';
@@ -273,10 +274,7 @@ describe('PasswordService', () => {
 
       mockTypeormUserRepository.findOne.mockResolvedValue(user);
 
-      const res = await service.adminInitiateReset({
-        tenantCode: 'tenant-1',
-        userId: 'user-target',
-      });
+      const res = await service.adminInitiateReset('user-target');
       expect(res.message).toContain('Password reset workflow initiated');
       expect(mockPasswordResetRedisAdapter.saveChallenge).toHaveBeenCalled();
       expect(mockTypeormOutboxRepository.save).toHaveBeenCalled();

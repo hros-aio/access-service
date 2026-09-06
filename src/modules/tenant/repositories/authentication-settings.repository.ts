@@ -1,57 +1,27 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import { TransactionService } from '@new-hros/libs-sql';
-import { FindOneOptions, Repository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
 
 import { AuthenticationSettings } from '../entities/authentication-settings.entity';
 
 @Injectable()
-export class AuthenticationSettingsRepository {
-  constructor(private readonly transactionService: TransactionService) {}
-
-  protected get repository(): Repository<AuthenticationSettings> {
-    return this.transactionService.getManager().getRepository(AuthenticationSettings);
+export class AuthenticationSettingsRepository extends BaseRepository<AuthenticationSettings> {
+  constructor(transactionService: TransactionService) {
+    super(AuthenticationSettings, transactionService);
   }
 
   async findByTenantCode(tenantCode: string): Promise<AuthenticationSettings | null> {
     return this.repository.findOne({ where: { tenantCode } });
   }
 
-  async findOne(
-    options: FindOneOptions<AuthenticationSettings>,
-  ): Promise<AuthenticationSettings | null> {
-    return this.repository.findOne(options);
-  }
-
   async updateWithOptimisticLock(
-    tenantCode: string,
+    id: string,
     expectedVersion: number,
     updateData: Partial<AuthenticationSettings>,
   ): Promise<AuthenticationSettings> {
-    const result = await this.repository
-      .createQueryBuilder()
-      .update(AuthenticationSettings)
-      .set({
-        ...updateData,
-        version: expectedVersion + 1,
-        updatedAt: new Date(),
-      })
-      .where('tenant_code = :tenantCode AND version = :expectedVersion', {
-        tenantCode,
-        expectedVersion,
-      })
-      .execute();
-
-    if (result.affected === 0) {
-      throw new ConflictException(
-        `Optimistic lock conflict: Authentication settings for tenant ${tenantCode} were modified concurrently`,
-      );
-    }
-
-    const updated = await this.findByTenantCode(tenantCode);
-    if (!updated) {
-      throw new ConflictException(`Tenant settings not found for tenant ${tenantCode}`);
-    }
-
-    return updated;
+    return this.update(id, {
+      ...updateData,
+      version: expectedVersion + 1,
+      updatedAt: new Date(),
+    });
   }
 }

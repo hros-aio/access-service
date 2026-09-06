@@ -1,19 +1,11 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Request,
-  ValidationPipe,
-} from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '@new-hros/libs-apis';
-import { RequestContext } from '@new-hros/libs-core';
+import { Response } from 'express';
 
-import { EnrollMfaDto } from '../dto/enroll_mfa.dto';
+import { EnrollMfaDto, EnrollMfaResponse } from '../dto/enroll_mfa.dto';
 import { VerifyChallengeDto } from '../dto/verify_challenge.dto';
-import { VerifyEnrollmentDto } from '../dto/verify_enrollment.dto';
+import { VerifyEnrollmentDto, VerifyEnrollmentResponseDto } from '../dto/verify_enrollment.dto';
 import { MfaApplicationService } from '../services/mfa_application.service';
 
 @Public()
@@ -24,34 +16,36 @@ export class MfaController {
 
   @Post('enroll')
   @HttpCode(HttpStatus.CREATED)
-  public async initiateEnrollment(
-    @Body(new ValidationPipe({ transform: true })) dto: EnrollMfaDto,
-    @Request() req: RequestContext,
-  ): Promise<Record<string, unknown>> {
-    const tenantCode = req.user?.tenantCode ?? 'tenant-001';
-    const userId = req.user?.userId ?? '00000000-0000-0000-0000-000000000001';
-    return this.mfaApplicationService.initiateEnrollment(tenantCode, userId, dto);
+  public async initiateEnrollment(@Body() dto: EnrollMfaDto): Promise<EnrollMfaResponse> {
+    return this.mfaApplicationService.initiateEnrollment(dto);
   }
 
   @Post('enroll/verify')
   @HttpCode(HttpStatus.OK)
   public async verifyEnrollment(
-    @Body(new ValidationPipe({ transform: true })) dto: VerifyEnrollmentDto,
-    @Request() req: RequestContext,
-  ): Promise<Record<string, unknown>> {
-    const tenantCode = req.user?.tenantCode ?? 'tenant-001';
-    const userId = req.user?.userId ?? '00000000-0000-0000-0000-000000000001';
-    return this.mfaApplicationService.verifyAndActivateFactor(tenantCode, userId, dto);
+    @Body() dto: VerifyEnrollmentDto,
+  ): Promise<VerifyEnrollmentResponseDto> {
+    return this.mfaApplicationService.verifyAndActivateFactor(dto);
   }
 
   @Post('challenge/verify')
   @HttpCode(HttpStatus.OK)
   public async verifyChallenge(
-    @Body(new ValidationPipe({ transform: true })) dto: VerifyChallengeDto,
-    @Request() req: RequestContext,
-  ): Promise<Record<string, unknown>> {
-    const tenantCode = req.user?.tenantCode ?? 'tenant-001';
-    const userId = req.user?.userId ?? '00000000-0000-0000-0000-000000000001';
-    return this.mfaApplicationService.verifyLoginChallenge(tenantCode, userId, dto);
+    @Body() dto: VerifyChallengeDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ accessToken: string }> {
+    const { accessToken, refreshToken } =
+      await this.mfaApplicationService.verifyLoginChallenge(dto);
+    // Set HttpOnly refresh token cookie with Secure, SameSite, and __Host- prefix
+    if (refreshToken) {
+      res.cookie('__Host-refresh-token', refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+      });
+    }
+
+    return { accessToken };
   }
 }

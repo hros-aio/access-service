@@ -5,10 +5,10 @@ export class RequestPasswordResetDto {
   @ApiProperty({ description: 'Code of the tenant organization', example: 'acme-corp' })
   @IsString()
   @IsNotEmpty()
-  readonly tenantCode!: string;
+  readonly tenantCode: string;
 
   @ApiProperty({ description: 'User account email address', example: 'user@example.com' })
   @IsEmail()
   @IsNotEmpty()
-  readonly email!: string;
+  readonly email: string;
 }

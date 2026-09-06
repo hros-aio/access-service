@@ -5,36 +5,36 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { RequestContextService } from '@new-hros/libs-core';
+import { TransactionService } from '@new-hros/libs-sql';
 
 import { KmsCryptoAdapter } from '../adapters/kms-crypto.adapter';
 import { RedisMfaChallengeAdapter } from '../adapters/redis_mfa_challenge.adapter';
-import { EnrollMfaDto, MfaFactorType } from '../dto/enroll_mfa.dto';
+import { EnrollMfaDto, EnrollMfaResponse } from '../dto/enroll_mfa.dto';
 import { VerifyChallengeDto } from '../dto/verify_challenge.dto';
-import { VerifyEnrollmentDto } from '../dto/verify_enrollment.dto';
+import { VerifyEnrollmentDto, VerifyEnrollmentResponseDto } from '../dto/verify_enrollment.dto';
+import { MfaFactorStatus, MfaFactorType } from '../entities/mfa-method.entity';
 import { MfaMethodRepository } from '../repositories/mfa-method.repository';
 
-export enum MfaFactorStatus {
-  PENDING = 'pending',
-  ACTIVE = 'active',
-  DISABLED = 'disabled',
-}
+import { AuthSecurityEventOutboxRepository } from '@/modules/auth/repositories/auth-security-event-outbox.repository';
+import { AuthApplicationService } from '@/modules/auth/services/auth.application.service';
+import { UserRepository } from '@/modules/user/repositories/user.repository';
 
 @Injectable()
 export class MfaApplicationService {
   constructor(
     private readonly mfaRepository: MfaMethodRepository,
+    private readonly userRepository: UserRepository,
     private readonly kmsCryptoAdapter: KmsCryptoAdapter,
     private readonly challengeAdapter: RedisMfaChallengeAdapter,
-    private readonly dataSource: DataSource,
+    private readonly transactionService: TransactionService,
+    private readonly authApplicationService: AuthApplicationService,
+    private readonly outboxRepository: AuthSecurityEventOutboxRepository,
   ) {}
 
-  public async initiateEnrollment(
-    tenantCode: string,
-    userId: string,
-    dto: EnrollMfaDto,
-  ): Promise<{ factorId: string; factorType: MfaFactorType; status: string; qrCodeUrl?: string }> {
-    const existingPrimary = await this.mfaRepository.findActivePrimary(tenantCode, userId);
+  public async initiateEnrollment(dto: EnrollMfaDto): Promise<EnrollMfaResponse> {
+    const userId = RequestContextService.getUser().userId;
+    const existingPrimary = await this.mfaRepository.findActivePrimary(userId);
     if (existingPrimary) {
       throw new ConflictException('Active primary MFA factor already exists');
     }
@@ -42,15 +42,13 @@ export class MfaApplicationService {
     const secret = 'JBSWY3DPEHPK3PXP'; // Standard sample base32 TOTP secret
     const encryptedSecret = await this.kmsCryptoAdapter.encrypt(secret);
 
-    const factor = this.mfaRepository.create({
+    const saved = await this.mfaRepository.create({
       userId,
       type: dto.factorType,
       status: MfaFactorStatus.PENDING,
       encryptedSecret,
       isPrimary: false,
     });
-
-    const saved = await this.mfaRepository.save(factor);
 
     return {
       factorId: saved.id,
@@ -64,16 +62,14 @@ export class MfaApplicationService {
   }
 
   public async verifyAndActivateFactor(
-    tenantCode: string,
-    userId: string,
     dto: VerifyEnrollmentDto,
-  ): Promise<{ status: string; isPrimary: boolean; enrolledAt: Date }> {
-    const factor = await this.mfaRepository.findOne({
-      where: { id: dto.factorId, userId },
-    });
+  ): Promise<VerifyEnrollmentResponseDto> {
+    const userId = RequestContextService.getUser().userId;
+    const tenantCode = RequestContextService.getTenantCode();
+    const factor = await this.mfaRepository.findById(dto.factorId, { required: true });
 
-    if (!factor) {
-      throw new UnauthorizedException('MFA factor enrollment not found');
+    if (factor.userId !== userId) {
+      throw new UnauthorizedException('MFA factor enrollment not belong user');
     }
 
     if (factor.status === MfaFactorStatus.ACTIVE) {
@@ -85,55 +81,49 @@ export class MfaApplicationService {
       throw new UnauthorizedException('Invalid or expired MFA verification code');
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    const verifiedAt = new Date();
 
-    try {
-      factor.status = MfaFactorStatus.ACTIVE;
-      factor.isPrimary = true;
-      factor.verifiedAt = new Date();
-
-      await queryRunner.manager.save(factor);
+    await this.transactionService.runInTransaction(async () => {
+      await this.mfaRepository.update(factor.id, {
+        status: MfaFactorStatus.ACTIVE,
+        isPrimary: true,
+        verifiedAt,
+      });
 
       // Record security outbox event
-      await queryRunner.manager.query(
-        `INSERT INTO "auth_security_events_outbox" ("tenant_code", "user_id", "event_type", "sanitized_payload", "publish_status", "attempt_count")
-         VALUES ($1, $2, $3, $4, 'pending', 0)`,
-        [
+      await this.outboxRepository.create({
+        tenantCode,
+        userId,
+        eventType: 'authentication.mfa-enrolled',
+        sanitizedPayload: {
           tenantCode,
           userId,
-          'authentication.mfa-enrolled',
-          JSON.stringify({
-            tenantCode,
-            userId,
-            factorType: factor.type,
-            isPrimary: true,
-            enrolledAt: new Date().toISOString(),
-          }),
-        ],
-      );
+          factorType: factor.type,
+          isPrimary: true,
+          enrolledAt: verifiedAt.toISOString(),
+        },
+        publishStatus: 'pending',
+      });
+    });
 
-      await queryRunner.commitTransaction();
-
-      return {
-        status: factor.status,
-        isPrimary: factor.isPrimary,
-        enrolledAt: factor.verifiedAt,
-      };
-    } catch (err) {
-      await queryRunner.rollbackTransaction();
-      throw err;
-    } finally {
-      await queryRunner.release();
-    }
+    return {
+      status: MfaFactorStatus.ACTIVE,
+      isPrimary: true,
+      enrolledAt: verifiedAt,
+    };
   }
 
   public async verifyLoginChallenge(
-    tenantCode: string,
-    userId: string,
     dto: VerifyChallengeDto,
-  ): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const currentContext = RequestContextService.current();
+    const sourceIp = currentContext?.clientMetadata?.ip || 'unknown';
+    const userAgent = currentContext?.clientMetadata?.userAgent || 'unknown';
+    const tenantCode = RequestContextService.getTenantCode();
+    const userId = RequestContextService.getUser().userId;
+
+    const user = await this.userRepository.findById(userId, { required: true });
+
     const challenge = await this.challengeAdapter.getChallenge(tenantCode, userId, dto.challengeId);
     if (!challenge) {
       throw new UnauthorizedException('INVALID_MFA_CODE: Challenge code expired or invalid');
@@ -152,10 +142,24 @@ export class MfaApplicationService {
 
     await this.challengeAdapter.deleteChallenge(tenantCode, userId, dto.challengeId);
 
+    // Step 6: Generate Access and Refresh JWT Tokens
+    const { sessionId, accessToken, refreshToken } = this.authApplicationService.generateAuthTokens(
+      user,
+      challenge.rememberMe,
+    );
+
+    // Step 7: Store session state and log successful login
+    await this.authApplicationService.storeSessionAndLogSuccess(
+      user,
+      sessionId,
+      sourceIp,
+      userAgent,
+      challenge.rememberMe,
+    );
+
     return {
-      accessToken: 'mock-access-token-jwt',
-      refreshToken: 'mock-refresh-token-uuid',
-      expiresIn: 3600,
+      accessToken,
+      refreshToken,
     };
   }
 }

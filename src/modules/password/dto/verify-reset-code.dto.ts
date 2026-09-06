@@ -8,12 +8,12 @@ export class VerifyResetCodeDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  readonly challengeId!: string;
+  readonly challengeId: string;
 
   @ApiProperty({ description: 'Tenant code associated with challenge', example: 'acme-corp' })
   @IsString()
   @IsNotEmpty()
-  readonly tenantCode!: string;
+  readonly tenantCode: string;
 
   @ApiProperty({
     description: 'User ID associated with challenge',
@@ -21,10 +21,10 @@ export class VerifyResetCodeDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  readonly userId!: string;
+  readonly userId: string;
 
   @ApiProperty({ description: '6-digit numeric OTP code', example: '123456' })
   @IsString()
   @Matches(/^[0-9]{6}$/, { message: 'Verification code must be a 6-digit numeric code' })
-  readonly code!: string;
+  readonly code: string;
 }

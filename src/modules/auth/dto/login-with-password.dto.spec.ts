@@ -5,7 +5,6 @@ import { LoginWithPasswordDto } from './login-with-password.dto';
 describe('LoginWithPasswordDto', () => {
   it('should pass validation with valid data', async () => {
     const dto = new LoginWithPasswordDto();
-    dto.tenantCode = 'TENANT_123';
     dto.email = 'employee@tenant.com';
     dto.password = 'SecurePassword123!';
     dto.rememberMe = true;
@@ -16,7 +15,6 @@ describe('LoginWithPasswordDto', () => {
 
   it('should fail validation with invalid email format', async () => {
     const dto = new LoginWithPasswordDto();
-    dto.tenantCode = 'TENANT_123';
     dto.email = 'invalid-email';
     dto.password = 'SecurePassword123!';
 
@@ -27,7 +25,6 @@ describe('LoginWithPasswordDto', () => {
 
   it('should fail validation with empty values', async () => {
     const dto = new LoginWithPasswordDto();
-    dto.tenantCode = '';
     dto.email = '';
     dto.password = '';
 

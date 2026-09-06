@@ -10,13 +10,50 @@ export class UserRepository extends BaseRepository<User> {
     super(User, transactionService);
   }
 
-  async findByEmail(email: string): Promise<User | null> {
+  async findByIdUnscoped(id: string): Promise<User> {
+    return this.findById(id, { withTenancy: false, required: true });
+  }
+
+  async findByIdForUpdateUnscoped(id: string): Promise<User> {
+    return this.findById(id, {
+      required: true,
+      withTenancy: false,
+      lock: { mode: 'pessimistic_write' },
+    });
+  }
+
+  async findByTenantAndExternalIdentity(externalIdentityId: string): Promise<User | null> {
+    return this.repository.findOne({
+      where: { externalIdentityId },
+    });
+  }
+
+  async findByEmailUnscoped(email: string): Promise<User | null> {
     const normalizedEmail = email.toLowerCase().trim();
-    return this.findOne({ normalizedEmail });
+    const where = { normalizedEmail };
+    return this.findOne(where, { where, withTenancy: false });
+  }
+
+  async findByEmailWithTenant(email: string, tenantCode: string): Promise<User | null> {
+    const normalizedEmail = email.toLowerCase().trim();
+    return this.findOne({ normalizedEmail, tenantCode });
+  }
+
+  async findTenantCodeByEmail(email: string): Promise<string[]> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const users = await this.find(
+      { normalizedEmail },
+      {
+        withTenancy: false,
+        select: { tenantCode: true },
+      },
+    );
+    return users.map((u) => u.tenantCode);
   }
 
   async findByEmployeeId(employeeRefId: string): Promise<User | null> {
-    return this.findOne({ employeeRefId });
+    const where = { employeeRefId };
+    return this.findOne(where, { where });
   }
 
   async findOneWithOptions(options: FindOneOptions<User>): Promise<User | null> {
@@ -52,5 +89,20 @@ export class UserRepository extends BaseRepository<User> {
       .execute();
 
     return (result.affected || 0) > 0;
+  }
+
+  async incrementSecurityVersionById(id: string): Promise<number> {
+    const result = await this.repository
+      .createQueryBuilder()
+      .update(this.entityTarget)
+      .set({
+        securityVersion: () => '"security_version" + 1',
+      })
+      .where('id = :id', { id })
+      .andWhere('tenant_code = :tenantCode', { tenantCode: this.tenantCode })
+      .returning(['id'])
+      .execute();
+
+    return result.affected ?? 0;
   }
 }

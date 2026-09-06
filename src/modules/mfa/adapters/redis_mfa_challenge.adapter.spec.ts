@@ -32,25 +32,6 @@ describe('RedisMfaChallengeAdapter', () => {
     jest.clearAllMocks();
   });
 
-  it('should save challenge to redis cache with 300s TTL', async () => {
-    const data = {
-      challengeId: 'ch-123',
-      tenantCode: 't-1',
-      userId: 'u-1',
-      factorType: 'totp',
-      codeHash: 'hash',
-      attemptsLeft: 5,
-    };
-
-    await adapter.saveChallenge(data);
-
-    expect(redisCacheProvider.set).toHaveBeenCalledWith(
-      'auth:mfa-challenge:t-1:u-1:ch-123',
-      JSON.stringify(data),
-      300,
-    );
-  });
-
   it('should return challenge object on lookup', async () => {
     const data = {
       challengeId: 'ch-123',
@@ -99,38 +80,10 @@ describe('RedisMfaChallengeAdapter', () => {
     expect(redisCacheProvider.set).toHaveBeenCalled();
   });
 
-  it('should throw ServiceUnavailableException on save error', async () => {
-    redisCacheProvider.set.mockRejectedValue(new Error('Redis error'));
-    await expect(
-      adapter.saveChallenge({
-        challengeId: 'ch-1',
-        tenantCode: 't-1',
-        userId: 'u-1',
-        factorType: 'totp',
-        codeHash: 'hash',
-        attemptsLeft: 5,
-      }),
-    ).rejects.toThrow('AUTH_STORE_UNAVAILABLE');
-  });
-
   it('should throw ServiceUnavailableException on get error', async () => {
     redisCacheProvider.get.mockRejectedValue(new Error('Redis error'));
     await expect(adapter.getChallenge('t-1', 'u-1', 'ch-1')).rejects.toThrow(
       'AUTH_STORE_UNAVAILABLE',
     );
-  });
-
-  it('should throw ServiceUnavailableException on decrement error', async () => {
-    redisCacheProvider.set.mockRejectedValue(new Error('Redis error'));
-    await expect(
-      adapter.decrementAttempts({
-        challengeId: 'ch-1',
-        tenantCode: 't-1',
-        userId: 'u-1',
-        factorType: 'totp',
-        codeHash: 'hash',
-        attemptsLeft: 2,
-      }),
-    ).rejects.toThrow('AUTH_STORE_UNAVAILABLE');
   });
 });

@@ -2,7 +2,9 @@ import { Column, Entity, OneToOne, PrimaryColumn } from 'typeorm';
 
 import { AuthenticationSettings } from './authentication-settings.entity';
 
-@Entity('tenants')
+import { TableName } from '@/enums';
+
+@Entity(TableName.TENANTS)
 export class Tenant {
   @PrimaryColumn({ name: 'tenant_code', type: 'varchar', length: 50 })
   tenantCode: string;

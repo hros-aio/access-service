@@ -94,16 +94,12 @@ describe('PasswordController', () => {
 
   describe('adminInitiateReset', () => {
     it('should delegate adminInitiateReset to PasswordService', async () => {
-      const dto = { tenantCode: 't-1', userId: 'u-1' };
       const expected = { message: 'Password reset workflow initiated for user.' };
       mockPasswordService.adminInitiateReset.mockResolvedValue(expected);
 
-      const res = await controller.adminInitiateReset('u-1', dto);
+      const res = await controller.adminInitiateReset('u-1');
       expect(res).toEqual(expected);
-      expect(mockPasswordService.adminInitiateReset).toHaveBeenCalledWith({
-        tenantCode: 't-1',
-        userId: 'u-1',
-      });
+      expect(mockPasswordService.adminInitiateReset).toHaveBeenCalledWith('u-1');
     });
   });
 
@@ -127,14 +123,10 @@ describe('PasswordController', () => {
 
       const result = await controller.setupPassword(mockReq, mockDto);
 
-      expect(result).toEqual({
-        status: 'success',
-        data: serviceResult,
-      });
+      expect(result).toEqual(serviceResult);
 
       expect(mockPasswordService.setupPasswordViaSsoFallback).toHaveBeenCalledWith(
         'flow-123',
-        'tenant-123',
         'user-123',
         mockDto,
       );

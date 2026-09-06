@@ -1,14 +1,13 @@
 import { createHmac, randomUUID } from 'crypto';
 
 import { Injectable } from '@nestjs/common';
-import { RedisCacheProvider } from '@new-hros/libs-core';
+import { RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 import { In } from 'typeorm';
 
 import { CredentialPolicy } from './credential.policy';
 import { CredentialStatus, EventType, InvitationStatus, UserStatus } from '../../../enums';
 import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
-import { Credential } from '../../auth/entities/credential.entity';
 import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { CredentialRepository } from '../../auth/repositories/credential.repository';
 import { CredentialDomainService } from '../../auth/services/credential.domain.service';
@@ -22,13 +21,10 @@ import {
   InvalidResetCodeException,
   MaxAttemptsExceededException,
   SelfServiceResetDisabledException,
-  WeakPasswordException,
 } from '../exceptions/password-reset.exception';
 import {
-  AuthSessionExpiredError,
   AuthStoreUnavailableError,
   CredentialAlreadyExistsError,
-  InvalidPasswordPolicyError,
 } from '../exceptions/password.exception';
 
 @Injectable()
@@ -65,14 +61,17 @@ export class PasswordService {
     }
 
     const normalizedEmail = dto.email.trim().toLowerCase();
-    const user = await this.userRepository.findOne({
-      tenantCode: dto.tenantCode,
-      normalizedEmail,
-      status: UserStatus.ACTIVE,
-    });
+    const user = await this.userRepository.findOne(
+      {
+        tenantCode: dto.tenantCode,
+        normalizedEmail,
+        status: UserStatus.ACTIVE,
+      },
+      { withTenancy: false },
+    );
 
     if (!user) {
-      this.hashOtpCode('000000');
+      this.preventBruteForceAttack();
       return { message: 'If an active account exists, recovery instructions have been sent.' };
     }
 
@@ -157,10 +156,6 @@ export class PasswordService {
     resetToken: string;
     newPassword: string;
   }): Promise<{ success: boolean }> {
-    if (!this.credentialPolicy.validatePasswordStrength(dto.newPassword)) {
-      throw new WeakPasswordException();
-    }
-
     const challenge = await this.passwordResetRedisAdapter.getChallenge(
       dto.challengeId,
       dto.tenantCode,
@@ -172,32 +167,29 @@ export class PasswordService {
     }
 
     await this.transactionService.runInTransaction(async () => {
-      const user = await this.userRepository.findByIdWithLock(dto.userId);
-
-      if (!user) {
-        throw new InvalidResetChallengeException();
-      }
-
-      const activeCredential = await this.credentialRepository.findOne({
-        where: { userId: user.id, status: CredentialStatus.ACTIVE },
-      });
+      const user = await this.userRepository.findByIdForUpdateUnscoped(dto.userId);
+      const activeCredential = await this.credentialRepository.findActiveByUserForUpdateUnscope(
+        dto.userId,
+      );
 
       if (activeCredential) {
         activeCredential.status = CredentialStatus.SUPERSEDED;
-        await this.credentialRepository.save(activeCredential);
+        await this.credentialRepository.update(activeCredential.id, {
+          status: CredentialStatus.SUPERSEDED,
+        });
       }
 
       const { hash: passwordHash, algorithm } = await this.credentialDomainService.hashPassword(
         dto.newPassword,
       );
 
-      const newCred = new Credential();
-      newCred.userId = user.id;
-      newCred.passwordHash = passwordHash;
-      newCred.algorithm = algorithm;
-      newCred.status = CredentialStatus.ACTIVE;
-      newCred.passwordChangedAt = new Date();
-      await this.credentialRepository.save(newCred);
+      await this.credentialRepository.create({
+        userId: user.id,
+        passwordHash,
+        algorithm,
+        status: CredentialStatus.ACTIVE,
+        passwordChangedAt: new Date(),
+      });
 
       user.securityVersion += 1;
       await this.userRepository.save(user);
@@ -230,26 +222,22 @@ export class PasswordService {
     return { success: true };
   }
 
-  async adminInitiateReset(dto: {
-    tenantCode: string;
-    userId: string;
-  }): Promise<{ message: string }> {
-    const user = await this.userRepository.findOne({
-      id: dto.userId,
-      tenantCode: dto.tenantCode,
-      status: UserStatus.ACTIVE,
-    });
-
-    if (!user) {
-      return { message: 'Password reset workflow initiated for user.' };
-    }
+  async adminInitiateReset(userId: string): Promise<{ message: string }> {
+    const tenantCode = RequestContextService.getTenantCode();
+    const user = await this.userRepository.findOne(
+      {
+        id: userId,
+        status: UserStatus.ACTIVE,
+      },
+      { required: true },
+    );
 
     const rawCode = this.generate6DigitOtp();
     const hashedCode = this.hashOtpCode(rawCode);
     const challengeId = randomUUID();
 
     await this.passwordResetRedisAdapter.saveChallenge(challengeId, {
-      tenantCode: dto.tenantCode,
+      tenantCode,
       userId: user.id,
       hashedCode,
       codeVerified: false,
@@ -257,11 +245,11 @@ export class PasswordService {
 
     await this.transactionService.runInTransaction(async () => {
       const event = new AuthSecurityEventOutbox();
-      event.tenantCode = dto.tenantCode;
+      event.tenantCode = tenantCode;
       event.userId = user.id;
       event.eventType = 'authentication.password-reset-requested' as EventType;
       event.sanitizedPayload = {
-        tenantCode: dto.tenantCode,
+        tenantCode,
         userId: user.id,
         deliveryEmail: user.displayEmail,
         challengeId,
@@ -276,7 +264,6 @@ export class PasswordService {
 
   async setupPasswordViaSsoFallback(
     flowId: string,
-    tenantCode: string,
     userId: string,
     dto: { password: string },
   ): Promise<{
@@ -285,19 +272,14 @@ export class PasswordService {
     refreshToken?: string;
     mfaSetupToken?: string;
   }> {
-    if (!this.credentialPolicy.validatePasswordStrength(dto.password)) {
-      throw new InvalidPasswordPolicyError();
-    }
+    const tenantCode = RequestContextService.getTenantCode();
 
     await this.transactionService.runInTransaction(async () => {
-      const user = await this.userRepository.findByIdWithLock(userId);
-
-      if (!user) {
-        throw new AuthSessionExpiredError('User not found');
-      }
+      const user = await this.userRepository.findById(userId, { required: true });
 
       const existingCredential = await this.credentialRepository.findOne({
-        where: { userId: user.id, status: CredentialStatus.ACTIVE },
+        userId: user.id,
+        status: CredentialStatus.ACTIVE,
       });
 
       if (existingCredential) {
@@ -308,24 +290,38 @@ export class PasswordService {
         dto.password,
       );
 
-      const credential = new Credential();
-      credential.userId = user.id;
-      credential.passwordHash = passwordHash;
-      credential.algorithm = algorithm;
-      credential.status = CredentialStatus.ACTIVE;
-      credential.passwordChangedAt = new Date();
-      await this.credentialRepository.save(credential);
-
-      user.status = UserStatus.ACTIVE;
-      user.credentialStatus = CredentialStatus.ACTIVE;
-      user.securityVersion += 1;
-      await this.userRepository.save(user);
-
-      const pendingInvite = await this.invitationRepository.findOne({
-        where: { userId: user.id, status: In([InvitationStatus.PENDING, InvitationStatus.SENT]) },
+      await this.credentialRepository.create({
+        userId: user.id,
+        passwordHash,
+        algorithm,
+        status: CredentialStatus.ACTIVE,
+        passwordChangedAt: new Date(),
       });
 
-      await this.invitationRepository.cancelPendingInvitations(tenantCode, user.id);
+      await this.userRepository.update(user.id, {
+        status: UserStatus.ACTIVE,
+        credentialStatus: CredentialStatus.ACTIVE,
+        securityVersion: user.securityVersion++,
+      });
+
+      const pendingInvite = await this.invitationRepository.findOne({
+        userId: user.id,
+        status: In([InvitationStatus.PENDING, InvitationStatus.SENT]),
+      });
+      if (pendingInvite) {
+        const invitationAcceptedEvent = new AuthSecurityEventOutbox();
+        invitationAcceptedEvent.tenantCode = tenantCode;
+        invitationAcceptedEvent.userId = user.id;
+        invitationAcceptedEvent.eventType = EventType.AUTHENTICATION_INVITATION_ACCEPTED;
+        invitationAcceptedEvent.sanitizedPayload = {
+          userId: user.id,
+          invitationId: pendingInvite.id,
+          supersededBy: 'SSO_SETUP',
+        };
+        invitationAcceptedEvent.publishStatus = 'pending';
+        await this.authSecurityEventOutboxRepository.save(invitationAcceptedEvent);
+      }
+      await this.invitationRepository.cancelPendingInvitations(user.id);
 
       const passwordChangedEvent = new AuthSecurityEventOutbox();
       passwordChangedEvent.tenantCode = tenantCode;
@@ -341,20 +337,6 @@ export class PasswordService {
       };
       passwordChangedEvent.publishStatus = 'pending';
       await this.authSecurityEventOutboxRepository.save(passwordChangedEvent);
-
-      if (pendingInvite) {
-        const invitationAcceptedEvent = new AuthSecurityEventOutbox();
-        invitationAcceptedEvent.tenantCode = tenantCode;
-        invitationAcceptedEvent.userId = user.id;
-        invitationAcceptedEvent.eventType = EventType.AUTHENTICATION_INVITATION_ACCEPTED;
-        invitationAcceptedEvent.sanitizedPayload = {
-          userId: user.id,
-          invitationId: pendingInvite.id,
-          supersededBy: 'SSO_SETUP',
-        };
-        invitationAcceptedEvent.publishStatus = 'pending';
-        await this.authSecurityEventOutboxRepository.save(invitationAcceptedEvent);
-      }
     });
 
     try {
@@ -376,5 +358,9 @@ export class PasswordService {
     return {
       mfaRequired: false,
     };
+  }
+
+  private preventBruteForceAttack(): void {
+    this.hashOtpCode('000000');
   }
 }

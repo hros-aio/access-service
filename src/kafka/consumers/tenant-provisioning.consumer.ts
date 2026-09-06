@@ -1,6 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
-import { RequestContextService, RequestContext } from '@new-hros/libs-core';
+import { RequestContext, RequestContextService } from '@new-hros/libs-core';
 import { EventEnvelope } from '@new-hros/libs-events';
 
 import { EventType } from '../../enums';
@@ -36,7 +36,6 @@ export class TenantProvisioningConsumer {
     const context: RequestContext = {
       traceId: envelope.correlationId || envelope.id,
       requestId: envelope.id,
-      serviceName: 'hrms-access-service',
       tenantCode: payload.tenantCode,
       clientMetadata: {
         ip: '127.0.0.1',

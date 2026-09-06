@@ -1,11 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
-import { EntityManager } from 'typeorm';
 
-import {
-  AuthenticationSettingsResponseDto,
-  UpdateAuthenticationSettingsDto,
-} from '../dto/authentication-settings.dto';
+import { UpdateAuthenticationSettingsDto } from '../dto/authentication-settings.dto';
 import { AuthenticationSettings } from '../entities/authentication-settings.entity';
 import { AuthenticationSettingsRepository } from '../repositories/authentication-settings.repository';
 
@@ -16,26 +12,15 @@ export class AuthenticationSettingsService {
     private readonly transactionService: TransactionService,
   ) {}
 
-  async getSettings(tenantCode: string): Promise<AuthenticationSettingsResponseDto> {
-    const settings = await this.repository.findByTenantCode(tenantCode);
-    if (!settings) {
-      throw new NotFoundException(`Authentication settings not found for tenant: ${tenantCode}`);
-    }
-    return this.mapToDto(settings, tenantCode);
+  async getSettings(): Promise<AuthenticationSettings> {
+    return this.repository.findOne({}, { required: true });
   }
 
-  async updateSettings(
-    tenantCode: string,
-    dto: UpdateAuthenticationSettingsDto,
-    userId: string,
-  ): Promise<AuthenticationSettingsResponseDto> {
-    let updatedSettings!: AuthenticationSettings;
-
-    await this.transactionService.runInTransaction(async () => {
-      const entityManager: EntityManager = this.transactionService.getManager();
-      const current = await this.repository.findByTenantCode(tenantCode);
+  async upsertSettings(dto: UpdateAuthenticationSettingsDto): Promise<AuthenticationSettings> {
+    return this.transactionService.runInTransaction(async () => {
+      const current = await this.repository.findOne({});
       if (!current) {
-        throw new NotFoundException(`Authentication settings not found for tenant: ${tenantCode}`);
+        return this.repository.create(dto);
       }
 
       const changes: Record<string, { old: unknown; new: unknown }> = {};
@@ -89,50 +74,7 @@ export class AuthenticationSettingsService {
         fieldsToUpdate.allowedIpCidrs = dto.ipAllowList;
       }
 
-      updatedSettings = await this.repository.updateWithOptimisticLock(
-        tenantCode,
-        dto.version,
-        fieldsToUpdate,
-      );
-
-      if (Object.keys(changes).length > 0) {
-        await entityManager
-          .createQueryBuilder()
-          .insert()
-          .into('auth_security_events_outbox')
-          .values({
-            tenant_code: tenantCode,
-            user_id: userId === 'system' ? null : userId,
-            event_type: 'authentication.settings-updated',
-            sanitized_payload: {
-              tenantCode,
-              updatedByUserId: userId,
-              changes,
-              updatedAt: updatedSettings.updatedAt,
-            },
-            publish_status: 'pending',
-          })
-          .execute();
-      }
+      return this.repository.updateWithOptimisticLock(current.id, dto.version, fieldsToUpdate);
     });
-
-    return this.mapToDto(updatedSettings, tenantCode);
-  }
-
-  private mapToDto(
-    entity: AuthenticationSettings,
-    fallbackTenantCode: string,
-  ): AuthenticationSettingsResponseDto {
-    return {
-      tenantCode: entity.tenant?.tenantCode ?? fallbackTenantCode,
-      mfaRequired: entity.restrictedMfaEnabled,
-      selfServicePasswordResetEnabled: entity.needAdminResetPassword,
-      lockoutEnabled: entity.accountLockoutEnabled,
-      lockoutThreshold: entity.maxFailedRetries,
-      ipRestrictionEnabled: entity.ipRestrictionEnabled,
-      ipAllowList: Array.isArray(entity.allowedIpCidrs) ? (entity.allowedIpCidrs as string[]) : [],
-      version: entity.version,
-      updatedAt: entity.updatedAt,
-    };
   }
 }

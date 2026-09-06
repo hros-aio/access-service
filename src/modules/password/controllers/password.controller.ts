@@ -11,9 +11,8 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AuthGuard, PermissionGuard, Public, RequirePermission } from '@new-hros/libs-apis';
+import { PermissionGuard, Public, RequirePermission } from '@new-hros/libs-apis';
 
-import { AdminInitiatePasswordResetDto } from '../dto/admin-initiate-password-reset.dto';
 import { ConfirmPasswordResetDto } from '../dto/confirm-password-reset.dto';
 import { RequestPasswordResetDto } from '../dto/request-password-reset.dto';
 import { SetupPasswordViaSsoDto } from '../dto/setup-password-via-sso.dto';
@@ -63,29 +62,21 @@ export class PasswordController {
   @ApiOperation({ summary: 'Confirm new password using reset token' })
   @ApiResponse({ status: 200, description: 'Password reset completed' })
   @ApiResponse({ status: 400, description: 'Invalid token or weak password' })
-  async confirmReset(
-    @Body(new ValidationPipe({ whitelist: true, transform: true }))
-    dto: ConfirmPasswordResetDto,
-  ): Promise<{ success: boolean }> {
+  async confirmReset(@Body() dto: ConfirmPasswordResetDto): Promise<{ success: boolean }> {
     return this.passwordService.confirmPasswordReset(dto);
   }
 
   @Post('admin/users/:userId/password-reset')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(AuthGuard, PermissionGuard)
+  @UseGuards(PermissionGuard)
   @RequirePermission('user:security:manage')
   @ApiOperation({ summary: 'Admin-initiated password reset' })
   @ApiResponse({ status: 200, description: 'Password reset workflow initiated for user' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   async adminInitiateReset(
     @Param('userId', ParseUUIDPipe) userId: string,
-    @Body(new ValidationPipe({ whitelist: true, transform: true }))
-    dto: AdminInitiatePasswordResetDto,
   ): Promise<{ message: string }> {
-    return this.passwordService.adminInitiateReset({
-      tenantCode: dto.tenantCode,
-      userId,
-    });
+    return this.passwordService.adminInitiateReset(userId);
   }
 
   @Post('setup/firebase')
@@ -100,29 +91,16 @@ export class PasswordController {
     @Body()
     dto: SetupPasswordViaSsoDto,
   ): Promise<{
-    status: string;
-    data: {
-      mfaRequired: boolean;
-      accessToken?: string;
-      refreshToken?: string;
-      mfaSetupToken?: string;
-    };
+    mfaRequired: boolean;
+    accessToken?: string;
+    refreshToken?: string;
+    mfaSetupToken?: string;
   }> {
     const session = req.session;
     if (!session) {
       throw new AuthSessionExpiredError('Session metadata not set by guard');
     }
 
-    const result = await this.passwordService.setupPasswordViaSsoFallback(
-      session.flowId,
-      session.tenantCode,
-      session.userId,
-      dto,
-    );
-
-    return {
-      status: 'success',
-      data: result,
-    };
+    return this.passwordService.setupPasswordViaSsoFallback(session.flowId, session.userId, dto);
   }
 }

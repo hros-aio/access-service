@@ -2,7 +2,7 @@ export interface DecodedFirebaseToken {
   uid: string;
   email?: string;
   email_verified?: boolean;
-  tenant_id?: string;
+  tenant_code?: string;
   [key: string]: unknown;
 }
 

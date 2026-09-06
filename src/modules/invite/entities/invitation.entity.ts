@@ -1,20 +1,11 @@
-import {
-  Column,
-  Entity,
-  JoinColumn,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-  VersionColumn,
-} from 'typeorm';
+import { BaseEntity } from '@new-hros/libs-sql';
+import { Column, Entity, JoinColumn, ManyToOne, VersionColumn } from 'typeorm';
 
-import { InvitationStatus } from '../../../enums';
+import { InvitationStatus, TableName } from '../../../enums';
 import { User } from '../../user/entities/user.entity';
 
-@Entity('invitations')
-export class Invitation {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+@Entity(TableName.INVITATIONS)
+export class Invitation extends BaseEntity {
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
@@ -49,4 +40,11 @@ export class Invitation {
   @ManyToOne(() => User, { onDelete: 'SET NULL', onUpdate: 'CASCADE' })
   @JoinColumn({ name: 'issued_by' })
   issuer?: User;
+
+  public isExpired(): boolean {
+    return (
+      (this.status !== InvitationStatus.PENDING && this.status !== InvitationStatus.SENT) ||
+      this.expiresAt < new Date()
+    );
+  }
 }
