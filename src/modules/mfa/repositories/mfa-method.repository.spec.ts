@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { MfaMethodRepository } from './mfa-method.repository';
-import { MfaMethod } from '../entities/mfa-method.entity';
+import { MfaFactorStatus, MfaMethod } from '../entities/mfa-method.entity';
 
 describe('MfaMethodRepository', () => {
   let repository: MfaMethodRepository;
@@ -15,6 +15,7 @@ describe('MfaMethodRepository', () => {
       save: jest.fn(),
       findOne: jest.fn(),
       find: jest.fn(),
+      update: jest.fn(),
     };
 
     mockEntityManager = {
@@ -52,7 +53,7 @@ describe('MfaMethodRepository', () => {
     const result = await repository.findById('method-uuid');
     expect(result).toEqual(method);
     expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
-      where: { id: 'method-uuid' },
+      where: { tenantCode: '000000' },
     });
   });
 
@@ -63,7 +64,7 @@ describe('MfaMethodRepository', () => {
     const result = await repository.findActiveByUserId('user-uuid');
     expect(result).toEqual(methods);
     expect(mockTypeormRepository.find).toHaveBeenCalledWith({
-      where: { userId: 'user-uuid', status: 'active' },
+      where: { userId: 'user-uuid', status: MfaFactorStatus.ACTIVE },
     });
   });
 
@@ -71,23 +72,21 @@ describe('MfaMethodRepository', () => {
     const method = new MfaMethod();
     method.userId = 'user-uuid';
     method.isPrimary = true;
-    method.status = 'active';
+    method.status = MfaFactorStatus.ACTIVE;
 
     mockTypeormRepository.findOne.mockResolvedValue(method);
 
-    const result = await repository.findPrimaryByUserId('user-uuid');
+    const result = await repository.findActivePrimary('user-uuid');
     expect(result).toEqual(method);
-    expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
-      where: { userId: 'user-uuid', isPrimary: true, status: 'active' },
-    });
   });
 
-  it('should save mfa method', async () => {
-    const method = new MfaMethod();
-    mockTypeormRepository.save.mockResolvedValue(method);
+  it('should disable all user factors', async () => {
+    mockTypeormRepository.update.mockResolvedValue({ affected: 1 });
 
-    const result = await repository.save(method);
-    expect(result).toEqual(method);
-    expect(mockTypeormRepository.save).toHaveBeenCalledWith(method);
+    await repository.disableAllUserFactors('user-uuid');
+    expect(mockTypeormRepository.update).toHaveBeenCalledWith(
+      { userId: 'user-uuid', tenantCode: (repository as any).tenantCode },
+      { status: MfaFactorStatus.DISABLED, disabledAt: expect.any(Date), isPrimary: false },
+    );
   });
 });

@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RequestContext } from '@new-hros/libs-core';
+import { Response } from 'express';
 
 import { MfaController } from './mfa.controller';
-import { MfaFactorType } from '../dto/enroll_mfa.dto';
+import { MfaFactorStatus, MfaFactorType } from '../entities/mfa-method.entity';
 import { MfaApplicationService } from '../services/mfa_application.service';
 
 describe('MfaController', () => {
@@ -24,75 +24,60 @@ describe('MfaController', () => {
     controller = module.get<MfaController>(MfaController);
   });
 
-  it('should initiate enrollment using req user or fallbacks', async () => {
-    service.initiateEnrollment.mockResolvedValue({
+  it('should initiate enrollment', async () => {
+    const expectedResult = {
       factorId: 'f1',
       factorType: MfaFactorType.TOTP,
-      status: 'pending',
-    });
+      status: MfaFactorStatus.PENDING,
+    };
+    service.initiateEnrollment.mockResolvedValue(expectedResult);
 
-    const reqWithUser = {
-      user: { tenantCode: 'tenant-abc', userId: 'user-xyz' },
-    } as unknown as RequestContext;
-    await controller.initiateEnrollment({ factorType: MfaFactorType.TOTP }, reqWithUser);
-    expect(service.initiateEnrollment).toHaveBeenCalledWith('tenant-abc', 'user-xyz', {
-      factorType: MfaFactorType.TOTP,
-    });
+    const dto = { factorType: MfaFactorType.TOTP };
+    const result = await controller.initiateEnrollment(dto);
 
-    const reqWithoutUser = {} as unknown as RequestContext;
-    await controller.initiateEnrollment({ factorType: MfaFactorType.TOTP }, reqWithoutUser);
-    expect(service.initiateEnrollment).toHaveBeenCalledWith(
-      'tenant-001',
-      '00000000-0000-0000-0000-000000000001',
-      { factorType: MfaFactorType.TOTP },
-    );
+    expect(service.initiateEnrollment).toHaveBeenCalledWith(dto);
+    expect(result).toEqual(expectedResult);
   });
 
-  it('should verify enrollment using req user or fallbacks', async () => {
-    service.verifyAndActivateFactor.mockResolvedValue({
-      status: 'active',
+  it('should verify enrollment', async () => {
+    const expectedResult = {
+      status: MfaFactorStatus.ACTIVE,
       isPrimary: true,
       enrolledAt: new Date(),
-    });
+    };
+    service.verifyAndActivateFactor.mockResolvedValue(expectedResult);
 
     const dto = {
       factorId: '00000000-0000-0000-0000-000000000001',
       factorType: MfaFactorType.TOTP,
       code: '123456',
     };
-    const reqWithUser = {
-      user: { tenantCode: 't1', userId: 'u1' },
-    } as unknown as RequestContext;
-    await controller.verifyEnrollment(dto, reqWithUser);
-    expect(service.verifyAndActivateFactor).toHaveBeenCalledWith('t1', 'u1', dto);
+    const result = await controller.verifyEnrollment(dto);
 
-    const reqWithoutUser = {} as unknown as RequestContext;
-    await controller.verifyEnrollment(dto, reqWithoutUser);
-    expect(service.verifyAndActivateFactor).toHaveBeenCalledWith(
-      'tenant-001',
-      '00000000-0000-0000-0000-000000000001',
-      dto,
-    );
+    expect(service.verifyAndActivateFactor).toHaveBeenCalledWith(dto);
+    expect(result).toEqual(expectedResult);
   });
 
-  it('should verify login challenge using req user or fallbacks', async () => {
+  it('should verify login challenge and set refresh token cookie', async () => {
     service.verifyLoginChallenge.mockResolvedValue({
       accessToken: 'at',
       refreshToken: 'rt',
-      expiresIn: 3600,
     });
 
-    const dto = { challengeId: '00000000-0000-0000-0000-000000000002', code: '123456' };
-    const reqWithUser = { user: { tenantCode: 't1', userId: 'u1' } } as unknown as RequestContext;
-    await controller.verifyChallenge(dto, reqWithUser);
-    expect(service.verifyLoginChallenge).toHaveBeenCalledWith('t1', 'u1', dto);
+    const mockResponse = {
+      cookie: jest.fn(),
+    } as unknown as Response;
 
-    const reqWithoutUser = {} as unknown as RequestContext;
-    await controller.verifyChallenge(dto, reqWithoutUser);
-    expect(service.verifyLoginChallenge).toHaveBeenCalledWith(
-      'tenant-001',
-      '00000000-0000-0000-0000-000000000001',
-      dto,
-    );
+    const dto = { challengeId: '00000000-0000-0000-0000-000000000002', code: '123456' };
+    const result = await controller.verifyChallenge(dto, mockResponse);
+
+    expect(service.verifyLoginChallenge).toHaveBeenCalledWith(dto);
+    expect(mockResponse.cookie).toHaveBeenCalledWith('__Host-refresh-token', 'rt', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+    });
+    expect(result).toEqual({ accessToken: 'at' });
   });
 });

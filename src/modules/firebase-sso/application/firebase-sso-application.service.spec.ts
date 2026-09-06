@@ -50,20 +50,20 @@ describe('FirebaseSsoApplicationService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('authenticateSso', () => {
+  describe('authenticate', () => {
     it('should throw ExternalIdentityNotMappedException when user mapping is missing', async () => {
       firebaseVerifier.verifyIdToken.mockResolvedValue({
         uid: 'fb_uid_123',
         email: 'user@tenant.com',
+        tenant_code: 'TENANT_01',
       });
       userRepo.findByTenantAndExternalIdentity.mockResolvedValue(null);
 
       await expect(
-        service.authenticate({ tenantCode: 'TENANT_01', idToken: 'valid_token' }),
+        service.authenticate('valid_token'),
       ).rejects.toThrow(ExternalIdentityNotMappedException);
 
       expect(userRepo.findByTenantAndExternalIdentity).toHaveBeenCalledWith(
-        'TENANT_01',
         'fb_uid_123',
       );
       expect(securityEventService.logSsoLoginFailed).toHaveBeenCalledWith(
@@ -80,6 +80,7 @@ describe('FirebaseSsoApplicationService', () => {
       firebaseVerifier.verifyIdToken.mockResolvedValue({
         uid: 'fb_uid_123',
         email: 'token_email@tenant.com',
+        tenant_code: 'TENANT_01',
       });
       userRepo.findByTenantAndExternalIdentity.mockResolvedValue({
         id: 'user_1',
@@ -88,7 +89,7 @@ describe('FirebaseSsoApplicationService', () => {
 
       await expect(
         service.authenticate(
-          { tenantCode: 'TENANT_01', idToken: 'valid_token' },
+          'valid_token',
           '192.168.1.1',
           'custom-agent',
         ),
@@ -112,12 +113,13 @@ describe('FirebaseSsoApplicationService', () => {
       });
       userRepo.findByTenantAndExternalIdentity.mockResolvedValue({
         id: 'user_1',
+        tenantCode: 'TENANT_01',
         normalizedEmail: 'user@tenant.com',
       } as User);
 
       await expect(
         service.authenticate(
-          { tenantCode: 'TENANT_01', idToken: 'valid_token' },
+          'valid_token',
           '192.168.1.1',
           'custom-agent',
         ),
@@ -148,10 +150,7 @@ describe('FirebaseSsoApplicationService', () => {
       userRepo.findByTenantAndExternalIdentity.mockResolvedValue(mockUser);
 
       const result = await service.authenticate(
-        {
-          tenantCode: 'TENANT_01',
-          idToken: 'valid_token',
-        },
+        'valid_token',
         '10.0.0.1',
         'test-browser',
       );

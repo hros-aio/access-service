@@ -65,6 +65,9 @@ describe('AuthApplicationService', () => {
   beforeEach(async () => {
     mockUserRepository = {
       findOne: jest.fn(),
+      findTenantCodeByEmail: jest.fn().mockResolvedValue(['TENANT_123']),
+      findByEmailWithTenant: jest.fn().mockResolvedValue(mockUser),
+      findByEmailUnscoped: jest.fn().mockResolvedValue(mockUser),
     };
     mockCredentialRepository = {
       findActiveByUseUnscope: jest.fn(),
@@ -89,6 +92,7 @@ describe('AuthApplicationService', () => {
     mockLockoutService = {
       handleFailure: jest.fn().mockResolvedValue(false),
       resetFailureCount: jest.fn(),
+      recordIpFailure: jest.fn(),
     };
     mockSecurityEventService = {
       logLoginSucceeded: jest.fn(),
@@ -110,7 +114,7 @@ describe('AuthApplicationService', () => {
     };
 
     mockFirebaseSsoApplicationService = {
-      authenticateSso: jest.fn(),
+      authenticate: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -149,13 +153,12 @@ describe('AuthApplicationService', () => {
 
   describe('loginWithPassword', () => {
     it('should successfully authenticate user and return tokens', async () => {
-      mockUserRepository.findOne.mockResolvedValue(mockUser);
+      mockUserRepository.findByEmailWithTenant.mockResolvedValue(mockUser);
       mockCredentialRepository.findActiveByUseUnscope.mockResolvedValue(mockCredential);
       mockCredentialDomainService.verifyPassword.mockResolvedValue(true);
       (jwt.sign as jest.Mock).mockReturnValue('mock-jwt-token');
 
       const result = await service.loginWithPassword({
-        tenantCode: 'TENANT_123',
         email: 'employee@tenant.com',
         password: 'SecurePassword123!',
         rememberMe: true,
@@ -173,7 +176,6 @@ describe('AuthApplicationService', () => {
 
       await expect(
         service.loginWithPassword({
-          tenantCode: 'TENANT_XYZ',
           email: 'employee@tenant.com',
           password: 'SecurePassword123!',
         }),
@@ -181,11 +183,10 @@ describe('AuthApplicationService', () => {
     });
 
     it('should throw InvalidCredentialsError for non-existent user email', async () => {
-      mockUserRepository.findOne.mockResolvedValue(null);
+      mockUserRepository.findByEmailWithTenant.mockResolvedValue(null);
 
       await expect(
         service.loginWithPassword({
-          tenantCode: 'TENANT_123',
           email: 'nonexistent@tenant.com',
           password: 'SecurePassword123!',
         }),
@@ -193,14 +194,13 @@ describe('AuthApplicationService', () => {
     });
 
     it('should throw AccountDisabledError for suspended user', async () => {
-      mockUserRepository.findOne.mockResolvedValue({
+      mockUserRepository.findByEmailWithTenant.mockResolvedValue({
         ...mockUser,
         status: UserStatus.SUSPENDED,
       });
 
       await expect(
         service.loginWithPassword({
-          tenantCode: 'TENANT_123',
           email: 'employee@tenant.com',
           password: 'SecurePassword123!',
         }),
@@ -208,14 +208,13 @@ describe('AuthApplicationService', () => {
     });
 
     it('should throw AccountLockedError for locked user', async () => {
-      mockUserRepository.findOne.mockResolvedValue({
+      mockUserRepository.findByEmailWithTenant.mockResolvedValue({
         ...mockUser,
         status: UserStatus.LOCKED,
       });
 
       await expect(
         service.loginWithPassword({
-          tenantCode: 'TENANT_123',
           email: 'employee@tenant.com',
           password: 'SecurePassword123!',
         }),
@@ -223,13 +222,12 @@ describe('AuthApplicationService', () => {
     });
 
     it('should throw InvalidCredentialsError for wrong password', async () => {
-      mockUserRepository.findOne.mockResolvedValue(mockUser);
+      mockUserRepository.findByEmailWithTenant.mockResolvedValue(mockUser);
       mockCredentialRepository.findActiveByUseUnscope.mockResolvedValue(mockCredential);
       mockCredentialDomainService.verifyPassword.mockResolvedValue(false);
 
       await expect(
         service.loginWithPassword({
-          tenantCode: 'TENANT_123',
           email: 'employee@tenant.com',
           password: 'WrongPassword!',
         }),
@@ -237,7 +235,7 @@ describe('AuthApplicationService', () => {
     });
 
     it('should return MFA_REQUIRED and a challengeId if user has active enrolled MFA methods', async () => {
-      mockUserRepository.findOne.mockResolvedValue(mockUser);
+      mockUserRepository.findByEmailWithTenant.mockResolvedValue(mockUser);
       mockCredentialRepository.findActiveByUseUnscope.mockResolvedValue(mockCredential);
       mockCredentialDomainService.verifyPassword.mockResolvedValue(true);
       mockMfaMethodRepository.findActiveByUserId.mockResolvedValue([
@@ -248,7 +246,6 @@ describe('AuthApplicationService', () => {
       });
 
       const result = await service.loginWithPassword({
-        tenantCode: 'TENANT_123',
         email: 'employee@tenant.com',
         password: 'SecurePassword123!',
       });
@@ -267,7 +264,7 @@ describe('AuthApplicationService', () => {
     });
 
     it('should return MFA_REQUIRED and a challengeId if tenant has mandatory MFA enabled', async () => {
-      mockUserRepository.findOne.mockResolvedValue(mockUser);
+      mockUserRepository.findByEmailWithTenant.mockResolvedValue(mockUser);
       mockCredentialRepository.findActiveByUseUnscope.mockResolvedValue(mockCredential);
       mockCredentialDomainService.verifyPassword.mockResolvedValue(true);
       mockMfaMethodRepository.findActiveByUserId.mockResolvedValue([]);
@@ -276,7 +273,6 @@ describe('AuthApplicationService', () => {
       });
 
       const result = await service.loginWithPassword({
-        tenantCode: 'TENANT_123',
         email: 'employee@tenant.com',
         password: 'SecurePassword123!',
       });
@@ -286,7 +282,7 @@ describe('AuthApplicationService', () => {
     });
 
     it('should return MFA_REQUIRED and a challengeId if user requires MFA enrollment', async () => {
-      mockUserRepository.findOne.mockResolvedValue({
+      mockUserRepository.findByEmailWithTenant.mockResolvedValue({
         ...mockUser,
         mfaEnrollmentRequired: true,
       });
@@ -298,7 +294,6 @@ describe('AuthApplicationService', () => {
       });
 
       const result = await service.loginWithPassword({
-        tenantCode: 'TENANT_123',
         email: 'employee@tenant.com',
         password: 'SecurePassword123!',
       });
@@ -310,19 +305,21 @@ describe('AuthApplicationService', () => {
 
   describe('loginWithFirebase', () => {
     const firebaseDto = {
-      tenantCode: 'TENANT_123',
       idToken: 'valid-firebase-token',
     };
 
     it('should successfully authenticate via SSO and return tokens', async () => {
-      mockFirebaseSsoApplicationService.authenticateSso.mockResolvedValue(mockUser);
-      mockUserRepository.findOne.mockResolvedValue(mockUser);
+      mockFirebaseSsoApplicationService.authenticate.mockResolvedValue({
+        normalizedEmail: 'employee@tenant.com',
+        tenantCode: 'TENANT_123',
+      });
+      mockUserRepository.findByEmailWithTenant.mockResolvedValue(mockUser);
       (jwt.sign as jest.Mock).mockReturnValue('mock-jwt-token');
 
       const result = await service.loginWithFirebase(firebaseDto);
 
-      expect(mockFirebaseSsoApplicationService.authenticateSso).toHaveBeenCalledWith(
-        firebaseDto,
+      expect(mockFirebaseSsoApplicationService.authenticate).toHaveBeenCalledWith(
+        firebaseDto.idToken,
         'unknown',
         'unknown',
       );
@@ -333,7 +330,7 @@ describe('AuthApplicationService', () => {
     });
 
     it('should throw UnauthorizedException when token is invalid or expired', async () => {
-      mockFirebaseSsoApplicationService.authenticateSso.mockRejectedValue(
+      mockFirebaseSsoApplicationService.authenticate.mockRejectedValue(
         new InvalidFirebaseTokenException(),
       );
 
@@ -343,7 +340,7 @@ describe('AuthApplicationService', () => {
     });
 
     it('should throw UnauthorizedException when external identity is not mapped', async () => {
-      mockFirebaseSsoApplicationService.authenticateSso.mockRejectedValue(
+      mockFirebaseSsoApplicationService.authenticate.mockRejectedValue(
         new ExternalIdentityNotMappedException(),
       );
 
@@ -353,7 +350,7 @@ describe('AuthApplicationService', () => {
     });
 
     it('should throw ConflictException when identity mapping is ambiguous', async () => {
-      mockFirebaseSsoApplicationService.authenticateSso.mockRejectedValue(
+      mockFirebaseSsoApplicationService.authenticate.mockRejectedValue(
         new AmbiguousIdentityMappingException(),
       );
 
@@ -363,7 +360,7 @@ describe('AuthApplicationService', () => {
     });
 
     it('should throw ServiceUnavailableException when Firebase provider is unavailable', async () => {
-      mockFirebaseSsoApplicationService.authenticateSso.mockRejectedValue(
+      mockFirebaseSsoApplicationService.authenticate.mockRejectedValue(
         new FirebaseProviderUnavailableException(),
       );
 
