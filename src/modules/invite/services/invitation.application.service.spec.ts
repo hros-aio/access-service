@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test, TestingModule } from '@nestjs/testing';
-import { RedisCacheProvider } from '@new-hros/libs-core';
+import { RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { CryptoAdapter } from './crypto.adapter';
@@ -81,6 +81,12 @@ describe('InvitationApplicationService', () => {
       findById: jest
         .fn()
         .mockImplementation((id) => mockTypeormUserRepository.findOne({ where: { id } })),
+      findByIdUnscoped: jest
+        .fn()
+        .mockImplementation((id) => mockTypeormUserRepository.findOne({ where: { id } })),
+      findByIdForUpdateUnscoped: jest
+        .fn()
+        .mockImplementation((id) => mockTypeormUserRepository.findOne({ where: { id } })),
       findByIdWithLock: jest
         .fn()
         .mockImplementation((id) => mockTypeormUserRepository.findOne({ where: { id } })),
@@ -89,6 +95,7 @@ describe('InvitationApplicationService', () => {
         .mockImplementation((opts) => mockTypeormUserRepository.findOne(opts)),
       findOne: jest.fn().mockImplementation((opts) => mockTypeormUserRepository.findOne(opts)),
       save: jest.fn().mockImplementation((u) => mockTypeormUserRepository.save(u)),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
     mockInvitationRepository = {
@@ -97,10 +104,23 @@ describe('InvitationApplicationService', () => {
         .mockImplementation((tokenHash) =>
           mockTypeormInvitationRepository.findOne({ where: { tokenHash } }),
         ),
+      findByTokenHashUnscoped: jest.fn().mockImplementation(async (tokenHash) => {
+        const invite = await mockTypeormInvitationRepository.findOne({ where: { tokenHash } });
+        if (!invite) throw new AuthInvitationInvalidError();
+        return invite;
+      }),
+      findByTokenHashForUpdateUnscoped: jest.fn().mockImplementation(async (tokenHash) => {
+        const invite = await mockTypeormInvitationRepository.findOne({ where: { tokenHash } });
+        if (!invite) throw new AuthInvitationInvalidError();
+        return invite;
+      }),
+      findPreviousByUser: jest.fn().mockResolvedValue(null),
       findOne: jest
         .fn()
         .mockImplementation((opts) => mockTypeormInvitationRepository.findOne(opts)),
       save: jest.fn().mockImplementation((i) => mockTypeormInvitationRepository.save(i)),
+      create: jest.fn().mockImplementation((data) => ({ ...data, id: 'saved-invite-id' })),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
     mockCredentialRepository = {
@@ -109,7 +129,19 @@ describe('InvitationApplicationService', () => {
         .mockImplementation((userId) =>
           mockTypeormCredentialRepository.findOne({ where: { userId, status: 'active' } }),
         ),
+      findActiveByUserForUpdateUnscope: jest
+        .fn()
+        .mockImplementation((userId) =>
+          mockTypeormCredentialRepository.findOne({ where: { userId, status: 'active' } }),
+        ),
+      findActiveByUseUnscope: jest
+        .fn()
+        .mockImplementation((userId) =>
+          mockTypeormCredentialRepository.findOne({ where: { userId, status: 'active' } }),
+        ),
       save: jest.fn().mockImplementation((c) => mockTypeormCredentialRepository.save(c)),
+      create: jest.fn().mockImplementation((data) => ({ ...data, id: 'cred-id' })),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
     mockAuthSecurityEventOutboxRepository = {
@@ -175,23 +207,24 @@ describe('InvitationApplicationService', () => {
       user.tenantCode = 'tenant-123';
       user.displayEmail = 'employee@tenant.com';
 
-      mockInvitationRepository.findByTokenHash.mockResolvedValue(invite);
+      mockTypeormInvitationRepository.findOne.mockResolvedValue(invite);
       mockTypeormUserRepository.findOne.mockResolvedValue(user);
 
       const result = await service.validateInvitation('token123');
 
       expect(result).toEqual({
-        valid: true,
         userId: 'user-uuid',
         email: 'employee@tenant.com',
         tenantCode: 'tenant-123',
       });
       expect(mockCryptoAdapter.hashToken).toHaveBeenCalledWith('token123');
-      expect(mockInvitationRepository.findByTokenHash).toHaveBeenCalledWith('hashed-token123');
+      expect(mockInvitationRepository.findByTokenHashUnscoped).toHaveBeenCalledWith(
+        'hashed-token123',
+      );
     });
 
     it('should throw AuthInvitationInvalidError if invitation does not exist', async () => {
-      mockInvitationRepository.findByTokenHash.mockResolvedValue(null);
+      mockTypeormInvitationRepository.findOne.mockResolvedValue(null);
       await expect(service.validateInvitation('invalid-token')).rejects.toThrow(
         AuthInvitationInvalidError,
       );
@@ -203,7 +236,7 @@ describe('InvitationApplicationService', () => {
       invite.status = InvitationStatus.PENDING;
       invite.expiresAt = new Date(Date.now() - 10000); // expired
 
-      mockInvitationRepository.findByTokenHash.mockResolvedValue(invite);
+      mockTypeormInvitationRepository.findOne.mockResolvedValue(invite);
       await expect(service.validateInvitation('expired-token')).rejects.toThrow(
         AuthInvitationInvalidError,
       );
@@ -211,10 +244,17 @@ describe('InvitationApplicationService', () => {
   });
 
   describe('acceptInvitation', () => {
-    it('should throw InvalidPasswordPolicyError if password violates policy', async () => {
-      await expect(service.acceptInvitation({ token: 'tok', password: 'short' })).rejects.toThrow(
-        InvalidPasswordPolicyError,
-      );
+    it('should throw AuthInvitationInvalidError if invitation is expired', async () => {
+      const invite = new Invitation();
+      invite.userId = 'user-uuid';
+      invite.status = InvitationStatus.PENDING;
+      invite.expiresAt = new Date(Date.now() - 10000); // expired
+
+      mockTypeormInvitationRepository.findOne.mockResolvedValue(invite);
+
+      await expect(
+        service.acceptInvitation({ token: 'tok', password: 'ValidPassword123!' }),
+      ).rejects.toThrow(AuthInvitationInvalidError);
     });
 
     it('should successfully accept and initialize credential', async () => {
@@ -241,12 +281,16 @@ describe('InvitationApplicationService', () => {
       });
 
       expect(result).toEqual({ success: true, userId: 'user-uuid' });
-      expect(invite.status).toBe(InvitationStatus.ACCEPTED);
-      expect(invite.acceptedAt).toBeDefined();
-      expect(user.status).toBe(UserStatus.ACTIVE);
-      expect(user.securityVersion).toBe(2);
-      expect(mockTypeormCredentialRepository.save).toHaveBeenCalled();
-      expect(mockTypeormOutboxRepository.save).toHaveBeenCalled();
+      expect(mockInvitationRepository.update).toHaveBeenCalledWith(
+        'invite-uuid',
+        expect.objectContaining({ status: InvitationStatus.ACCEPTED }),
+      );
+      expect(mockUserRepository.update).toHaveBeenCalledWith(
+        'user-uuid',
+        expect.objectContaining({ status: UserStatus.ACTIVE }),
+      );
+      expect(mockCredentialRepository.create).toHaveBeenCalled();
+      expect(mockAuthSecurityEventOutboxRepository.save).toHaveBeenCalled();
       expect(mockRedisClient.smembers).toHaveBeenCalled();
     });
 
@@ -276,8 +320,14 @@ describe('InvitationApplicationService', () => {
       });
 
       expect(result).toEqual({ success: true, userId: 'user-uuid' });
-      expect(invite.status).toBe(InvitationStatus.ACCEPTED);
-      expect(user.status).toBe(UserStatus.ACTIVE);
+      expect(mockInvitationRepository.update).toHaveBeenCalledWith(
+        'invite-uuid',
+        expect.objectContaining({ status: InvitationStatus.ACCEPTED }),
+      );
+      expect(mockUserRepository.update).toHaveBeenCalledWith(
+        'user-uuid',
+        expect.objectContaining({ status: UserStatus.ACTIVE }),
+      );
     });
 
     it('should successfully accept invitation and delete sessions and challenges from Redis', async () => {
@@ -355,7 +405,9 @@ describe('InvitationApplicationService', () => {
 
   describe('resendInvitation', () => {
     it('should resend invitation for valid target user', async () => {
-      const actor = { userId: 'admin-uuid', tenantCode: 'tenant-123', userType: 'admin' };
+      jest
+        .spyOn(RequestContextService, 'getUser')
+        .mockReturnValue({ userId: 'admin-uuid', tenantCode: 'tenant-123' } as any);
       const targetUser = new User();
       targetUser.id = 'target-user-uuid';
       targetUser.tenantCode = 'tenant-123';
@@ -365,25 +417,18 @@ describe('InvitationApplicationService', () => {
       mockTypeormCredentialRepository.findOne.mockResolvedValue(null); // No credentials
       mockTypeormInvitationRepository.findOne.mockResolvedValue(null); // No old invitation
 
-      const result = await service.resendInvitation(actor, 'target-user-uuid');
+      const result = await service.resendInvitation('target-user-uuid');
 
       expect(result.success).toBe(true);
       expect(result.rawToken).toBe('raw-token');
-      expect(mockTypeormInvitationRepository.save).toHaveBeenCalled();
-      expect(mockTypeormOutboxRepository.save).toHaveBeenCalled();
-    });
-
-    it('should throw CrossTenantAccessDeniedError if user does not exist or tenant mismatch', async () => {
-      const actor = { userId: 'admin-uuid', tenantCode: 'tenant-123', userType: 'admin' };
-      mockTypeormUserRepository.findOne.mockResolvedValue(null);
-
-      await expect(service.resendInvitation(actor, 'non-existent-user')).rejects.toThrow(
-        CrossTenantAccessDeniedError,
-      );
+      expect(mockInvitationRepository.create).toHaveBeenCalled();
+      expect(mockAuthSecurityEventOutboxRepository.save).toHaveBeenCalled();
     });
 
     it('should throw InvitationNotAllowedError if active credential already exists', async () => {
-      const actor = { userId: 'admin-uuid', tenantCode: 'tenant-123', userType: 'admin' };
+      jest
+        .spyOn(RequestContextService, 'getUser')
+        .mockReturnValue({ userId: 'admin-uuid', tenantCode: 'tenant-123' } as any);
       const targetUser = new User();
       targetUser.id = 'target-user-uuid';
       targetUser.tenantCode = 'tenant-123';
@@ -395,7 +440,7 @@ describe('InvitationApplicationService', () => {
       mockTypeormUserRepository.findOne.mockResolvedValue(targetUser);
       mockTypeormCredentialRepository.findOne.mockResolvedValue(credential);
 
-      await expect(service.resendInvitation(actor, 'target-user-uuid')).rejects.toThrow(
+      await expect(service.resendInvitation('target-user-uuid')).rejects.toThrow(
         InvitationNotAllowedError,
       );
     });

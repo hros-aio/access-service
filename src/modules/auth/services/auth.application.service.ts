@@ -269,7 +269,7 @@ export class AuthApplicationService {
     sourceIp: string,
     userAgent: string,
   ): Promise<void> {
-    const credential = await this.credentialRepository.findActiveByUserId(user.id);
+    const credential = await this.credentialRepository.findActiveByUseUnscope(user.id);
 
     let isPasswordValid = false;
     if (credential) {

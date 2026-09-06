@@ -96,6 +96,10 @@ describe('ProvisioningApplicationService', () => {
       find: jest.fn().mockImplementation((opts) => mockTypeormInvitationRepository.find(opts)),
       save: jest.fn().mockImplementation((inv) => mockTypeormInvitationRepository.save(inv)),
       bulkSave: jest.fn().mockImplementation((invs) => mockTypeormInvitationRepository.save(invs)),
+      create: jest.fn().mockImplementation((data) => {
+        const inv = { ...data, id: data.id || 'new-invite-id' };
+        return mockTypeormInvitationRepository.save(inv);
+      }),
     };
     mockConsumedEventRepository = {
       exists: jest.fn().mockResolvedValue(false),
@@ -323,8 +327,9 @@ describe('ProvisioningApplicationService', () => {
       expect(existingRef.status).toBe('terminated');
       expect(existingRef.sourceVersion).toBe('10');
 
-      expect(mockTypeormInvitationRepository.find).toHaveBeenCalledWith({
-        where: { userId: 'user-123', status: 'pending' },
+      expect(mockInvitationRepository.find).toHaveBeenCalledWith({
+        userId: 'user-123',
+        status: InvitationStatus.PENDING,
       });
       expect(mockTypeormInvitationRepository.save).toHaveBeenCalledWith([
         expect.objectContaining({
@@ -384,8 +389,9 @@ describe('ProvisioningApplicationService', () => {
       expect(existingRef.status).toBe('reactivated');
       expect(existingRef.sourceVersion).toBe('10');
 
-      expect(mockTypeormInvitationRepository.find).toHaveBeenCalledWith({
-        where: { userId: 'user-123', status: InvitationStatus.PENDING },
+      expect(mockInvitationRepository.find).toHaveBeenCalledWith({
+        userId: 'user-123',
+        status: InvitationStatus.PENDING,
       });
       // Verify revoke old invitations
       expect(mockTypeormInvitationRepository.save).toHaveBeenCalledWith([

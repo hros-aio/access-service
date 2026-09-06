@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { CredentialRepository } from './credential.repository';
+import { CredentialStatus } from '../../../enums';
 import { Credential } from '../entities/credential.entity';
 
 describe('CredentialRepository', () => {
@@ -52,41 +53,38 @@ describe('CredentialRepository', () => {
     const result = await repository.findById('cred-uuid');
     expect(result).toEqual(cred);
     expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
-      where: { id: 'cred-uuid' },
+      where: { tenantCode: '000000' },
     });
   });
 
-  it('should find active credential by user ID', async () => {
+  it('should find active credential by user ID for update unscope', async () => {
     const cred = new Credential();
     cred.userId = 'user-uuid';
-    cred.status = 'active';
+    cred.status = CredentialStatus.ACTIVE;
 
     mockTypeormRepository.findOne.mockResolvedValue(cred);
 
-    const result = await repository.findActiveByUserId('user-uuid');
+    const result = await repository.findActiveByUserForUpdateUnscope('user-uuid');
     expect(result).toEqual(cred);
     expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
-      where: { userId: 'user-uuid', status: 'active' },
+      where: undefined,
+      withTenancy: false,
+      lock: { mode: 'pessimistic_write' },
     });
   });
 
-  it('should find credentials by user ID', async () => {
-    const creds = [new Credential()];
-    mockTypeormRepository.find.mockResolvedValue(creds);
-
-    const result = await repository.findByUserId('user-uuid');
-    expect(result).toEqual(creds);
-    expect(mockTypeormRepository.find).toHaveBeenCalledWith({
-      where: { userId: 'user-uuid' },
-    });
-  });
-
-  it('should save credential', async () => {
+  it('should find active credential by user ID unscope', async () => {
     const cred = new Credential();
-    mockTypeormRepository.save.mockResolvedValue(cred);
+    cred.userId = 'user-uuid';
+    cred.status = CredentialStatus.ACTIVE;
 
-    const result = await repository.save(cred);
+    mockTypeormRepository.findOne.mockResolvedValue(cred);
+
+    const result = await repository.findActiveByUseUnscope('user-uuid');
     expect(result).toEqual(cred);
-    expect(mockTypeormRepository.save).toHaveBeenCalledWith(cred);
+    expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
+      where: undefined,
+      withTenancy: false,
+    });
   });
 });

@@ -67,7 +67,7 @@ describe('AuthApplicationService', () => {
       findOne: jest.fn(),
     };
     mockCredentialRepository = {
-      findActiveByUserId: jest.fn(),
+      findActiveByUseUnscope: jest.fn(),
     };
     mockCredentialDomainService = {
       verifyPassword: jest.fn(),
@@ -150,7 +150,7 @@ describe('AuthApplicationService', () => {
   describe('loginWithPassword', () => {
     it('should successfully authenticate user and return tokens', async () => {
       mockUserRepository.findOne.mockResolvedValue(mockUser);
-      mockCredentialRepository.findActiveByUserId.mockResolvedValue(mockCredential);
+      mockCredentialRepository.findActiveByUseUnscope.mockResolvedValue(mockCredential);
       mockCredentialDomainService.verifyPassword.mockResolvedValue(true);
       (jwt.sign as jest.Mock).mockReturnValue('mock-jwt-token');
 
@@ -224,7 +224,7 @@ describe('AuthApplicationService', () => {
 
     it('should throw InvalidCredentialsError for wrong password', async () => {
       mockUserRepository.findOne.mockResolvedValue(mockUser);
-      mockCredentialRepository.findActiveByUserId.mockResolvedValue(mockCredential);
+      mockCredentialRepository.findActiveByUseUnscope.mockResolvedValue(mockCredential);
       mockCredentialDomainService.verifyPassword.mockResolvedValue(false);
 
       await expect(
@@ -238,7 +238,7 @@ describe('AuthApplicationService', () => {
 
     it('should return MFA_REQUIRED and a challengeId if user has active enrolled MFA methods', async () => {
       mockUserRepository.findOne.mockResolvedValue(mockUser);
-      mockCredentialRepository.findActiveByUserId.mockResolvedValue(mockCredential);
+      mockCredentialRepository.findActiveByUseUnscope.mockResolvedValue(mockCredential);
       mockCredentialDomainService.verifyPassword.mockResolvedValue(true);
       mockMfaMethodRepository.findActiveByUserId.mockResolvedValue([
         { id: 'mfa-uuid', type: 'sms', status: 'active' },
@@ -268,7 +268,7 @@ describe('AuthApplicationService', () => {
 
     it('should return MFA_REQUIRED and a challengeId if tenant has mandatory MFA enabled', async () => {
       mockUserRepository.findOne.mockResolvedValue(mockUser);
-      mockCredentialRepository.findActiveByUserId.mockResolvedValue(mockCredential);
+      mockCredentialRepository.findActiveByUseUnscope.mockResolvedValue(mockCredential);
       mockCredentialDomainService.verifyPassword.mockResolvedValue(true);
       mockMfaMethodRepository.findActiveByUserId.mockResolvedValue([]);
       mockAuthenticationSettingsRepository.findByTenantCode.mockResolvedValue({
@@ -290,7 +290,7 @@ describe('AuthApplicationService', () => {
         ...mockUser,
         mfaEnrollmentRequired: true,
       });
-      mockCredentialRepository.findActiveByUserId.mockResolvedValue(mockCredential);
+      mockCredentialRepository.findActiveByUseUnscope.mockResolvedValue(mockCredential);
       mockCredentialDomainService.verifyPassword.mockResolvedValue(true);
       mockMfaMethodRepository.findActiveByUserId.mockResolvedValue([]);
       mockAuthenticationSettingsRepository.findByTenantCode.mockResolvedValue({

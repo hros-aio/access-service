@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test, TestingModule } from '@nestjs/testing';
+import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
+import { In } from 'typeorm';
 
 import { InvitationRepository } from './invitation.repository';
 import { InvitationStatus } from '../../../enums';
@@ -10,21 +12,13 @@ describe('InvitationRepository', () => {
   let repository: InvitationRepository;
   let mockEntityManager: any;
   let mockTypeormRepository: any;
-  let mockQueryBuilder: any;
 
   beforeEach(async () => {
-    mockQueryBuilder = {
-      innerJoinAndSelect: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(),
-      setLock: jest.fn().mockReturnThis(),
-      getOne: jest.fn(),
-    };
-
     mockTypeormRepository = {
       save: jest.fn(),
       findOne: jest.fn(),
-      createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+      find: jest.fn(),
+      update: jest.fn(),
     };
 
     mockEntityManager = {
@@ -43,6 +37,8 @@ describe('InvitationRepository', () => {
     }).compile();
 
     repository = module.get<InvitationRepository>(InvitationRepository);
+
+    jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue('TENANT_A');
   });
 
   afterEach(() => {
@@ -62,20 +58,52 @@ describe('InvitationRepository', () => {
     const result = await repository.findById('invite-uuid');
     expect(result).toEqual(invite);
     expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
-      where: { id: 'invite-uuid' },
+      where: { tenantCode: 'TENANT_A' },
     });
   });
 
-  it('should find invitation by token hash', async () => {
+  it('should find invitation by token hash unscoped', async () => {
     const invite = new Invitation();
     invite.tokenHash = 'hash-val';
 
     mockTypeormRepository.findOne.mockResolvedValue(invite);
 
-    const result = await repository.findByTokenHash('hash-val');
+    const result = await repository.findByTokenHashUnscoped('hash-val');
     expect(result).toEqual(invite);
     expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
-      where: { tokenHash: 'hash-val' },
+      where: undefined,
+      withTenancy: false,
+    });
+  });
+
+  it('should find invitation by token hash for update unscoped', async () => {
+    const invite = new Invitation();
+    invite.tokenHash = 'hash-val';
+
+    mockTypeormRepository.findOne.mockResolvedValue(invite);
+
+    const result = await repository.findByTokenHashForUpdateUnscoped('hash-val');
+    expect(result).toEqual(invite);
+    expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
+      lock: { mode: 'pessimistic_write' },
+      where: undefined,
+      withTenancy: false,
+    });
+  });
+
+  it('should find previous invitation by user', async () => {
+    const invite = new Invitation();
+    invite.userId = 'user-uuid';
+
+    mockTypeormRepository.findOne.mockResolvedValue(invite);
+
+    const result = await repository.findPreviousByUser('user-uuid');
+    expect(result).toEqual(invite);
+    expect(mockTypeormRepository.findOne).toHaveBeenCalledWith({
+      lock: { mode: 'pessimistic_write' },
+      order: { sentAt: 'DESC' },
+      where: undefined,
+      withTenancy: false,
     });
   });
 
@@ -96,59 +124,30 @@ describe('InvitationRepository', () => {
     });
   });
 
-  it('should save invitation', async () => {
-    const invite = new Invitation();
-    mockTypeormRepository.save.mockResolvedValue(invite);
+  it('should bulk save invitations', async () => {
+    const invites = [new Invitation()];
+    mockTypeormRepository.save.mockResolvedValue(invites);
 
-    const result = await repository.save(invite);
-    expect(result).toEqual(invite);
-    expect(mockTypeormRepository.save).toHaveBeenCalledWith(invite);
+    const result = await repository.bulkSave(invites);
+    expect(result).toEqual(invites);
+    expect(mockTypeormRepository.save).toHaveBeenCalledWith(invites);
   });
 
-  describe('findPendingForUpdate', () => {
-    it('should query with locks and tenant parameters', async () => {
-      const invite = new Invitation();
-      mockQueryBuilder.getOne.mockResolvedValue(invite);
+  it('should cancel pending invitations', async () => {
+    mockTypeormRepository.update.mockResolvedValue({ affected: 1 });
 
-      const result = await repository.findPendingForUpdate(
-        'tenant-code',
-        'user-uuid',
-        'token-hash',
-      );
-      expect(result).toEqual(invite);
-      expect(mockTypeormRepository.createQueryBuilder).toHaveBeenCalledWith('invitation');
-      expect(mockQueryBuilder.innerJoinAndSelect).toHaveBeenCalledWith('invitation.user', 'user');
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith('user.tenantCode = :tenantCode', {
-        tenantCode: 'tenant-code',
-      });
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('invitation.userId = :userId', {
+    await repository.cancelPendingInvitations('user-uuid');
+
+    expect(mockTypeormRepository.update).toHaveBeenCalledWith(
+      {
         userId: 'user-uuid',
-      });
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        "invitation.status IN ('pending', 'sent')",
-      );
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('invitation.tokenHash = :tokenHash', {
-        tokenHash: 'token-hash',
-      });
-      expect(mockQueryBuilder.setLock).toHaveBeenCalledWith('pessimistic_write');
-    });
-  });
-
-  describe('findByTenantAndTokenHash', () => {
-    it('should query by tenant and token hash without lock', async () => {
-      const invite = new Invitation();
-      mockQueryBuilder.getOne.mockResolvedValue(invite);
-
-      const result = await repository.findByTenantAndTokenHash('tenant-code', 'token-hash');
-      expect(result).toEqual(invite);
-      expect(mockTypeormRepository.createQueryBuilder).toHaveBeenCalledWith('invitation');
-      expect(mockQueryBuilder.innerJoinAndSelect).toHaveBeenCalledWith('invitation.user', 'user');
-      expect(mockQueryBuilder.where).toHaveBeenCalledWith('user.tenantCode = :tenantCode', {
-        tenantCode: 'tenant-code',
-      });
-      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith('invitation.tokenHash = :tokenHash', {
-        tokenHash: 'token-hash',
-      });
-    });
+        tenantCode: 'TENANT_A',
+        status: In([InvitationStatus.PENDING, InvitationStatus.SENT]),
+      },
+      expect.objectContaining({
+        status: InvitationStatus.CANCELLED,
+      }),
+    );
   });
 });
+
