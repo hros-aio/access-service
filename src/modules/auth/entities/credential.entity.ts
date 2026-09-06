@@ -1,12 +1,12 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { BaseEntity } from '@new-hros/libs-sql';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 import { User } from '../../user/entities/user.entity';
 
-@Entity('credentials')
-export class Credential {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+import { TableName } from '@/enums';
 
+@Entity(TableName.CREDENTIALS)
+export class Credential extends BaseEntity {
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 

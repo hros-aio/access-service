@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Post, Query, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Public } from '@new-hros/libs-apis';
 
 import { AcceptInvitationDto, ValidateInvitationQueryDto } from '../dto/invitation.dto';
 import { InvitationApplicationService } from '../services/invitation.application.service';
@@ -10,12 +11,13 @@ export class InvitationController {
   constructor(private readonly invitationService: InvitationApplicationService) {}
 
   @Get('validate')
+  @Public()
   @ApiOperation({ summary: 'Validate raw invitation token' })
   @ApiResponse({ status: 200, description: 'Token is valid' })
   @ApiResponse({ status: 400, description: 'Token is invalid, expired, or revoked' })
   async validate(
-    @Query(new ValidationPipe({ transform: true })) query: ValidateInvitationQueryDto,
-  ): Promise<{ valid: boolean; userId: string; email: string; tenantCode: string }> {
+    @Query() query: ValidateInvitationQueryDto,
+  ): Promise<{ userId: string; email: string; tenantCode: string }> {
     return this.invitationService.validateInvitation(query.token);
   }
 
@@ -24,10 +26,7 @@ export class InvitationController {
   @ApiResponse({ status: 200, description: 'Invitation accepted and account activated' })
   @ApiResponse({ status: 400, description: 'Invalid password policy or invalid token' })
   @ApiResponse({ status: 503, description: 'Redis session store unavailable' })
-  async accept(
-    @Body()
-    dto: AcceptInvitationDto,
-  ): Promise<{ success: boolean; userId: string }> {
+  async accept(@Body() dto: AcceptInvitationDto): Promise<{ success: boolean; userId: string }> {
     return this.invitationService.acceptInvitation(dto);
   }
 }

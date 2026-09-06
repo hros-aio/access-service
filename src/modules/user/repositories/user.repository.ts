@@ -10,6 +10,18 @@ export class UserRepository extends BaseRepository<User> {
     super(User, transactionService);
   }
 
+  async findByIdUnscoped(id: string): Promise<User> {
+    return this.findById(id, { withTenancy: false, required: true });
+  }
+
+  async findByIdForUpdateUnscoped(id: string): Promise<User> {
+    return this.findById(id, {
+      required: true,
+      withTenancy: false,
+      lock: { mode: 'pessimistic_write' },
+    });
+  }
+
   async findByTenantAndExternalIdentity(
     tenantCode: string,
     externalIdentityId: string,
