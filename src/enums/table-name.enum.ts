@@ -1,7 +1,6 @@
 export enum TableName {
   AUTH_SECURITY_EVENTS_OUTBOX = 'auth_security_events_outbox',
   CREDENTIALS = 'credentials',
-  EXTERNAL_IDENTITIES = 'external_identities',
   EMPLOYEE_REFERENCES = 'employee_references',
   INVITATIONS = 'invitations',
   MFA_METHODS = 'mfa_methods',

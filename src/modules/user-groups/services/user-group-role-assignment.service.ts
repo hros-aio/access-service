@@ -3,9 +3,8 @@ import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { UserGroupImpactService } from './user-group-impact.service';
-import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { RoleRepository } from '../../roles/repositories/role.repository';
+import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
 import { UserGroupAggregate } from '../domain/aggregates/user-group.aggregate';
 import {
   ConcurrentModificationError,

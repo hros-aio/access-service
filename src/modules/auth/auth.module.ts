@@ -6,13 +6,11 @@ import { FirebaseSsoModule } from '../firebase-sso/firebase-sso.module';
 import { IpRestrictionService } from '../ip-restriction/services/ip-restriction.service';
 import { LockoutService } from '../lockout/services/lockout.service';
 import { MfaModule } from '../mfa/mfa.module';
-import { SecurityEventService } from '../security-event/services/security-event.service';
+import { SecurityEventModule } from '../security-event/security-event.module';
 import { TenantModule } from '../tenant/tenant.module';
 import { UserModule } from '../user/user.module';
 import { AuthController } from './controllers/auth.controller';
-import { AuthSecurityEventOutbox } from './entities/auth-security-event-outbox.entity';
 import { Credential } from './entities/credential.entity';
-import { AuthSecurityEventOutboxRepository } from './repositories/auth-security-event-outbox.repository';
 import { CredentialRepository } from './repositories/credential.repository';
 import { AuthApplicationService } from './services/auth.application.service';
 import { CredentialDomainService } from './services/credential.domain.service';
@@ -20,20 +18,19 @@ import { SessionApplicationService } from './services/session.application.servic
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Credential, AuthSecurityEventOutbox]),
+    TypeOrmModule.forFeature([Credential]),
     TenantModule,
     UserModule,
+    SecurityEventModule,
     forwardRef(() => MfaModule),
     forwardRef(() => FirebaseSsoModule),
   ],
   controllers: [AuthController],
   providers: [
     CredentialRepository,
-    AuthSecurityEventOutboxRepository,
     SessionApplicationService,
     CredentialDomainService,
     AuthApplicationService,
-    SecurityEventService,
     IpRestrictionService,
     LockoutService,
     {
@@ -44,11 +41,9 @@ import { SessionApplicationService } from './services/session.application.servic
   ],
   exports: [
     CredentialRepository,
-    AuthSecurityEventOutboxRepository,
     SessionApplicationService,
     CredentialDomainService,
     AuthApplicationService,
-    SecurityEventService,
     IpRestrictionService,
     LockoutService,
     RedisCacheProvider,

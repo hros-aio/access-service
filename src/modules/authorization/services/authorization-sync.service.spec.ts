@@ -3,8 +3,8 @@ import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { AuthorizationSyncService } from './authorization-sync.service';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { RoleRepository } from '../../roles/repositories/role.repository';
+import { AuthSecurityEventOutboxRepository } from '../../security-event';
 import { UserGroupRepository } from '../../user-groups/repositories/user-group.repository';
 import {
   AuthorizationSyncJob,

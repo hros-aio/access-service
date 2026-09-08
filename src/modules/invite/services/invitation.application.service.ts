@@ -5,10 +5,9 @@ import { TransactionService } from '@new-hros/libs-sql';
 import { CryptoAdapter } from './crypto.adapter';
 import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 import { CredentialStatus, EventType, InvitationStatus, UserStatus } from '../../../enums';
-import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { CredentialRepository } from '../../auth/repositories/credential.repository';
 import { CredentialDomainService } from '../../auth/services/credential.domain.service';
+import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { AcceptInvitationDto } from '../dto/invitation.dto';
 import {

@@ -5,7 +5,7 @@ import { TransactionService } from '@new-hros/libs-sql';
 import { MfaMethodRepository } from '../repositories/mfa-method.repository';
 
 import { GenerateSessionKey, GenerateUserSessionsKey } from '@/constants';
-import { AuthSecurityEventOutboxRepository } from '@/modules/auth/repositories/auth-security-event-outbox.repository';
+import { AuthSecurityEventOutboxRepository } from '@/modules/security-event';
 import { UserRepository } from '@/modules/user/repositories/user.repository';
 
 @Injectable()

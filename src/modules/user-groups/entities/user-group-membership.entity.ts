@@ -5,7 +5,9 @@ import { UserGroup } from './user-group.entity';
 import { EmployeeReference } from '../../employee/entities/employee-reference.entity';
 import { Tenant } from '../../tenant/entities/tenant.entity';
 
-@Entity('user_group_memberships')
+import { TableName } from '@/enums';
+
+@Entity(TableName.USER_GROUP_MEMBERSHIPS)
 @Unique('uq_user_group_memberships_tenant_group_employee', ['tenantCode', 'groupId', 'employeeId'])
 export class UserGroupMembership extends BaseEntity {
   @Column({ name: 'group_id', type: 'uuid' })

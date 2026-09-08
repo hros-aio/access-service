@@ -7,6 +7,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import {
+  AuthContext,
+  CacheService,
   ConfigurationService,
   RedisCacheProvider,
   RequestContextService,
@@ -38,6 +40,7 @@ import {
 } from '../exceptions/auth.exception';
 import { CredentialRepository } from '../repositories/credential.repository';
 
+import { EmployeeReferenceRepository } from '@/modules/employee/repositories/employee-reference.repository';
 import { FirebaseSsoApplicationService } from '@/modules/firebase-sso/application/firebase-sso-application.service';
 import {
   AmbiguousIdentityMappingException,
@@ -63,6 +66,8 @@ export class AuthApplicationService {
     private readonly lockoutService: LockoutService,
     private readonly securityEventService: SecurityEventService,
     private readonly firebaseSsoAppService: FirebaseSsoApplicationService,
+    private readonly cacheService: CacheService,
+    private readonly employeeRepo: EmployeeReferenceRepository,
   ) {}
 
   async loginWithPassword(dto: LoginWithPasswordDto): Promise<LoginResultResponseDto> {
@@ -393,21 +398,30 @@ export class AuthApplicationService {
   ): Promise<void> {
     const ttlSeconds = rememberMe ? 2592000 : 604800;
     const sessionKey = GenerateSessionKey(sessionId);
-    const sessionData = {
+    const sessionData: AuthContext = {
       sessionId,
       userId: user.id,
       tenantCode: user.tenantCode,
-      user: {
-        id: user.id,
-        tenantCode: user.tenantCode,
-        email: user.displayEmail,
-        roles: [],
-      },
-      createdAt: new Date().toISOString(),
+      roles: [],
+      scopes: [],
+      permissions: [],
     };
 
+    if (user.employeeRefId) {
+      const employee = await this.employeeRepo.findById(user.employeeRefId);
+      if (employee) {
+        sessionData.employee = {
+          employeeId: employee.id,
+          companyId: employee.companyId,
+          locationId: employee.locationId,
+          departmentId: employee.departmentId,
+          managerId: employee.managerId,
+        };
+      }
+    }
+
     try {
-      await this.redisCacheProvider.set(sessionKey, sessionData, ttlSeconds);
+      await this.cacheService.set(sessionKey, sessionData, ttlSeconds);
 
       const client = this.redisCacheProvider.getClient();
       if (client) {

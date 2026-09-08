@@ -6,7 +6,7 @@ import { TransactionService } from '@new-hros/libs-sql';
 
 import { MfaAdminApplicationService } from './mfa_admin_application.service';
 import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { AuthSecurityEventOutboxRepository } from '../../security-event';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { MfaMethodRepository } from '../repositories/mfa-method.repository';
 

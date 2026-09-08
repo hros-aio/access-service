@@ -16,8 +16,8 @@ import { VerifyEnrollmentDto, VerifyEnrollmentResponseDto } from '../dto/verify_
 import { MfaFactorStatus, MfaFactorType } from '../entities/mfa-method.entity';
 import { MfaMethodRepository } from '../repositories/mfa-method.repository';
 
-import { AuthSecurityEventOutboxRepository } from '@/modules/auth/repositories/auth-security-event-outbox.repository';
 import { AuthApplicationService } from '@/modules/auth/services/auth.application.service';
+import { AuthSecurityEventOutboxRepository } from '@/modules/security-event';
 import { UserRepository } from '@/modules/user/repositories/user.repository';
 
 @Injectable()
