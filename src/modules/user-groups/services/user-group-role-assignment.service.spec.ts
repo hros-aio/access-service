@@ -2,8 +2,8 @@ import { TransactionService } from '@new-hros/libs-sql';
 
 import { UserGroupImpactService } from './user-group-impact.service';
 import { UserGroupRoleAssignmentService } from './user-group-role-assignment.service';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { RoleRepository } from '../../roles/repositories/role.repository';
+import { AuthSecurityEventOutboxRepository } from '../../security-event';
 import {
   HighImpactConfirmationRequiredError,
   InvalidRoleAssignmentError,

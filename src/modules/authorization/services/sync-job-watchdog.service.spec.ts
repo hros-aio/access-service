@@ -1,7 +1,7 @@
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { SyncJobWatchdogService } from './sync-job-watchdog.service';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { AuthSecurityEventOutboxRepository } from '../../security-event';
 import {
   AuthorizationSyncJob,
   SyncJobStatus,

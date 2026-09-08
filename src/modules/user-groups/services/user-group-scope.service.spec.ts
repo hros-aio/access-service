@@ -3,8 +3,7 @@ import { TransactionService } from '@new-hros/libs-sql';
 
 import { UserGroupImpactService } from './user-group-impact.service';
 import { UserGroupScopeService } from './user-group-scope.service';
-import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
 import { ScopeType } from '../domain/enums/scope-type.enum';
 import {
   ConcurrentModificationError,

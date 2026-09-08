@@ -2,7 +2,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { SecurityEventService } from './security-event.service';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { AuthSecurityEventOutboxRepository } from '../repositories/auth-security-event-outbox.repository';
 
 describe('SecurityEventService', () => {
   let service: SecurityEventService;

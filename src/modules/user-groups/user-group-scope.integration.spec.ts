@@ -1,8 +1,8 @@
 import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
+import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../security-event';
 import { UserGroupScopeController } from './controllers/user-group-scope.controller';
-import { AuthSecurityEventOutboxRepository } from '../auth/repositories/auth-security-event-outbox.repository';
 import { ScopeType } from './domain/enums/scope-type.enum';
 import {
   ConcurrentModificationError,
@@ -15,7 +15,6 @@ import { UserGroupRoleRepository } from './repositories/user-group-role.reposito
 import { UserGroupRepository } from './repositories/user-group.repository';
 import { UserGroupImpactService } from './services/user-group-impact.service';
 import { UserGroupScopeService } from './services/user-group-scope.service';
-import { AuthSecurityEventOutbox } from '../auth/entities/auth-security-event-outbox.entity';
 
 describe('UserGroupScope Integration / Security Isolation', () => {
   let controller: UserGroupScopeController;

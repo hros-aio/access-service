@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
-import { AuthSecurityEventOutboxRepository } from '../../src/modules/auth/repositories/auth-security-event-outbox.repository';
 import {
   SyncJobStatus,
   SyncSourceType,
@@ -13,6 +12,7 @@ import { AuthorizationSyncService } from '../../src/modules/authorization/servic
 import { DistributedLockAdapter } from '../../src/modules/authorization/services/distributed-lock.adapter';
 import { ScheduledReconciliationScanner } from '../../src/modules/authorization/services/scheduled-reconciliation-scanner.service';
 import { RoleRepository } from '../../src/modules/roles/repositories/role.repository';
+import { AuthSecurityEventOutboxRepository } from '../../src/modules/security-event';
 import { UserGroupRepository } from '../../src/modules/user-groups/repositories/user-group.repository';
 
 describe('Scheduled Authorization Reconciliation (E2E Integration Flow)', () => {

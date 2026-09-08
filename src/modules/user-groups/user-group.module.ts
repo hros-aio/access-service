@@ -22,10 +22,9 @@ import { UserGroupPopulationQueryService } from './services/user-group-populatio
 import { UserGroupQueryService } from './services/user-group-query.service';
 import { UserGroupRoleAssignmentService } from './services/user-group-role-assignment.service';
 import { UserGroupScopeService } from './services/user-group-scope.service';
-import { AuthSecurityEventOutbox } from '../auth/entities/auth-security-event-outbox.entity';
-import { AuthSecurityEventOutboxRepository } from '../auth/repositories/auth-security-event-outbox.repository';
 import { EmployeeModule } from '../employee/employee.module';
 import { RoleModule } from '../roles/role.module';
+import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../security-event';
 
 @Module({
   imports: [

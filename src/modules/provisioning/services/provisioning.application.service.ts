@@ -5,12 +5,11 @@ import { TransactionService } from '@new-hros/libs-sql';
 
 import { SystemRoleSeederService } from './system-role-seeder.service';
 import { CredentialStatus, EventType, InvitationStatus, UserStatus } from '../../../enums';
-import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { SessionApplicationService } from '../../auth/services/session.application.service';
 import { EmployeeReferenceRepository } from '../../employee/repositories/employee-reference.repository';
 import { Invitation } from '../../invite/entities/invitation.entity';
 import { InvitationRepository } from '../../invite/repositories/invitation.repository';
+import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
 import { User } from '../../user/entities/user.entity';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { ConsumedEvent } from '../entities/consumed-event.entity';

@@ -15,6 +15,7 @@ import { PasswordModule } from './modules/password/password.module';
 import { PermissionsModule } from './modules/permissions';
 import { ProvisioningModule } from './modules/provisioning/provisioning.module';
 import { RoleModule } from './modules/roles/role.module';
+import { SecurityEventModule } from './modules/security-event/security-event.module';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { UserModule } from './modules/user/user.module';
 import { UserGroupModule } from './modules/user-groups/user-group.module';
@@ -68,6 +69,7 @@ const config = new ConfigurationService({});
     ImpactAnalysisModule,
     AuthorizationModule,
     ProvisioningModule,
+    SecurityEventModule,
   ],
 })
 export class AppModule {}

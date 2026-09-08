@@ -7,12 +7,11 @@ import { In } from 'typeorm';
 
 import { CredentialPolicy } from './credential.policy';
 import { CredentialStatus, EventType, InvitationStatus, UserStatus } from '../../../enums';
-import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { CredentialRepository } from '../../auth/repositories/credential.repository';
 import { CredentialDomainService } from '../../auth/services/credential.domain.service';
 import { SessionApplicationService } from '../../auth/services/session.application.service';
 import { InvitationRepository } from '../../invite/repositories/invitation.repository';
+import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
 import { AuthenticationSettingsRepository } from '../../tenant/repositories/authentication-settings.repository';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { PasswordResetRedisAdapter } from '../adapters/password-reset-redis.adapter';

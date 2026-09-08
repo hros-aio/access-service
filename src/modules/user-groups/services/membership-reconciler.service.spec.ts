@@ -1,7 +1,7 @@
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { MembershipReconciler } from './membership-reconciler.service';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { AuthSecurityEventOutboxRepository } from '../../security-event';
 import { UserGroupRole } from '../entities/user-group-role.entity';
 import { UserGroup } from '../entities/user-group.entity';
 import { UserEffectiveRoleRepository } from '../repositories/user-effective-role.repository';

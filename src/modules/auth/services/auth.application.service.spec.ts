@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigurationService, RedisCacheProvider } from '@new-hros/libs-core';
+import { CacheService, ConfigurationService, RedisCacheProvider } from '@new-hros/libs-core';
 import * as jwt from 'jsonwebtoken';
 
 import { AuthApplicationService } from './auth.application.service';
 import { CredentialDomainService } from './credential.domain.service';
 import { CredentialStatus, UserStatus } from '../../../enums';
+import { EmployeeReferenceRepository } from '../../employee/repositories/employee-reference.repository';
 import { IpRestrictionService } from '../../ip-restriction/services/ip-restriction.service';
 import { LockoutService } from '../../lockout/services/lockout.service';
 import { MfaMethodRepository } from '../../mfa/repositories/mfa-method.repository';
@@ -42,6 +43,7 @@ describe('AuthApplicationService', () => {
   let mockLockoutService: any;
   let mockSecurityEventService: any;
   let mockRedisCacheProvider: any;
+  let mockCacheService: any;
   let mockConfigService: any;
   let mockFirebaseSsoApplicationService: any;
 
@@ -106,6 +108,11 @@ describe('AuthApplicationService', () => {
         expire: jest.fn().mockResolvedValue(1),
       }),
     };
+    mockCacheService = {
+      set: jest.fn().mockResolvedValue(undefined),
+      get: jest.fn().mockResolvedValue(null),
+      del: jest.fn().mockResolvedValue(undefined),
+    };
     mockConfigService = {
       get: jest.fn().mockImplementation((key: string) => {
         if (key === 'jwt.privateKey') return 'dummy-private-key';
@@ -138,6 +145,11 @@ describe('AuthApplicationService', () => {
           provide: FirebaseSsoApplicationService,
           useValue: mockFirebaseSsoApplicationService,
         },
+        {
+          provide: CacheService,
+          useValue: mockCacheService,
+        },
+        { provide: EmployeeReferenceRepository, useValue: {} },
       ],
     }).compile();
 
@@ -167,7 +179,7 @@ describe('AuthApplicationService', () => {
       expect(result.authState).toBe('AUTHENTICATED');
       expect(result.accessToken).toBe('mock-jwt-token');
       expect(result.refreshToken).toBe('mock-jwt-token');
-      expect(mockRedisCacheProvider.set).toHaveBeenCalled();
+      expect(mockCacheService.set).toHaveBeenCalled();
       expect(mockRedisCacheProvider.getClient().sadd).toHaveBeenCalled();
     });
 
@@ -326,7 +338,7 @@ describe('AuthApplicationService', () => {
       expect(result.authState).toBe('AUTHENTICATED');
       expect(result.accessToken).toBe('mock-jwt-token');
       expect(result.refreshToken).toBe('mock-jwt-token');
-      expect(mockRedisCacheProvider.set).toHaveBeenCalled();
+      expect(mockCacheService.set).toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException when token is invalid or expired', async () => {

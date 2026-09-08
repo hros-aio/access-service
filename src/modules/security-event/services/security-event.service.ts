@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { AuthSecurityEventOutboxRepository } from '../repositories/auth-security-event-outbox.repository';
 
 @Injectable()
 export class SecurityEventService {

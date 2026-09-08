@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
 
-import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
+import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
 import { AuthorizationSyncJobRepository } from '../repositories/authorization-sync-job.repository';
 
 @Injectable()

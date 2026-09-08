@@ -2,9 +2,8 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
-import { AuthSecurityEventOutbox } from '../../auth/entities/auth-security-event-outbox.entity';
-import { AuthSecurityEventOutboxRepository } from '../../auth/repositories/auth-security-event-outbox.repository';
 import { RoleRepository } from '../../roles/repositories/role.repository';
+import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
 import { UserGroupRepository } from '../../user-groups/repositories/user-group.repository';
 import { SyncJobResponseDto } from '../dto/sync-job-response.dto';
 import { TriggerSyncNowDto } from '../dto/trigger-sync-now.dto';
