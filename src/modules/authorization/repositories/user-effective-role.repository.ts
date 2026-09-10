@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { ScopeConstraint } from '@new-hros/libs-core';
 import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
 import { In } from 'typeorm';
 
 import { GenerateUserEffectiveRoleKey } from '../../../constants';
 import { UserEffectiveRoleEntity } from '../entities/user-effective-role.entity';
-import { ScopeConstraint } from '../interfaces/effective-user-role.interface';
 
 export interface PersistUserEffectiveRoleEntry {
   roleId: string;

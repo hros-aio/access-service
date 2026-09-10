@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
+import { CACHE_KEY_BUILDER, RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { CryptoAdapter } from './crypto.adapter';
-import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 import { CredentialStatus, EventType, InvitationStatus, UserStatus } from '../../../enums';
 import { CredentialRepository } from '../../auth/repositories/credential.repository';
 import { CredentialDomainService } from '../../auth/services/credential.domain.service';
@@ -174,10 +173,10 @@ export class InvitationApplicationService {
     }
 
     try {
-      const userSessionsKey = GenerateUserSessionsKey(tenantCode, userId);
+      const userSessionsKey = CACHE_KEY_BUILDER.buildUserSessions(tenantCode, userId);
       const sessionIds: string[] = await client.smembers(userSessionsKey);
       if (sessionIds && sessionIds.length > 0) {
-        const keys = sessionIds.map((sid) => GenerateSessionKey(sid));
+        const keys = sessionIds.map((sid) => CACHE_KEY_BUILDER.buildSession(sid));
         await client.del(...keys, userSessionsKey);
       }
 

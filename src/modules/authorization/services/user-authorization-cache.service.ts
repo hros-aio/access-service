@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisCacheProvider } from '@new-hros/libs-core';
-
-import { GenerateUserAuthzCacheKey, GenerateUserAuthzVersionKey } from '../../../constants';
 import {
+  CACHE_KEY_BUILDER,
+  CacheService,
   EffectiveUserRole,
+  RedisCacheProvider,
   UserAuthorizationProfile,
-} from '../interfaces/effective-user-role.interface';
+} from '@new-hros/libs-core';
+
+import { GenerateUserAuthzVersionKey } from '../../../constants';
 import { UserEffectiveRoleRepository } from '../repositories/user-effective-role.repository';
 
 @Injectable()
@@ -15,6 +17,7 @@ export class UserAuthorizationCacheService {
 
   constructor(
     private readonly redisCacheProvider: RedisCacheProvider,
+    private readonly cacheService: CacheService,
     private readonly effectiveRoleRepo: UserEffectiveRoleRepository,
   ) {}
 
@@ -30,7 +33,7 @@ export class UserAuthorizationCacheService {
         roleId: r.roleId,
         sourceGroupId: r.sourceGroupId,
         scope: {
-          type: r.scopeType as EffectiveUserRole['scope']['type'],
+          type: r.scopeType,
           refId: r.scopeEntityId || null,
         },
       }));
@@ -53,15 +56,13 @@ export class UserAuthorizationCacheService {
       roles,
     };
 
-    if (redisClient) {
-      try {
-        const key = GenerateUserAuthzCacheKey(tenantCode, userId);
-        await redisClient.set(key, JSON.stringify(payload), 'EX', this.TTL_SECONDS);
-      } catch (err) {
-        this.logger.error(
-          `Failed to write authorization cache for user ${userId}: ${(err as Error).message}`,
-        );
-      }
+    try {
+      const key = CACHE_KEY_BUILDER.buildUserAuthz(tenantCode, userId);
+      await this.cacheService.set(key, payload, this.TTL_SECONDS);
+    } catch (err) {
+      this.logger.error(
+        `Failed to write authorization cache for user ${userId}: ${(err as Error).message}`,
+      );
     }
 
     return payload;
@@ -71,19 +72,16 @@ export class UserAuthorizationCacheService {
     tenantCode: string,
     userId: string,
   ): Promise<UserAuthorizationProfile> {
-    const redisClient = this.redisCacheProvider.getClient();
-    if (redisClient) {
-      try {
-        const key = GenerateUserAuthzCacheKey(tenantCode, userId);
-        const data = await redisClient.get(key);
-        if (data) {
-          return JSON.parse(data) as UserAuthorizationProfile;
-        }
-      } catch (err) {
-        this.logger.warn(
-          `Redis get failed for authz:user:${tenantCode}:${userId}: ${(err as Error).message}`,
-        );
+    try {
+      const key = CACHE_KEY_BUILDER.buildUserAuthz(tenantCode, userId);
+      const data = await this.cacheService.get<UserAuthorizationProfile>(key);
+      if (data) {
+        return data;
       }
+    } catch (err) {
+      this.logger.warn(
+        `Redis get failed for authz:user:${tenantCode}:${userId}: ${(err as Error).message}`,
+      );
     }
 
     // Cache miss or Redis down: fallback to DB projection recovery
@@ -98,11 +96,9 @@ export class UserAuthorizationCacheService {
   }
 
   async invalidateUserCache(tenantCode: string, userId: string): Promise<void> {
-    const redisClient = this.redisCacheProvider.getClient();
-    if (!redisClient) return;
     try {
-      const key = GenerateUserAuthzCacheKey(tenantCode, userId);
-      await redisClient.del(key);
+      const key = CACHE_KEY_BUILDER.buildUserAuthz(tenantCode, userId);
+      await this.cacheService.del(key);
     } catch (err) {
       this.logger.warn(`Failed to invalidate cache for user ${userId}: ${(err as Error).message}`);
     }

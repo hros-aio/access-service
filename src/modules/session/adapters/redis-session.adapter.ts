@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { CACHE_KEY_BUILDER } from '@new-hros/libs-core';
 import Redis from 'ioredis';
-
-import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 
 @Injectable()
 export class RedisSessionAdapter {
@@ -14,8 +13,10 @@ export class RedisSessionAdapter {
    * Uses cluster hash tags {tenantCode:userId} to ensure slot alignment in Redis Cluster.
    */
   async deleteSession(tenantCode: string, userId: string, sessionId: string): Promise<number> {
-    const sessionKey = GenerateSessionKey(sessionId);
-    const userSessionsKey = GenerateUserSessionsKey(tenantCode, userId, { useHashTag: true });
+    const sessionKey = CACHE_KEY_BUILDER.buildSession(sessionId);
+    const userSessionsKey = CACHE_KEY_BUILDER.buildUserSessions(tenantCode, userId, {
+      useHashTag: true,
+    });
 
     const luaScript = `
       redis.call("DEL", KEYS[1])
@@ -46,7 +47,9 @@ export class RedisSessionAdapter {
    * Uses cluster hash tags {tenantCode:userId} to guarantee slot alignment.
    */
   async purgeAllUserSessions(tenantCode: string, userId: string): Promise<number> {
-    const userSessionsKey = GenerateUserSessionsKey(tenantCode, userId, { useHashTag: true });
+    const userSessionsKey = CACHE_KEY_BUILDER.buildUserSessions(tenantCode, userId, {
+      useHashTag: true,
+    });
 
     const luaScript = `
       local sessions = redis.call("SMEMBERS", KEYS[1])
@@ -64,7 +67,7 @@ export class RedisSessionAdapter {
         luaScript,
         1,
         userSessionsKey,
-        GenerateSessionKey(''),
+        CACHE_KEY_BUILDER.buildSession(''),
       );
       return Number(result) || 0;
     } catch (error) {

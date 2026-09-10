@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   AuthContext,
+  CACHE_KEY_BUILDER,
   CacheService,
   ConfigurationService,
   RedisCacheProvider,
@@ -16,11 +17,7 @@ import {
 import * as jwt from 'jsonwebtoken';
 
 import { CredentialDomainService } from './credential.domain.service';
-import {
-  GenerateAuthMfaChallengeKey,
-  GenerateSessionKey,
-  GenerateUserSessionsKey,
-} from '../../../constants';
+import { GenerateAuthMfaChallengeKey } from '../../../constants';
 import { UserStatus } from '../../../enums';
 import { IpRestrictionService } from '../../ip-restriction/services/ip-restriction.service';
 import { LockoutService } from '../../lockout/services/lockout.service';
@@ -397,7 +394,7 @@ export class AuthApplicationService {
     rememberMe?: boolean,
   ): Promise<void> {
     const ttlSeconds = rememberMe ? 2592000 : 604800;
-    const sessionKey = GenerateSessionKey(sessionId);
+    const sessionKey = CACHE_KEY_BUILDER.buildSession(sessionId);
     const sessionData: AuthContext = {
       sessionId,
       userId: user.id,
@@ -425,7 +422,7 @@ export class AuthApplicationService {
 
       const client = this.redisCacheProvider.getClient();
       if (client) {
-        const userSessionsKey = GenerateUserSessionsKey(user.tenantCode, user.id);
+        const userSessionsKey = CACHE_KEY_BUILDER.buildUserSessions(user.tenantCode, user.id);
         await client.sadd(userSessionsKey, sessionId);
         await client.expire(userSessionsKey, ttlSeconds);
       }

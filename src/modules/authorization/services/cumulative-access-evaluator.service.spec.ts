@@ -1,5 +1,6 @@
+import { EffectiveUserRole } from '@new-hros/libs-core';
+
 import { CumulativeAccessEvaluator } from './cumulative-access-evaluator.service';
-import { EffectiveUserRole } from '../interfaces/effective-user-role.interface';
 
 describe('CumulativeAccessEvaluator', () => {
   let evaluator: CumulativeAccessEvaluator;

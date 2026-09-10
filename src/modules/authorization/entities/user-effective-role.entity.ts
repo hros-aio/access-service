@@ -1,3 +1,4 @@
+import { ScopeType } from '@new-hros/libs-core';
 import { BaseEntity } from '@new-hros/libs-sql';
 import { Column, Entity, Unique } from 'typeorm';
 
@@ -23,7 +24,7 @@ export class UserEffectiveRoleEntity extends BaseEntity {
   sourceGroupId: string;
 
   @Column({ name: 'scope_type', type: 'varchar', length: 50 })
-  scopeType: string;
+  scopeType: ScopeType;
 
   @Column({ name: 'scope_entity_id', type: 'uuid', nullable: true })
   scopeEntityId?: string | null;

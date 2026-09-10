@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-
-import { EffectiveUserRole, ResourceContext } from '../interfaces/effective-user-role.interface';
+import { EffectiveUserRole, ResourceContext } from '@new-hros/libs-core';
 
 @Injectable()
 export class CumulativeAccessEvaluator {
