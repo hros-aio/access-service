@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RedisCacheProvider } from '@new-hros/libs-core';
+import { CacheService, RedisCacheProvider } from '@new-hros/libs-core';
 
 import { UserAuthorizationCacheService } from './user-authorization-cache.service';
 import { UserEffectiveRoleEntity } from '../entities/user-effective-role.entity';
@@ -8,6 +8,11 @@ import { UserEffectiveRoleRepository } from '../repositories/user-effective-role
 describe('UserAuthorizationCacheService', () => {
   let service: UserAuthorizationCacheService;
   let redisMock: Record<string, jest.Mock>;
+  let cacheServiceMock: {
+    get: jest.Mock;
+    set: jest.Mock;
+    del: jest.Mock;
+  };
   let repoMock: Partial<UserEffectiveRoleRepository>;
 
   const tenantCode = 'tenant-1';
@@ -15,10 +20,13 @@ describe('UserAuthorizationCacheService', () => {
 
   beforeEach(async () => {
     redisMock = {
-      set: jest.fn().mockResolvedValue('OK'),
-      get: jest.fn().mockResolvedValue(null),
-      del: jest.fn().mockResolvedValue(1),
       incr: jest.fn().mockResolvedValue(5),
+    };
+
+    cacheServiceMock = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(undefined),
+      del: jest.fn().mockResolvedValue(undefined),
     };
 
     repoMock = {
@@ -44,6 +52,10 @@ describe('UserAuthorizationCacheService', () => {
           useValue: { getClient: jest.fn().mockReturnValue(redisMock) },
         },
         {
+          provide: CacheService,
+          useValue: cacheServiceMock,
+        },
+        {
           provide: UserEffectiveRoleRepository,
           useValue: repoMock,
         },
@@ -62,10 +74,21 @@ describe('UserAuthorizationCacheService', () => {
     expect(result.roles[0].scope.type).toBe('SELF');
 
     expect(redisMock.incr).toHaveBeenCalledWith(`authz:version:${tenantCode}:${userId}`);
-    expect(redisMock.set).toHaveBeenCalledWith(
+    expect(cacheServiceMock.set).toHaveBeenCalledWith(
       `authz:user:${tenantCode}:${userId}`,
-      expect.stringContaining('"version":5'),
-      'EX',
+      {
+        version: 5,
+        roles: [
+          {
+            roleId: 'role-1',
+            sourceGroupId: 'group-1',
+            scope: {
+              type: 'SELF',
+              refId: null,
+            },
+          },
+        ],
+      },
       86400,
     );
   });
@@ -81,7 +104,7 @@ describe('UserAuthorizationCacheService', () => {
         },
       ],
     };
-    redisMock.get.mockResolvedValueOnce(JSON.stringify(cachedProfile));
+    cacheServiceMock.get.mockResolvedValueOnce(cachedProfile);
 
     const result = await service.getUserAuthorizationProfile(tenantCode, userId);
 
@@ -90,7 +113,7 @@ describe('UserAuthorizationCacheService', () => {
   });
 
   it('should recover from repository on cache miss', async () => {
-    redisMock.get.mockResolvedValueOnce(null);
+    cacheServiceMock.get.mockResolvedValueOnce(null);
 
     const result = await service.getUserAuthorizationProfile(tenantCode, userId);
 
@@ -104,10 +127,9 @@ describe('UserAuthorizationCacheService', () => {
     const result = await service.syncUserCache(tenantCode, userId);
 
     expect(result.roles).toEqual([]);
-    expect(redisMock.set).toHaveBeenCalledWith(
+    expect(cacheServiceMock.set).toHaveBeenCalledWith(
       `authz:user:${tenantCode}:${userId}`,
-      JSON.stringify({ version: 5, roles: [] }),
-      'EX',
+      { version: 5, roles: [] },
       86400,
     );
   });

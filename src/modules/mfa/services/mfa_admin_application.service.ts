@@ -1,10 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
+import { CACHE_KEY_BUILDER, RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { MfaMethodRepository } from '../repositories/mfa-method.repository';
 
-import { GenerateSessionKey, GenerateUserSessionsKey } from '@/constants';
 import { AuthSecurityEventOutboxRepository } from '@/modules/security-event';
 import { UserRepository } from '@/modules/user/repositories/user.repository';
 
@@ -51,14 +50,14 @@ export class MfaAdminApplicationService {
       // 4. Revoke active Redis sessions
       let revokedCount = 0;
       const client = this.redisCacheProvider.getClient();
-      const userSessionsKey = GenerateUserSessionsKey(tenantCode, targetUserId);
+      const userSessionsKey = CACHE_KEY_BUILDER.buildUserSessions(tenantCode, targetUserId);
 
       if (client) {
         const sessionIds: string[] = await client.smembers(userSessionsKey);
         if (sessionIds && sessionIds.length > 0) {
           revokedCount = sessionIds.length;
           for (const sid of sessionIds) {
-            await client.del(GenerateSessionKey(sid));
+            await client.del(CACHE_KEY_BUILDER.buildSession(sid));
           }
           await client.del(userSessionsKey);
         }

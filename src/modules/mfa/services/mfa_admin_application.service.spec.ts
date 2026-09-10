@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
+import { CACHE_KEY_BUILDER, RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { MfaAdminApplicationService } from './mfa_admin_application.service';
-import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 import { AuthSecurityEventOutboxRepository } from '../../security-event';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { MfaMethodRepository } from '../repositories/mfa-method.repository';
@@ -92,9 +91,13 @@ describe('MfaAdminApplicationService', () => {
       },
       publishStatus: 'pending',
     });
-    expect(mockRedisClient.smembers).toHaveBeenCalledWith(GenerateUserSessionsKey('t-1', 'u-1'));
-    expect(mockRedisClient.del).toHaveBeenCalledWith(GenerateSessionKey('sess-1'));
-    expect(mockRedisClient.del).toHaveBeenCalledWith(GenerateSessionKey('sess-2'));
-    expect(mockRedisClient.del).toHaveBeenCalledWith(GenerateUserSessionsKey('t-1', 'u-1'));
+    expect(mockRedisClient.smembers).toHaveBeenCalledWith(
+      CACHE_KEY_BUILDER.buildUserSessions('t-1', 'u-1'),
+    );
+    expect(mockRedisClient.del).toHaveBeenCalledWith(CACHE_KEY_BUILDER.buildSession('sess-1'));
+    expect(mockRedisClient.del).toHaveBeenCalledWith(CACHE_KEY_BUILDER.buildSession('sess-2'));
+    expect(mockRedisClient.del).toHaveBeenCalledWith(
+      CACHE_KEY_BUILDER.buildUserSessions('t-1', 'u-1'),
+    );
   });
 });

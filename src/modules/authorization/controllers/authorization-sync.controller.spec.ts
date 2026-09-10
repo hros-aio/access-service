@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { PermissionGuard } from '@new-hros/libs-apis';
 import { RequestContextService } from '@new-hros/libs-core';
 
 import { AuthorizationSyncController } from './authorization-sync.controller';
@@ -15,7 +16,6 @@ import {
   SyncSourceType,
   SyncTriggerType,
 } from '../entities/authorization-sync-job.entity';
-import { AuthorizationGuard } from '../guards/authorization.guard';
 import { AuthorizationSyncService } from '../services/authorization-sync.service';
 import { ScheduledReconciliationScanner } from '../services/scheduled-reconciliation-scanner.service';
 import { SyncStatusProjectionService } from '../services/sync-status-projection.service';
@@ -61,7 +61,7 @@ describe('AuthorizationSyncController', () => {
         },
       ],
     })
-      .overrideGuard(AuthorizationGuard)
+      .overrideGuard(PermissionGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

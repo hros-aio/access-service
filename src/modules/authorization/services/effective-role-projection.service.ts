@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EffectiveUserRole } from '@new-hros/libs-core';
 
 import { UserAuthorizationCacheService } from './user-authorization-cache.service';
 import { UserGroupMembershipRepository } from '../../user-groups/repositories/user-group-membership.repository';
 import { UserGroupRoleRepository } from '../../user-groups/repositories/user-group-role.repository';
 import { UserGroupRepository } from '../../user-groups/repositories/user-group.repository';
-import { EffectiveUserRole } from '../interfaces/effective-user-role.interface';
 import {
   PersistUserEffectiveRoleEntry,
   UserEffectiveRoleRepository,

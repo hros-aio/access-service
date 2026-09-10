@@ -1,19 +1,19 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { PermissionGuard, RequirePermission } from '@new-hros/libs-apis';
 
 import { SyncJobResponseDto } from '../dto/sync-job-response.dto';
 import { SyncStatusResponseDto } from '../dto/sync-status-response.dto';
 import { SyncStatusSummaryResponseDto } from '../dto/sync-status-summary-response.dto';
 import { TriggerSyncNowDto } from '../dto/trigger-sync-now.dto';
 import { SyncSourceType } from '../entities/authorization-sync-job.entity';
-import { AuthorizationGuard, RequirePermissions } from '../guards/authorization.guard';
 import { AuthorizationSyncService } from '../services/authorization-sync.service';
 import { ScheduledReconciliationScanner } from '../services/scheduled-reconciliation-scanner.service';
 import { SyncStatusProjectionService } from '../services/sync-status-projection.service';
 
 @ApiTags('Authorization Sync')
 @ApiBearerAuth()
-@UseGuards(AuthorizationGuard)
+@UseGuards(PermissionGuard)
 @Controller('authz')
 export class AuthorizationSyncController {
   constructor(
@@ -23,7 +23,7 @@ export class AuthorizationSyncController {
   ) {}
 
   @Post('sync-now')
-  @RequirePermissions('user_group.sync', 'role.sync')
+  @RequirePermission('user_group.sync', 'role.sync')
   @ApiOperation({ summary: 'Trigger on-demand synchronization for Role or User Group' })
   @ApiResponse({
     status: 200,
@@ -35,7 +35,7 @@ export class AuthorizationSyncController {
   }
 
   @Get('sync-jobs/:jobId')
-  @RequirePermissions('user_group.read', 'role.read', 'user_group.view', 'role.view')
+  @RequirePermission('user_group.read', 'role.read', 'user_group.view', 'role.view')
   @ApiOperation({ summary: 'Retrieve status and progress of a synchronization job' })
   @ApiResponse({
     status: 200,
@@ -47,7 +47,7 @@ export class AuthorizationSyncController {
   }
 
   @Get('sync-status/summary')
-  @RequirePermissions('user_group.read', 'role.read', 'user_group.view', 'role.view')
+  @RequirePermission('user_group.read', 'role.read', 'user_group.view', 'role.view')
   @ApiOperation({ summary: 'Retrieve tenant-wide synchronization summary' })
   @ApiResponse({
     status: 200,
@@ -59,7 +59,7 @@ export class AuthorizationSyncController {
   }
 
   @Get('sync-status/:sourceType/:sourceId')
-  @RequirePermissions('user_group.read', 'role.read', 'user_group.view', 'role.view')
+  @RequirePermission('user_group.read', 'role.read', 'user_group.view', 'role.view')
   @ApiOperation({ summary: 'Retrieve real-time synchronization status and metadata for an entity' })
   @ApiResponse({
     status: 200,
@@ -74,7 +74,7 @@ export class AuthorizationSyncController {
   }
 
   @Post('sync-status/:sourceType/:sourceId/retry')
-  @RequirePermissions('user_group.sync', 'role.sync')
+  @RequirePermission('user_group.sync', 'role.sync')
   @ApiOperation({ summary: 'Retry a failed synchronization for Role or User Group' })
   @ApiResponse({
     status: 200,

@@ -1,7 +1,7 @@
+import { CACHE_KEY_BUILDER } from '@new-hros/libs-core';
 import Redis from 'ioredis';
 
 import { RedisSessionAdapter } from './redis-session.adapter';
-import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 
 describe('RedisSessionAdapter', () => {
   let adapter: RedisSessionAdapter;
@@ -24,8 +24,8 @@ describe('RedisSessionAdapter', () => {
       expect(mockRedis.eval).toHaveBeenCalledWith(
         expect.stringContaining('redis.call("DEL", KEYS[1])'),
         2,
-        GenerateSessionKey('sess-456'),
-        GenerateUserSessionsKey('TENANT_A', 'usr-123', { useHashTag: true }),
+        CACHE_KEY_BUILDER.buildSession('sess-456'),
+        CACHE_KEY_BUILDER.buildUserSessions('TENANT_A', 'usr-123', { useHashTag: true }),
         'sess-456',
       );
       expect(count).toBe(1);
@@ -49,8 +49,8 @@ describe('RedisSessionAdapter', () => {
       expect(mockRedis.eval).toHaveBeenCalledWith(
         expect.stringContaining('SMEMBERS'),
         1,
-        GenerateUserSessionsKey('TENANT_A', 'usr-123', { useHashTag: true }),
-        GenerateSessionKey(''),
+        CACHE_KEY_BUILDER.buildUserSessions('TENANT_A', 'usr-123', { useHashTag: true }),
+        CACHE_KEY_BUILDER.buildSession(''),
       );
       expect(count).toBe(3);
     });

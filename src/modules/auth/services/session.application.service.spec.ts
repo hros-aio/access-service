@@ -1,8 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RedisCacheProvider } from '@new-hros/libs-core';
+import { CACHE_KEY_BUILDER, RedisCacheProvider } from '@new-hros/libs-core';
 
 import { SessionApplicationService } from './session.application.service';
-import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 
 describe('SessionApplicationService', () => {
   let service: SessionApplicationService;
@@ -51,12 +50,12 @@ describe('SessionApplicationService', () => {
       await service.revokeAllSessions(tenantCode, userId);
 
       expect(mockRedisClient.smembers).toHaveBeenCalledWith(
-        GenerateUserSessionsKey(tenantCode, userId),
+        CACHE_KEY_BUILDER.buildUserSessions(tenantCode, userId),
       );
       expect(mockRedisClient.del).toHaveBeenCalledWith(
-        GenerateSessionKey('sid-1'),
-        GenerateSessionKey('sid-2'),
-        GenerateUserSessionsKey(tenantCode, userId),
+        CACHE_KEY_BUILDER.buildSession('sid-1'),
+        CACHE_KEY_BUILDER.buildSession('sid-2'),
+        CACHE_KEY_BUILDER.buildUserSessions(tenantCode, userId),
       );
     });
 
@@ -69,7 +68,7 @@ describe('SessionApplicationService', () => {
       await service.revokeAllSessions(tenantCode, userId);
 
       expect(mockRedisClient.smembers).toHaveBeenCalledWith(
-        GenerateUserSessionsKey(tenantCode, userId),
+        CACHE_KEY_BUILDER.buildUserSessions(tenantCode, userId),
       );
       expect(mockRedisClient.del).not.toHaveBeenCalled();
     });

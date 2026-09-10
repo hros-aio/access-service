@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test, TestingModule } from '@nestjs/testing';
-import { RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
+import { CACHE_KEY_BUILDER, RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { CryptoAdapter } from './crypto.adapter';
 import { InvitationApplicationService } from './invitation.application.service';
-import { GenerateSessionKey, GenerateUserSessionsKey } from '../../../constants';
 import { CredentialStatus, InvitationStatus, UserStatus } from '../../../enums';
 import { Credential } from '../../auth/entities/credential.entity';
 import { CredentialRepository } from '../../auth/repositories/credential.repository';
@@ -360,12 +359,12 @@ describe('InvitationApplicationService', () => {
 
       expect(result).toEqual({ success: true, userId: 'user-uuid' });
       expect(mockRedisClient.smembers).toHaveBeenCalledWith(
-        GenerateUserSessionsKey('tenant-123', 'user-uuid'),
+        CACHE_KEY_BUILDER.buildUserSessions('tenant-123', 'user-uuid'),
       );
       expect(mockRedisClient.del).toHaveBeenCalledWith(
-        GenerateSessionKey('session-1'),
-        GenerateSessionKey('session-2'),
-        GenerateUserSessionsKey('tenant-123', 'user-uuid'),
+        CACHE_KEY_BUILDER.buildSession('session-1'),
+        CACHE_KEY_BUILDER.buildSession('session-2'),
+        CACHE_KEY_BUILDER.buildUserSessions('tenant-123', 'user-uuid'),
       );
       expect(mockRedisClient.keys).toHaveBeenCalledWith('auth:mfa-challenge:*');
       expect(mockRedisClient.get).toHaveBeenCalledWith('auth:mfa-challenge:1');
