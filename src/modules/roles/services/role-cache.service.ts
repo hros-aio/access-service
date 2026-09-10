@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CACHE_PROVIDER_TOKEN, CacheService } from '@new-hros/libs-core';
+import { CACHE_KEY_BUILDER, CACHE_PROVIDER_TOKEN, CacheService } from '@new-hros/libs-core';
 
-import { GenerateRoleAuthzCacheKey } from '../../../constants';
 import { Role } from '../entities/role.entity';
 import { CachedRoleData } from '../interfaces/system-role-template.interface';
 
@@ -15,7 +14,7 @@ export class RoleCacheService {
   ) {}
 
   async syncRole(role: Role): Promise<void> {
-    const key = GenerateRoleAuthzCacheKey(role.tenantCode, role.id);
+    const key = CACHE_KEY_BUILDER.buildRoleAuthz(role.tenantCode, role.id);
     const cachedData: CachedRoleData = {
       roleId: role.id,
       tenantCode: role.tenantCode,
@@ -35,12 +34,12 @@ export class RoleCacheService {
   }
 
   async getRole(tenantCode: string, roleId: string): Promise<CachedRoleData | null> {
-    const key = GenerateRoleAuthzCacheKey(tenantCode, roleId);
+    const key = CACHE_KEY_BUILDER.buildRoleAuthz(tenantCode, roleId);
     return this.cacheService.get<CachedRoleData>(key);
   }
 
   async invalidateRole(tenantCode: string, roleId: string): Promise<void> {
-    const key = GenerateRoleAuthzCacheKey(tenantCode, roleId);
+    const key = CACHE_KEY_BUILDER.buildRoleAuthz(tenantCode, roleId);
     await this.cacheService.del(key);
   }
 }

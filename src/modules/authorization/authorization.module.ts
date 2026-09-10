@@ -11,7 +11,6 @@ import { AuthorizationSyncController } from './controllers/authorization-sync.co
 import { BootstrapAuthorizationController } from './controllers/bootstrap-authorization.controller';
 import { AuthorizationSyncJob } from './entities/authorization-sync-job.entity';
 import { UserEffectiveRoleEntity } from './entities/user-effective-role.entity';
-import { AuthorizationGuard } from './guards/authorization.guard';
 import { AuthorizationSyncJobRepository } from './repositories/authorization-sync-job.repository';
 import { UserEffectiveRoleRepository } from './repositories/user-effective-role.repository';
 import { AuthorizationReconciliationWorker } from './services/authorization-reconciliation-worker.service';
@@ -52,7 +51,6 @@ import { UserAuthorizationCacheService } from './services/user-authorization-cac
     DistributedLockAdapter,
     ScheduledReconciliationScanner,
     SyncStatusProjectionService,
-    AuthorizationGuard,
   ],
   exports: [
     UserEffectiveRoleRepository,
@@ -67,7 +65,6 @@ import { UserAuthorizationCacheService } from './services/user-authorization-cac
     DistributedLockAdapter,
     ScheduledReconciliationScanner,
     SyncStatusProjectionService,
-    AuthorizationGuard,
   ],
 })
 export class AuthorizationModule {}
