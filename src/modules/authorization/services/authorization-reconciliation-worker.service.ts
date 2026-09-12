@@ -17,6 +17,8 @@ import {
 import { AuthorizationSyncJob, SyncSourceType } from '../entities/authorization-sync-job.entity';
 import { AuthorizationSyncJobRepository } from '../repositories/authorization-sync-job.repository';
 
+import { UserRepository } from '@/modules/user/repositories/user.repository';
+
 @Injectable()
 export class AuthorizationReconciliationWorker {
   private readonly logger = new Logger(AuthorizationReconciliationWorker.name);
@@ -33,6 +35,7 @@ export class AuthorizationReconciliationWorker {
     private readonly outboxRepo: AuthSecurityEventOutboxRepository,
     private readonly transactionService: TransactionService,
     private readonly lockAdapter: DistributedLockAdapter,
+    private readonly userRepository: UserRepository,
   ) {}
 
   async processNextJob(tenantCode: string): Promise<boolean> {
@@ -71,8 +74,8 @@ export class AuthorizationReconciliationWorker {
     );
 
     // 1. Fetch total employees for tenant
-    const totalEmployees = await this.employeeRepo.countEmployeesByTenant(job.tenantCode);
-    await this.syncJobRepo.updateProgress(job.id, 0, totalEmployees);
+    const totalUsers = await this.userRepository.countActive();
+    await this.syncJobRepo.updateProgress(job.id, 0, totalUsers);
 
     // 2. If User Group sync, perform dynamic matching and membership reconciliation
     if (job.sourceType === SyncSourceType.USER_GROUP) {
@@ -93,25 +96,21 @@ export class AuthorizationReconciliationWorker {
 
     // 3. Process employees in bounded batches
     let processed = 0;
-    while (processed < totalEmployees) {
-      const employees = await this.employeeRepo.findEmployeesBatch(
-        job.tenantCode,
-        processed,
-        this.batchSize,
-      );
-      if (!employees || employees.length === 0) {
+    while (processed < totalUsers) {
+      const users = await this.userRepository.findBatchWithEmployee(processed, this.batchSize);
+      if (!users || users.length === 0) {
         break;
       }
 
-      for (const employee of employees) {
+      for (const user of users) {
         await this.effectiveRoleProjectionService.recomputeUserEffectiveRoles(
           job.tenantCode,
-          employee.employeeId,
+          user.id,
         );
       }
 
-      processed += employees.length;
-      await this.syncJobRepo.updateProgress(job.id, processed, totalEmployees);
+      processed += users.length;
+      await this.syncJobRepo.updateProgress(job.id, processed, totalUsers);
     }
 
     // 4. Finalize job & advance projection_version in a single transaction
@@ -143,7 +142,7 @@ export class AuthorizationReconciliationWorker {
           sourceId: job.sourceId,
           sourceVersion: job.sourceVersion,
           triggerType: job.triggerType,
-          totalUsers: totalEmployees,
+          totalUsers,
           processedUsers: processed,
           affectedUsers: processed,
           durationMs,

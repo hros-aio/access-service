@@ -310,7 +310,7 @@ export class AuthApplicationService {
     const mfaRequired =
       authSettings?.restrictedMfaEnabled === true ||
       user.mfaEnrollmentRequired === true ||
-      user.mfaReenrollmentRequired === true ||
+      user.mfaReEnrollmentRequired === true ||
       mfaMethods.length > 0;
 
     if (mfaRequired) {

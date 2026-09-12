@@ -2,6 +2,8 @@ import { TransactionService } from '@new-hros/libs-sql';
 
 import { EmployeeReferenceRepository } from './employee-reference.repository';
 
+import { EmployeeStatus } from '@/enums/employee-status.enum';
+
 describe('EmployeeReferenceRepository', () => {
   let repository: EmployeeReferenceRepository;
   let mockManager: { getRepository: jest.Mock; query: jest.Mock };
@@ -24,22 +26,27 @@ describe('EmployeeReferenceRepository', () => {
     repository = new EmployeeReferenceRepository(mockTransactionService);
   });
 
-  it('upsertProjection executes raw SQL and returns true on conflict update', async () => {
-    mockManager.query.mockResolvedValueOnce([{ employee_id: 'emp-1' }]);
+  it('findByCode searches by tenantCode and employeeCode', async () => {
+    const mockEmp = { id: 'emp-1', employeeCode: 'EMP001', tenantCode: 'DEFAULT' };
+    mockTypeormRepo.findOne.mockResolvedValueOnce(mockEmp);
 
-    const result = await repository.upsertProjection({
-      employeeId: 'emp-1',
-      tenantCode: 'DEFAULT',
-      employeeCode: 'EMP001',
-      departmentId: 'dept-1',
-      sourceVersion: 5,
+    const result = await repository.findByCode('DEFAULT', 'EMP001');
+
+    expect(result).toEqual(mockEmp);
+    expect(mockTypeormRepo.findOne).toHaveBeenCalledWith({
+      where: { tenantCode: 'DEFAULT', employeeCode: 'EMP001' },
     });
+  });
 
-    expect(result).toBe(true);
-    expect(mockManager.query).toHaveBeenCalledWith(
-      expect.stringContaining('ON CONFLICT (tenant_code, employee_id) DO UPDATE'),
-      expect.arrayContaining(['emp-1', 'DEFAULT', 'EMP001', 5]),
-    );
+  it('countEmployeesByTenant returns active employee count', async () => {
+    mockTypeormRepo.count.mockResolvedValueOnce(42);
+
+    const count = await repository.countEmployeesByTenant('DEFAULT');
+
+    expect(count).toBe(42);
+    expect(mockTypeormRepo.count).toHaveBeenCalledWith({
+      where: { tenantCode: 'DEFAULT', status: EmployeeStatus.ACTIVE },
+    });
   });
 
   it('updateReporteesCount updates reportees count with GREATEST(0, ...)', async () => {

@@ -31,7 +31,7 @@ describe('MembershipReconciler', () => {
       findByGroup: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRoleRepository>;
     mockMembershipRepo = {
-      findMembershipsByEmployee: jest.fn(),
+      findByUserId: jest.fn(),
       findMemberEmployeeIdsByGroup: jest.fn(),
       insertSingleMembership: jest.fn(),
       deleteSingleMembership: jest.fn(),
@@ -39,7 +39,7 @@ describe('MembershipReconciler', () => {
       batchDelete: jest.fn(),
     } as unknown as jest.Mocked<UserGroupMembershipRepository>;
     mockEffectiveRoleRepo = {
-      syncEffectiveRolesForEmployee: jest.fn().mockResolvedValue({ inserted: 1, deleted: 0 }),
+      syncEffectiveRolesForUser: jest.fn().mockResolvedValue({ inserted: 1, deleted: 0 }),
     } as unknown as jest.Mocked<UserEffectiveRoleRepository>;
     mockOutboxRepo = {
       create: jest.fn(),
@@ -56,7 +56,7 @@ describe('MembershipReconciler', () => {
   });
 
   it('reconcileSingleEmployee adds new groups and syncs roles', async () => {
-    mockMembershipRepo.findMembershipsByEmployee.mockResolvedValueOnce([]);
+    mockMembershipRepo.findByUserId.mockResolvedValueOnce([]);
     mockUserGroupRepo.findById.mockResolvedValueOnce({
       id: 'grp-1',
       status: 'ACTIVE',
@@ -67,11 +67,11 @@ describe('MembershipReconciler', () => {
       { roleId: 'role-1' } as UserGroupRole,
     ]);
 
-    const result = await reconciler.reconcileSingleEmployee('DEFAULT', 'emp-1', ['grp-1']);
+    const result = await reconciler.reconcileSingleUser('DEFAULT', 'emp-1', ['grp-1']);
 
     expect(result.addedGroupIds).toEqual(['grp-1']);
     expect(mockMembershipRepo.insertSingleMembership).toHaveBeenCalledWith('emp-1', 'grp-1');
-    expect(mockEffectiveRoleRepo.syncEffectiveRolesForEmployee).toHaveBeenCalledWith('emp-1', [
+    expect(mockEffectiveRoleRepo.syncEffectiveRolesForUser).toHaveBeenCalledWith('emp-1', [
       {
         roleId: 'role-1',
         sourceGroupId: 'grp-1',

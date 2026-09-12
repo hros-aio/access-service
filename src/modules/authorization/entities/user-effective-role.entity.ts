@@ -7,15 +7,15 @@ import { TableName } from '../../../enums';
 @Entity(TableName.USER_EFFECTIVE_ROLES)
 @Unique('uq_user_effective_roles_grant', [
   'tenantCode',
-  'employeeId',
+  'user_id',
   'roleId',
   'sourceGroupId',
   'scopeType',
   'scopeEntityId',
 ])
 export class UserEffectiveRoleEntity extends BaseEntity {
-  @Column({ name: 'employee_id', type: 'uuid' })
-  employeeId: string;
+  @Column({ name: 'user_id', type: 'uuid' })
+  userId: string;
 
   @Column({ name: 'role_id', type: 'uuid' })
   roleId: string;

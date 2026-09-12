@@ -21,7 +21,7 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
   async countActiveHoldersByRoleId(roleId: string): Promise<number> {
     const result = await this.repository
       .createQueryBuilder('uer')
-      .select('COUNT(DISTINCT uer.employeeId)', 'count')
+      .select('COUNT(DISTINCT uer.userId)', 'count')
       .where('uer.tenantCode = :tenantCode', { tenantCode: this.tenantCode })
       .andWhere('uer.roleId = :roleId', { roleId })
       .getRawOne<{ count: string }>();
@@ -35,7 +35,7 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
   ): Promise<number> {
     const result = await this.repository
       .createQueryBuilder('uer')
-      .select('COUNT(DISTINCT uer.employeeId)', 'count')
+      .select('COUNT(DISTINCT uer.userId)', 'count')
       .where('uer.tenantCode = :tenantCode', { tenantCode: this.tenantCode })
       .andWhere('uer.roleId = :roleId', { roleId })
       .andWhere('uer.sourceGroupId != :excludedSourceGroupId', { excludedSourceGroupId })
@@ -53,14 +53,12 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
     });
   }
 
-  async syncEffectiveRolesForEmployee(
-    employeeId: string,
+  async syncEffectiveRolesForUser(
+    userId: string,
     targetRoles: UserEffectiveRoleEntry[],
   ): Promise<{ inserted: number; deleted: number }> {
     // 1. Fetch current effective roles
-    const currentRoles = await this.find({
-      employeeId,
-    });
+    const currentRoles = await this.find({ userId });
 
     const currentMap = new Map(currentRoles.map((r) => [GenerateUserEffectiveRoleKey(r), r]));
     const targetMap = new Map(targetRoles.map((r) => [GenerateUserEffectiveRoleKey(r), r]));
@@ -86,7 +84,7 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
     if (toInsert.length > 0) {
       const entities = toInsert.map((item) => ({
         tenantCode: this.tenantCode,
-        employeeId,
+        userId,
         roleId: item.roleId,
         sourceGroupId: item.sourceGroupId,
         scopeType: item.scopeType,

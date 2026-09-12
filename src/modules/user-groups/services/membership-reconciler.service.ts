@@ -11,8 +11,8 @@ import { UserGroupMembershipRepository } from '../repositories/user-group-member
 import { UserGroupRoleRepository } from '../repositories/user-group-role.repository';
 import { UserGroupRepository } from '../repositories/user-group.repository';
 
-export interface SingleEmployeeReconciliationResult {
-  employeeId: string;
+export interface SingleUserReconciliationResult {
+  userId: string;
   addedGroupIds: string[];
   removedGroupIds: string[];
   effectiveRolesChanged: boolean;
@@ -39,12 +39,12 @@ export class MembershipReconciler {
   /**
    * Reconciles group memberships and cascaded effective roles for a single employee.
    */
-  async reconcileSingleEmployee(
+  async reconcileSingleUser(
     tenantCode: string,
-    employeeId: string,
+    userId: string,
     targetMatchingGroupIds: string[],
-  ): Promise<SingleEmployeeReconciliationResult> {
-    const currentMemberships = await this.membershipRepo.findMembershipsByEmployee(employeeId);
+  ): Promise<SingleUserReconciliationResult> {
+    const currentMemberships = await this.membershipRepo.findByUserId(userId);
     const currentGroupIds = new Set(currentMemberships.map((m) => m.groupId));
     const targetGroupIdSet = new Set(targetMatchingGroupIds);
 
@@ -65,7 +65,7 @@ export class MembershipReconciler {
 
     if (addedGroupIds.length === 0 && removedGroupIds.length === 0) {
       return {
-        employeeId,
+        userId,
         addedGroupIds: [],
         removedGroupIds: [],
         effectiveRolesChanged: false,
@@ -74,11 +74,11 @@ export class MembershipReconciler {
 
     // Apply membership diffs
     for (const gid of addedGroupIds) {
-      await this.membershipRepo.insertSingleMembership(employeeId, gid);
+      await this.membershipRepo.insertSingleMembership(userId, gid);
     }
 
     for (const gid of removedGroupIds) {
-      await this.membershipRepo.deleteSingleMembership(employeeId, gid);
+      await this.membershipRepo.deleteSingleMembership(userId, gid);
     }
 
     // Recalculate effective roles across all currently matching groups
@@ -98,17 +98,14 @@ export class MembershipReconciler {
       }
     }
 
-    const roleDiff = await this.effectiveRoleRepo.syncEffectiveRolesForEmployee(
-      employeeId,
-      targetRoles,
-    );
+    const roleDiff = await this.effectiveRoleRepo.syncEffectiveRolesForUser(userId, targetRoles);
 
     // Record outbox audit event
     const outbox = new AuthSecurityEventOutbox();
     outbox.tenantCode = tenantCode;
     outbox.eventType = 'AUTHORIZATION_MEMBERSHIP_RECONCILED';
     outbox.sanitizedPayload = {
-      employeeId,
+      userId,
       addedGroupIds,
       removedGroupIds,
       effectiveRolesInserted: roleDiff.inserted,
@@ -119,7 +116,7 @@ export class MembershipReconciler {
     await this.outboxRepo.create(outbox);
 
     return {
-      employeeId,
+      userId,
       addedGroupIds,
       removedGroupIds,
       effectiveRolesChanged: roleDiff.inserted > 0 || roleDiff.deleted > 0,
@@ -167,7 +164,7 @@ export class MembershipReconciler {
       // Reconcile effective roles for affected employees
       const affectedEmployeeIds = [...addedEmployeeIds, ...removedEmployeeIds];
       for (const empId of affectedEmployeeIds) {
-        const empMemberships = await this.membershipRepo.findMembershipsByEmployee(empId);
+        const empMemberships = await this.membershipRepo.findByUserId(empId);
 
         const targetRoles: UserEffectiveRoleEntry[] = [];
         for (const m of empMemberships) {
@@ -185,7 +182,7 @@ export class MembershipReconciler {
           }
         }
 
-        await this.effectiveRoleRepo.syncEffectiveRolesForEmployee(empId, targetRoles);
+        await this.effectiveRoleRepo.syncEffectiveRolesForUser(empId, targetRoles);
       }
 
       await this.userGroupRepo.updateProjectionVersion(groupId, groupVersion);

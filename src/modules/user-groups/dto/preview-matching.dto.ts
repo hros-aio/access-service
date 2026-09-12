@@ -26,8 +26,8 @@ export class MatchedMemberDto {
 
   static mapFromUserGroup(membership: UserGroupMembership): MatchedMemberDto {
     return {
-      employeeId: membership.employeeId,
-      employeeCode: membership.employee?.employeeCode || membership.employeeId,
+      employeeId: membership.userId,
+      employeeCode: membership.employee?.employeeCode || membership.userId,
       departmentId: membership.employee?.departmentId || null,
       locationId: membership.employee?.locationId || null,
       employmentStatus: membership.employee?.employmentStatus || 'ACTIVE',

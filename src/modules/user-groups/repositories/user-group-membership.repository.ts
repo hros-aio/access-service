@@ -15,10 +15,10 @@ export class UserGroupMembershipRepository extends BaseRepository<UserGroupMembe
     super(UserGroupMembership, transactionService);
   }
 
-  async findMembershipsByEmployee(employeeId: string): Promise<UserGroupMembership[]> {
+  async findByUserId(userId: string): Promise<UserGroupMembership[]> {
     return this.find(
       {
-        employeeId,
+        userId,
       },
       {
         relations: ['userGroup'],
@@ -26,7 +26,7 @@ export class UserGroupMembershipRepository extends BaseRepository<UserGroupMembe
     );
   }
 
-  async findMembershipsByGroup(
+  async findByGroup(
     groupId: string,
     pagination: PaginationOptions,
   ): Promise<PaginatedResult<UserGroupMembership>> {
@@ -49,9 +49,9 @@ export class UserGroupMembershipRepository extends BaseRepository<UserGroupMembe
   async findMemberEmployeeIdsByGroup(groupId: string): Promise<string[]> {
     const rows = await this.repository.find({
       where: { tenantCode: this.tenantCode, groupId },
-      select: ['employeeId'],
+      select: ['userId'],
     });
-    return rows.map((r) => r.employeeId);
+    return rows.map((r) => r.userId);
   }
 
   async countMemberEmployeeIdsByGroup(groupId: string): Promise<number> {
@@ -102,14 +102,14 @@ export class UserGroupMembershipRepository extends BaseRepository<UserGroupMembe
     return queryResult.length;
   }
 
-  async batchInsert(groupId: string, employeeIds: string[]): Promise<void> {
-    if (employeeIds.length === 0) return;
+  async batchInsert(groupId: string, userIds: string[]): Promise<void> {
+    if (userIds.length === 0) return;
 
-    const entities = employeeIds.map((employeeId) =>
+    const entities = userIds.map((userId) =>
       this.repository.create({
         tenantCode: this.tenantCode,
         groupId,
-        employeeId,
+        userId,
         matchedAt: new Date(),
       }),
     );
@@ -117,28 +117,25 @@ export class UserGroupMembershipRepository extends BaseRepository<UserGroupMembe
     await this.repository.save(entities);
   }
 
-  async batchDelete(groupId: string, employeeIds: string[]): Promise<void> {
-    if (employeeIds.length === 0) return;
+  async batchDelete(groupId: string, userIds: string[]): Promise<void> {
+    if (userIds.length === 0) return;
 
     await this.repository.delete({
       tenantCode: this.tenantCode,
       groupId,
-      employeeId: In(employeeIds),
+      userId: In(userIds),
     });
   }
 
-  async deleteSingleMembership(employeeId: string, groupId: string): Promise<void> {
-    await this.repository.delete({ tenantCode: this.tenantCode, employeeId, groupId });
+  async deleteSingleMembership(userId: string, groupId: string): Promise<void> {
+    await this.repository.delete({ tenantCode: this.tenantCode, userId, groupId });
   }
 
-  async insertSingleMembership(employeeId: string, groupId: string): Promise<void> {
-    const entity = this.repository.create({
-      tenantCode: this.tenantCode,
+  async insertSingleMembership(userId: string, groupId: string): Promise<void> {
+    await this.create({
       groupId,
-      employeeId,
+      userId,
       matchedAt: new Date(),
     });
-
-    await this.repository.save(entity);
   }
 }

@@ -6,32 +6,17 @@ import { EventEnvelope } from '@new-hros/libs-events';
 import { EventType } from '../../enums';
 import { ProvisioningApplicationService } from '../../modules/provisioning/services/provisioning.application.service';
 
-interface TenantCreatedPayload {
-  tenantCode: string;
-  rootAdminEmail: string;
-}
+import { TenantCreatedPayload } from '@/modules/provisioning/interfaces/tenant-created.interface';
 
 @Controller()
 export class TenantProvisioningConsumer {
   constructor(private readonly provisioningService: ProvisioningApplicationService) {}
 
-  @EventPattern('tenant.lifecycle-events')
+  @EventPattern(EventType.TENANT_CREATED)
   async handleTenantLifecycleEvent(
-    @Payload() envelope: EventEnvelope<TenantCreatedPayload> & { eventType?: string },
+    @Payload() envelope: EventEnvelope<TenantCreatedPayload>,
   ): Promise<unknown> {
-    const eventType =
-      envelope.eventType ||
-      (envelope as unknown as { payload?: { eventType?: string } }).payload?.eventType ||
-      EventType.TENANT_CREATED;
-
-    if (eventType !== EventType.TENANT_CREATED) {
-      return;
-    }
-
-    const payload = envelope.payload?.tenantCode
-      ? envelope.payload
-      : (envelope as unknown as { payload?: { payload?: TenantCreatedPayload } }).payload
-          ?.payload || envelope.payload;
+    const payload = envelope.payload;
 
     const context: RequestContext = {
       traceId: envelope.correlationId || envelope.id,
@@ -44,7 +29,7 @@ export class TenantProvisioningConsumer {
     };
 
     return RequestContextService.run(context, async () => {
-      return this.provisioningService.bootstrapRootAdmin(envelope.id, envelope.topic, payload);
+      return this.provisioningService.bootstrapRootAdmin(payload);
     });
   }
 }

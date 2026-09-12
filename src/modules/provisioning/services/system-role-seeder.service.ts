@@ -4,7 +4,11 @@ import { TransactionService } from '@new-hros/libs-sql';
 import { SYSTEM_ROLE_TEMPLATES } from '../../roles/constants/system-role-templates.constant';
 import { RolePermission } from '../../roles/entities/role-permission.entity';
 import { Role } from '../../roles/entities/role.entity';
-import { RoleType, SystemRoleKey } from '../../roles/interfaces/system-role-template.interface';
+import {
+  RoleStatus,
+  RoleType,
+  SystemRoleKey,
+} from '../../roles/interfaces/system-role-template.interface';
 import { RolePermissionRepository } from '../../roles/repositories/role-permission.repository';
 import { RoleRepository } from '../../roles/repositories/role.repository';
 import { RoleCacheService } from '../../roles/services/role-cache.service';
@@ -37,15 +41,16 @@ export class SystemRoleSeederService {
         }
 
         // 1. Create Role
-        const role = new Role();
-        role.tenantCode = tenantCode;
-        role.name = template.defaultName;
-        role.description = template.description;
-        role.type = RoleType.SYSTEM;
-        role.systemRoleKey = template.key;
-        role.version = 1;
-
-        const savedRole = await this.roleRepository.save(role);
+        const savedRole = await this.roleRepository.create({
+          tenantCode,
+          name: template.defaultName,
+          description: template.description,
+          type: RoleType.SYSTEM,
+          systemRoleKey: template.key,
+          version: 1,
+          projectionVersion: 1,
+          status: RoleStatus.ACTIVE,
+        });
 
         // 2. Create Role Permissions
         const rolePermissions = template.permissions.map((p) => {

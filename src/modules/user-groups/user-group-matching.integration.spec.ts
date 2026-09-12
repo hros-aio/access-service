@@ -28,7 +28,7 @@ describe('UserGroupMatching (Integration)', () => {
     ]);
 
     const matchingEmployee: Partial<EmployeeReference> = {
-      employeeId: 'emp-100',
+      id: 'emp-100',
       tenantCode: 'TENANT1',
       departmentId: 'dept-eng',
       employmentStatus: 'ACTIVE',
@@ -36,7 +36,7 @@ describe('UserGroupMatching (Integration)', () => {
     };
 
     const nonMatchingEmployee: Partial<EmployeeReference> = {
-      employeeId: 'emp-200',
+      id: 'emp-200',
       tenantCode: 'TENANT1',
       departmentId: 'dept-sales',
       employmentStatus: 'ACTIVE',
