@@ -10,7 +10,7 @@ describe('UserGroupMatchingEngine', () => {
   });
 
   const baseEmployee: Partial<EmployeeReference> = {
-    employeeId: 'emp-1',
+    id: 'emp-1',
     tenantCode: 'DEFAULT',
     departmentId: 'dept-100',
     locationId: 'loc-100',

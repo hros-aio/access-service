@@ -10,106 +10,52 @@ import { EmployeeReference } from '../../employee/entities/employee-reference.en
 import { EmployeeReferenceRepository } from '../../employee/repositories/employee-reference.repository';
 import { Invitation } from '../../invite/entities/invitation.entity';
 import { InvitationRepository } from '../../invite/repositories/invitation.repository';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { AuthSecurityEventOutboxRepository } from '../../security-event';
 import { User } from '../../user/entities/user.entity';
 import { UserRepository } from '../../user/repositories/user.repository';
-import { ConsumedEvent } from '../entities/consumed-event.entity';
-import { ConsumedEventRepository } from '../repositories/consumed-event.repository';
+import { EmployeeStatus } from '@/enums/employee-status.enum';
 
 describe('ProvisioningApplicationService', () => {
   let service: ProvisioningApplicationService;
-  let mockTransactionService: { runInTransaction: jest.Mock; getManager: jest.Mock };
-  let mockUserRepository: Record<string, unknown>;
-  let mockEmployeeReferenceRepository: Record<string, unknown>;
-  let mockInvitationRepository: Record<string, unknown>;
-  let mockConsumedEventRepository: { exists: jest.Mock; save: jest.Mock };
-  let mockOutboxRepository: Record<string, unknown>;
+  let mockTransactionService: { runInTransaction: jest.Mock };
+  let mockUserRepository: { findOne: jest.Mock; create: jest.Mock; update: jest.Mock };
+  let mockEmployeeReferenceRepository: { findById: jest.Mock; update: jest.Mock };
+  let mockInvitationRepository: { find: jest.Mock; bulkSave: jest.Mock; create: jest.Mock };
+  let mockOutboxRepository: { save: jest.Mock; create: jest.Mock };
   let mockSessionService: { revokeAllSessions: jest.Mock };
   let mockSystemRoleSeederService: { seedBaselineSystemRoles: jest.Mock };
-  let mockEntityManager: { getRepository: jest.Mock };
-
-  let mockTypeormUserRepository: { findOne: jest.Mock; save: jest.Mock };
-  let mockTypeormEmployeeRefRepository: { findOne: jest.Mock; save: jest.Mock };
-  let mockTypeormInvitationRepository: { find: jest.Mock; save: jest.Mock };
-  let mockTypeormOutboxRepository: { save: jest.Mock };
-  let mockTypeormConsumedEventRepository: { save: jest.Mock };
 
   beforeEach(async () => {
-    mockTypeormUserRepository = {
-      findOne: jest.fn(),
-      save: jest.fn().mockImplementation((u) => ({ id: 'new-user-uuid', ...u })),
-    };
-
-    mockTypeormEmployeeRefRepository = {
-      findOne: jest.fn(),
-      save: jest.fn().mockImplementation((er) => er),
-    };
-
-    mockTypeormInvitationRepository = {
-      find: jest.fn(),
-      save: jest.fn().mockImplementation((inv) => {
-        if (Array.isArray(inv)) {
-          return inv;
-        }
-        return { id: 'new-invitation-uuid', ...inv };
-      }),
-    };
-
-    mockTypeormOutboxRepository = {
-      save: jest.fn().mockImplementation((o) => o),
-    };
-
-    mockTypeormConsumedEventRepository = {
-      save: jest.fn(),
-    };
-
-    mockEntityManager = {
-      getRepository: jest.fn().mockImplementation((entity) => {
-        if (entity === User) return mockTypeormUserRepository;
-        if (entity === EmployeeReference) return mockTypeormEmployeeRefRepository;
-        if (entity === Invitation) return mockTypeormInvitationRepository;
-        if (entity === AuthSecurityEventOutbox) return mockTypeormOutboxRepository;
-        if (entity === ConsumedEvent) return mockTypeormConsumedEventRepository;
-        return null;
-      }),
-    };
-
     mockTransactionService = {
       runInTransaction: jest.fn().mockImplementation((cb) => cb()),
-      getManager: jest.fn().mockReturnValue(mockEntityManager),
     };
 
     mockUserRepository = {
-      findOneWithOptions: jest
-        .fn()
-        .mockImplementation((opts) => mockTypeormUserRepository.findOne(opts)),
-      save: jest.fn().mockImplementation((u) => mockTypeormUserRepository.save(u)),
+      findOne: jest.fn(),
+      create: jest.fn().mockImplementation((u) => ({ id: 'new-user-uuid', ...u })),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
+
     mockEmployeeReferenceRepository = {
-      findOne: jest
-        .fn()
-        .mockImplementation((opts) => mockTypeormEmployeeRefRepository.findOne(opts)),
-      save: jest.fn().mockImplementation((er) => mockTypeormEmployeeRefRepository.save(er)),
+      findById: jest.fn(),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
+
     mockInvitationRepository = {
-      find: jest.fn().mockImplementation((opts) => mockTypeormInvitationRepository.find(opts)),
-      save: jest.fn().mockImplementation((inv) => mockTypeormInvitationRepository.save(inv)),
-      bulkSave: jest.fn().mockImplementation((invs) => mockTypeormInvitationRepository.save(invs)),
-      create: jest.fn().mockImplementation((data) => {
-        const inv = { ...data, id: data.id || 'new-invite-id' };
-        return mockTypeormInvitationRepository.save(inv);
-      }),
+      find: jest.fn(),
+      bulkSave: jest.fn().mockImplementation((invs) => invs),
+      create: jest.fn().mockImplementation((data) => ({ id: 'new-invitation-uuid', ...data })),
     };
-    mockConsumedEventRepository = {
-      exists: jest.fn().mockResolvedValue(false),
-      save: jest.fn().mockImplementation((c) => mockTypeormConsumedEventRepository.save(c)),
-    };
+
     mockOutboxRepository = {
-      save: jest.fn().mockImplementation((o) => mockTypeormOutboxRepository.save(o)),
+      save: jest.fn().mockImplementation((o) => o),
+      create: jest.fn().mockImplementation((o) => o),
     };
+
     mockSessionService = {
       revokeAllSessions: jest.fn().mockResolvedValue(undefined),
     };
+
     mockSystemRoleSeederService = {
       seedBaselineSystemRoles: jest.fn().mockResolvedValue([]),
     };
@@ -120,7 +66,6 @@ describe('ProvisioningApplicationService', () => {
         { provide: TransactionService, useValue: mockTransactionService },
         { provide: UserRepository, useValue: mockUserRepository },
         { provide: EmployeeReferenceRepository, useValue: mockEmployeeReferenceRepository },
-        { provide: ConsumedEventRepository, useValue: mockConsumedEventRepository },
         { provide: AuthSecurityEventOutboxRepository, useValue: mockOutboxRepository },
         { provide: InvitationRepository, useValue: mockInvitationRepository },
         { provide: SessionApplicationService, useValue: mockSessionService },
@@ -140,21 +85,23 @@ describe('ProvisioningApplicationService', () => {
   });
 
   describe('bootstrapRootAdmin', () => {
-    it('should return DUPLICATE if event is already processed', async () => {
-      mockConsumedEventRepository.exists.mockResolvedValue(true);
+    it('should return DUPLICATE if root admin already exists', async () => {
+      mockUserRepository.findOne.mockResolvedValueOnce(new User());
 
-      const result = await service.bootstrapRootAdmin('evt-123', 'topic-name', {
+      const result = await service.bootstrapRootAdmin({
         tenantCode: 'TENANT_A',
         rootAdminEmail: 'root@tenant.com',
       });
 
       expect(result).toEqual({ success: true, reason: 'DUPLICATE' });
-      expect(mockConsumedEventRepository.exists).toHaveBeenCalledWith('evt-123');
+      expect(mockUserRepository.findOne).toHaveBeenCalledWith({ protectedRootAdmin: true });
     });
 
     it('should throw BadRequestException if rootAdminEmail is missing', async () => {
+      mockUserRepository.findOne.mockResolvedValueOnce(null);
+
       await expect(
-        service.bootstrapRootAdmin('evt-123', 'topic-name', {
+        service.bootstrapRootAdmin({
           tenantCode: 'TENANT_A',
           rootAdminEmail: '',
         }),
@@ -162,98 +109,62 @@ describe('ProvisioningApplicationService', () => {
     });
 
     it('should throw BadRequestException if rootAdminEmail format is invalid', async () => {
+      mockUserRepository.findOne.mockResolvedValueOnce(null);
+
       await expect(
-        service.bootstrapRootAdmin('evt-123', 'topic-name', {
+        service.bootstrapRootAdmin({
           tenantCode: 'TENANT_A',
           rootAdminEmail: 'invalid-email',
         }),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should return ALREADY_EXISTS if root admin user exists', async () => {
-      mockTypeormUserRepository.findOne.mockResolvedValue(new User());
-
-      const result = await service.bootstrapRootAdmin('evt-123', 'topic-name', {
-        tenantCode: 'TENANT_A',
-        rootAdminEmail: 'root@tenant-a.com',
-      });
-
-      expect(result).toEqual({ success: true, reason: 'ALREADY_EXISTS' });
-    });
-
     it('should create root admin and seed system roles successfully', async () => {
-      mockTypeormUserRepository.findOne.mockResolvedValue(null);
+      mockUserRepository.findOne.mockResolvedValueOnce(null);
 
-      const result = await service.bootstrapRootAdmin('evt-123', 'topic-name', {
+      const result = await service.bootstrapRootAdmin({
         tenantCode: 'TENANT_A',
         rootAdminEmail: 'root@tenant-a.com',
       });
 
       expect(result).toEqual({ success: true });
-      expect(mockTypeormUserRepository.save).toHaveBeenCalled();
+      expect(mockUserRepository.create).toHaveBeenCalled();
       expect(mockSystemRoleSeederService.seedBaselineSystemRoles).toHaveBeenCalledWith('TENANT_A');
+      expect(mockOutboxRepository.save).toHaveBeenCalled();
     });
   });
 
   describe('synchronizeEmployeeStatus - US1 Suspension', () => {
-    it('should return DUPLICATE if event is already consumed', async () => {
-      mockConsumedEventRepository.exists.mockResolvedValue(true);
+    it('should return true if employee reference not found', async () => {
+      mockEmployeeReferenceRepository.findById.mockResolvedValueOnce(null);
 
-      const result = await service.synchronizeEmployeeStatus(
-        'evt-123',
-        EventType.EMPLOYEE_SUSPENDED,
-        {
-          employeeId: 'emp-123',
-          tenantCode: 'TENANT_A',
-          sourceVersion: 10,
-        },
-      );
+      const result = await service.synchronizeEmployeeStatus(EventType.EMPLOYEE_SUSPENDED, {
+        id: 'emp-123',
+        sourceVersion: 10,
+      });
 
-      expect(result).toEqual({ success: true, reason: 'DUPLICATE' });
-      expect(mockConsumedEventRepository.exists).toHaveBeenCalledWith('evt-123');
+      expect(result).toBe(true);
+      expect(mockEmployeeReferenceRepository.findById).toHaveBeenCalledWith('emp-123');
     });
 
-    it('should return UNKNOWN_EMPLOYEE_REFERENCE if employee reference not found', async () => {
-      mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(null);
-
-      const result = await service.synchronizeEmployeeStatus(
-        'evt-123',
-        EventType.EMPLOYEE_SUSPENDED,
-        {
-          employeeId: 'emp-123',
-          tenantCode: 'TENANT_A',
-          sourceVersion: 10,
-        },
-      );
-
-      expect(result).toEqual({ success: true, reason: 'UNKNOWN_EMPLOYEE_REFERENCE' });
-    });
-
-    it('should return STALE_VERSION if event version is less than or equal to stored version', async () => {
+    it('should return true if event version is less than or equal to stored version', async () => {
       const existingRef = new EmployeeReference();
-      existingRef.employeeId = 'emp-123';
-      existingRef.tenantCode = 'TENANT_A';
+      existingRef.id = 'emp-123';
       existingRef.sourceVersion = '10';
 
-      mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
+      mockEmployeeReferenceRepository.findById.mockResolvedValueOnce(existingRef);
 
-      const result = await service.synchronizeEmployeeStatus(
-        'evt-123',
-        EventType.EMPLOYEE_SUSPENDED,
-        {
-          employeeId: 'emp-123',
-          tenantCode: 'TENANT_A',
-          sourceVersion: 10, // equal to 10
-        },
-      );
+      const result = await service.synchronizeEmployeeStatus(EventType.EMPLOYEE_SUSPENDED, {
+        id: 'emp-123',
+        sourceVersion: 10,
+      });
 
-      expect(result).toEqual({ success: true, reason: 'STALE_VERSION' });
+      expect(result).toBe(true);
     });
 
     it('should suspend user, bump security version, write outbox and clear sessions post-commit', async () => {
       const existingRef = new EmployeeReference();
-      existingRef.employeeId = 'emp-123';
-      existingRef.tenantCode = 'TENANT_A';
+      existingRef.id = 'emp-123';
       existingRef.sourceVersion = '9';
 
       const existingUser = new User();
@@ -262,26 +173,25 @@ describe('ProvisioningApplicationService', () => {
       existingUser.status = UserStatus.ACTIVE;
       existingUser.securityVersion = 1;
 
-      mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
-      mockTypeormUserRepository.findOne.mockResolvedValue(existingUser);
+      mockEmployeeReferenceRepository.findById.mockResolvedValueOnce(existingRef);
+      mockUserRepository.findOne.mockResolvedValueOnce(existingUser);
 
-      const result = await service.synchronizeEmployeeStatus(
-        'evt-123',
-        EventType.EMPLOYEE_SUSPENDED,
-        {
-          employeeId: 'emp-123',
-          tenantCode: 'TENANT_A',
-          sourceVersion: 10,
-        },
-      );
+      const result = await service.synchronizeEmployeeStatus(EventType.EMPLOYEE_SUSPENDED, {
+        id: 'emp-123',
+        sourceVersion: 10,
+      });
 
-      expect(result).toEqual({ success: true });
-      expect(existingUser.status).toBe(UserStatus.DISABLED);
-      expect(existingUser.securityVersion).toBe(2);
-      expect(existingRef.status).toBe('suspended');
-      expect(existingRef.sourceVersion).toBe('10');
+      expect(result).toBe(true);
+      expect(mockUserRepository.update).toHaveBeenCalledWith('user-123', {
+        securityVersion: 1,
+        status: UserStatus.DISABLED,
+      });
+      expect(mockEmployeeReferenceRepository.update).toHaveBeenCalledWith('emp-123', {
+        status: EmployeeStatus.SUSPENDED,
+        sourceVersion: '10',
+      });
 
-      expect(mockTypeormOutboxRepository.save).toHaveBeenCalledWith(
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           eventType: EventType.AUTHENTICATION_SESSIONS_REVOKED,
           userId: 'user-123',
@@ -292,8 +202,7 @@ describe('ProvisioningApplicationService', () => {
 
     it('should terminate user, bump security version, revoke active invitations, write outbox and clear sessions post-commit', async () => {
       const existingRef = new EmployeeReference();
-      existingRef.employeeId = 'emp-123';
-      existingRef.tenantCode = 'TENANT_A';
+      existingRef.id = 'emp-123';
       existingRef.sourceVersion = '9';
 
       const existingUser = new User();
@@ -306,39 +215,38 @@ describe('ProvisioningApplicationService', () => {
       mockInvitation.userId = 'user-123';
       mockInvitation.status = InvitationStatus.PENDING;
 
-      mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
-      mockTypeormUserRepository.findOne.mockResolvedValue(existingUser);
-      mockTypeormInvitationRepository.find.mockResolvedValue([mockInvitation]);
+      mockEmployeeReferenceRepository.findById.mockResolvedValueOnce(existingRef);
+      mockUserRepository.findOne.mockResolvedValueOnce(existingUser);
+      mockInvitationRepository.find.mockResolvedValueOnce([mockInvitation]);
 
-      const result = await service.synchronizeEmployeeStatus(
-        'evt-124',
-        EventType.EMPLOYEE_TERMINATED,
-        {
-          employeeId: 'emp-123',
-          tenantCode: 'TENANT_A',
-          sourceVersion: 10,
-        },
-      );
+      const result = await service.synchronizeEmployeeStatus(EventType.EMPLOYEE_TERMINATED, {
+        id: 'emp-123',
+        sourceVersion: 10,
+      });
 
-      expect(result).toEqual({ success: true });
-      expect(existingUser.status).toBe('archived');
-      expect(existingUser.securityVersion).toBe(3);
-      expect(existingRef.status).toBe('terminated');
-      expect(existingRef.sourceVersion).toBe('10');
+      expect(result).toBe(true);
+      expect(mockUserRepository.update).toHaveBeenCalledWith('user-123', {
+        securityVersion: 2,
+        status: UserStatus.ARCHIVED,
+      });
+      expect(mockEmployeeReferenceRepository.update).toHaveBeenCalledWith('emp-123', {
+        status: EmployeeStatus.TERMINATED,
+        sourceVersion: '10',
+      });
 
       expect(mockInvitationRepository.find).toHaveBeenCalledWith({
         userId: 'user-123',
         status: InvitationStatus.PENDING,
       });
-      expect(mockTypeormInvitationRepository.save).toHaveBeenCalledWith([
+      expect(mockInvitationRepository.bulkSave).toHaveBeenCalledWith([
         expect.objectContaining({
           userId: 'user-123',
-          status: 'revoked',
+          status: InvitationStatus.REVOKED,
           revokedAt: expect.any(Date),
         }),
       ]);
 
-      expect(mockTypeormOutboxRepository.save).toHaveBeenCalledWith(
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           eventType: EventType.AUTHENTICATION_SESSIONS_REVOKED,
           userId: 'user-123',
@@ -352,8 +260,7 @@ describe('ProvisioningApplicationService', () => {
 
     it('should reactivate user, bump security version, revoke active invitations, create a new invitation, and write user-invited to outbox', async () => {
       const existingRef = new EmployeeReference();
-      existingRef.employeeId = 'emp-123';
-      existingRef.tenantCode = 'TENANT_A';
+      existingRef.id = 'emp-123';
       existingRef.sourceVersion = '9';
 
       const existingUser = new User();
@@ -368,32 +275,31 @@ describe('ProvisioningApplicationService', () => {
       mockInvitation.userId = 'user-123';
       mockInvitation.status = InvitationStatus.PENDING;
 
-      mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
-      mockTypeormUserRepository.findOne.mockResolvedValue(existingUser);
-      mockTypeormInvitationRepository.find.mockResolvedValue([mockInvitation]);
+      mockEmployeeReferenceRepository.findById.mockResolvedValueOnce(existingRef);
+      mockUserRepository.findOne.mockResolvedValueOnce(existingUser);
+      mockInvitationRepository.find.mockResolvedValueOnce([mockInvitation]);
 
-      const result = await service.synchronizeEmployeeStatus(
-        'evt-125',
-        EventType.EMPLOYEE_REACTIVATED,
-        {
-          employeeId: 'emp-123',
-          tenantCode: 'TENANT_A',
-          sourceVersion: 10,
-        },
-      );
+      const result = await service.synchronizeEmployeeStatus(EventType.EMPLOYEE_REACTIVATED, {
+        id: 'emp-123',
+        sourceVersion: 10,
+      });
 
-      expect(result).toEqual({ success: true });
-      expect(existingUser.status).toBe(UserStatus.INVITED);
-      expect(existingUser.securityVersion).toBe(4);
-      expect(existingRef.status).toBe('reactivated');
-      expect(existingRef.sourceVersion).toBe('10');
+      expect(result).toBe(true);
+      expect(mockUserRepository.update).toHaveBeenCalledWith('user-123', {
+        status: UserStatus.INACTIVE,
+        securityVersion: 3,
+      });
+      expect(mockEmployeeReferenceRepository.update).toHaveBeenCalledWith('emp-123', {
+        status: EmployeeStatus.REACTIVATED,
+        sourceVersion: '10',
+      });
 
       expect(mockInvitationRepository.find).toHaveBeenCalledWith({
         userId: 'user-123',
         status: InvitationStatus.PENDING,
       });
       // Verify revoke old invitations
-      expect(mockTypeormInvitationRepository.save).toHaveBeenCalledWith([
+      expect(mockInvitationRepository.bulkSave).toHaveBeenCalledWith([
         expect.objectContaining({
           userId: 'user-123',
           status: InvitationStatus.REVOKED,
@@ -402,7 +308,7 @@ describe('ProvisioningApplicationService', () => {
       ]);
 
       // Verify create new invitation
-      expect(mockTypeormInvitationRepository.save).toHaveBeenCalledWith(
+      expect(mockInvitationRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'user-123',
           status: InvitationStatus.PENDING,
@@ -412,14 +318,14 @@ describe('ProvisioningApplicationService', () => {
       );
 
       // Verify write user-invited to outbox
-      expect(mockTypeormOutboxRepository.save).toHaveBeenCalledWith(
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           eventType: EventType.AUTHENTICATION_USER_INVITED,
           userId: 'user-123',
           sanitizedPayload: expect.objectContaining({
             userId: 'user-123',
             email: 'rehire@tenant.com',
-            invitationId: expect.any(String),
+            invitationId: 'new-invitation-uuid',
           }),
         }),
       );
@@ -429,77 +335,62 @@ describe('ProvisioningApplicationService', () => {
   describe('synchronizeEmployeeStatus - Missing User Reference', () => {
     it('should update employee reference to suspended if user is missing', async () => {
       const existingRef = new EmployeeReference();
-      existingRef.employeeId = 'emp-123';
-      existingRef.tenantCode = 'TENANT_A';
+      existingRef.id = 'emp-123';
       existingRef.sourceVersion = '9';
 
-      mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
-      mockTypeormUserRepository.findOne.mockResolvedValue(null);
+      mockEmployeeReferenceRepository.findById.mockResolvedValueOnce(existingRef);
+      mockUserRepository.findOne.mockResolvedValueOnce(null);
 
-      const result = await service.synchronizeEmployeeStatus(
-        'evt-123',
-        EventType.EMPLOYEE_SUSPENDED,
-        {
-          employeeId: 'emp-123',
-          tenantCode: 'TENANT_A',
-          sourceVersion: 10,
-        },
-      );
+      const result = await service.synchronizeEmployeeStatus(EventType.EMPLOYEE_SUSPENDED, {
+        id: 'emp-123',
+        sourceVersion: 10,
+      });
 
-      expect(result).toEqual({ success: true });
-      expect(existingRef.status).toBe('suspended');
-      expect(existingRef.sourceVersion).toBe('10');
-      expect(mockTypeormConsumedEventRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'evt-123' }),
-      );
+      expect(result).toBe(true);
+      expect(mockEmployeeReferenceRepository.update).toHaveBeenCalledWith('emp-123', {
+        status: EmployeeStatus.SUSPENDED,
+        sourceVersion: '10',
+      });
     });
 
     it('should update employee reference to terminated if user is missing', async () => {
       const existingRef = new EmployeeReference();
-      existingRef.employeeId = 'emp-123';
-      existingRef.tenantCode = 'TENANT_A';
+      existingRef.id = 'emp-123';
       existingRef.sourceVersion = '9';
 
-      mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
-      mockTypeormUserRepository.findOne.mockResolvedValue(null);
+      mockEmployeeReferenceRepository.findById.mockResolvedValueOnce(existingRef);
+      mockUserRepository.findOne.mockResolvedValueOnce(null);
 
-      const result = await service.synchronizeEmployeeStatus(
-        'evt-123',
-        EventType.EMPLOYEE_TERMINATED,
-        {
-          employeeId: 'emp-123',
-          tenantCode: 'TENANT_A',
-          sourceVersion: 10,
-        },
-      );
+      const result = await service.synchronizeEmployeeStatus(EventType.EMPLOYEE_TERMINATED, {
+        id: 'emp-123',
+        sourceVersion: 10,
+      });
 
-      expect(result).toEqual({ success: true });
-      expect(existingRef.status).toBe('terminated');
-      expect(existingRef.sourceVersion).toBe('10');
+      expect(result).toBe(true);
+      expect(mockEmployeeReferenceRepository.update).toHaveBeenCalledWith('emp-123', {
+        status: EmployeeStatus.TERMINATED,
+        sourceVersion: '10',
+      });
     });
 
     it('should update employee reference to reactivated if user is missing', async () => {
       const existingRef = new EmployeeReference();
-      existingRef.employeeId = 'emp-123';
-      existingRef.tenantCode = 'TENANT_A';
+      existingRef.id = 'emp-123';
       existingRef.sourceVersion = '9';
 
-      mockTypeormEmployeeRefRepository.findOne.mockResolvedValue(existingRef);
-      mockTypeormUserRepository.findOne.mockResolvedValue(null);
+      mockEmployeeReferenceRepository.findById.mockResolvedValueOnce(existingRef);
+      mockUserRepository.findOne.mockResolvedValueOnce(null);
 
-      const result = await service.synchronizeEmployeeStatus(
-        'evt-123',
-        EventType.EMPLOYEE_REACTIVATED,
-        {
-          employeeId: 'emp-123',
-          tenantCode: 'TENANT_A',
-          sourceVersion: 10,
-        },
-      );
+      const result = await service.synchronizeEmployeeStatus(EventType.EMPLOYEE_REACTIVATED, {
+        id: 'emp-123',
+        sourceVersion: 10,
+      });
 
-      expect(result).toEqual({ success: true });
-      expect(existingRef.status).toBe('reactivated');
-      expect(existingRef.sourceVersion).toBe('10');
+      expect(result).toBe(true);
+      expect(mockEmployeeReferenceRepository.update).toHaveBeenCalledWith('emp-123', {
+        status: EmployeeStatus.REACTIVATED,
+        sourceVersion: '10',
+      });
     });
   });
 });

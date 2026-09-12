@@ -30,7 +30,7 @@ describe('UserAuthorizationCacheService', () => {
     };
 
     repoMock = {
-      findByEmployee: jest.fn().mockResolvedValue([
+      find: jest.fn().mockResolvedValue([
         {
           id: 'row-1',
           tenantCode,
@@ -109,7 +109,7 @@ describe('UserAuthorizationCacheService', () => {
     const result = await service.getUserAuthorizationProfile(tenantCode, userId);
 
     expect(result).toEqual(cachedProfile);
-    expect(repoMock.findByEmployee).not.toHaveBeenCalled();
+    expect(repoMock.find).not.toHaveBeenCalled();
   });
 
   it('should recover from repository on cache miss', async () => {
@@ -117,12 +117,12 @@ describe('UserAuthorizationCacheService', () => {
 
     const result = await service.getUserAuthorizationProfile(tenantCode, userId);
 
-    expect(repoMock.findByEmployee).toHaveBeenCalledWith(userId);
+    expect(repoMock.find).toHaveBeenCalledWith({ userId });
     expect(result.roles).toHaveLength(1);
   });
 
   it('should store empty roles array for zero-group user', async () => {
-    repoMock.findByEmployee = jest.fn().mockResolvedValueOnce([]);
+    repoMock.find = jest.fn().mockResolvedValueOnce([]);
 
     const result = await service.syncUserCache(tenantCode, userId);
 

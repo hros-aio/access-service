@@ -21,7 +21,7 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
   async countActiveHoldersByRoleId(roleId: string): Promise<number> {
     const result = await this.repository
       .createQueryBuilder('uer')
-      .select('COUNT(DISTINCT uer.employeeId)', 'count')
+      .select('COUNT(DISTINCT uer.userId)', 'count')
       .where('uer.tenantCode = :tenantCode', { tenantCode: this.tenantCode })
       .andWhere('uer.roleId = :roleId', { roleId })
       .getRawOne<{ count: string }>();
@@ -35,7 +35,7 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
   ): Promise<number> {
     const result = await this.repository
       .createQueryBuilder('uer')
-      .select('COUNT(DISTINCT uer.employeeId)', 'count')
+      .select('COUNT(DISTINCT uer.userId)', 'count')
       .where('uer.tenantCode = :tenantCode', { tenantCode: this.tenantCode })
       .andWhere('uer.roleId = :roleId', { roleId })
       .andWhere('uer.sourceGroupId != :excludedSourceGroupId', { excludedSourceGroupId })

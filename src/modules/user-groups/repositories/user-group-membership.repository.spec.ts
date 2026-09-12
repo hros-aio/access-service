@@ -38,7 +38,7 @@ describe('UserGroupMembershipRepository', () => {
     jest.restoreAllMocks();
   });
 
-  it('batchInsert creates and saves membership entities for given employee ids', async () => {
+  it('batchInsert creates and saves membership entities for given user ids', async () => {
     await repository.batchInsert('grp-1', ['emp-1', 'emp-2']);
 
     expect(mockTypeormRepo.create).toHaveBeenCalledTimes(2);
@@ -46,20 +46,20 @@ describe('UserGroupMembershipRepository', () => {
       expect.objectContaining({
         tenantCode: 'TENANT1',
         groupId: 'grp-1',
-        employeeId: 'emp-1',
+        userId: 'emp-1',
       }),
     );
     expect(mockTypeormRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantCode: 'TENANT1',
         groupId: 'grp-1',
-        employeeId: 'emp-2',
+        userId: 'emp-2',
       }),
     );
     expect(mockTypeormRepo.save).toHaveBeenCalledWith(
       expect.arrayContaining([
-        expect.objectContaining({ employeeId: 'emp-1' }),
-        expect.objectContaining({ employeeId: 'emp-2' }),
+        expect.objectContaining({ userId: 'emp-1' }),
+        expect.objectContaining({ userId: 'emp-2' }),
       ]),
     );
   });
@@ -82,14 +82,14 @@ describe('UserGroupMembershipRepository', () => {
       expect.objectContaining({
         tenantCode: 'TENANT1',
         groupId: 'grp-1',
-        employeeId: 'emp-1',
+        userId: 'emp-1',
       }),
     );
     expect(mockTypeormRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantCode: 'TENANT1',
         groupId: 'grp-1',
-        employeeId: 'emp-1',
+        userId: 'emp-1',
       }),
     );
   });

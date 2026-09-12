@@ -31,7 +31,7 @@ describe('MembershipReconciler', () => {
       findByGroup: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRoleRepository>;
     mockMembershipRepo = {
-      findMembershipsByEmployee: jest.fn(),
+      findByUserId: jest.fn(),
       findMemberEmployeeIdsByGroup: jest.fn(),
       insertSingleMembership: jest.fn(),
       deleteSingleMembership: jest.fn(),
@@ -39,7 +39,7 @@ describe('MembershipReconciler', () => {
       batchDelete: jest.fn(),
     } as unknown as jest.Mocked<UserGroupMembershipRepository>;
     mockEffectiveRoleRepo = {
-      syncEffectiveRolesForEmployee: jest.fn().mockResolvedValue({ inserted: 1, deleted: 0 }),
+      syncEffectiveRolesForUser: jest.fn().mockResolvedValue({ inserted: 1, deleted: 0 }),
     } as unknown as jest.Mocked<UserEffectiveRoleRepository>;
     mockOutboxRepo = {
       create: jest.fn(),

@@ -6,6 +6,8 @@ import { EffectiveRoleProjectionService } from './effective-role-projection.serv
 import { EmployeeReferenceRepository } from '../../employee/repositories/employee-reference.repository';
 import { RoleRepository } from '../../roles/repositories/role.repository';
 import { AuthSecurityEventOutboxRepository } from '../../security-event';
+import { User } from '../../user/entities/user.entity';
+import { UserRepository } from '../../user/repositories/user.repository';
 import { UserGroupRepository } from '../../user-groups/repositories/user-group.repository';
 import { MembershipReconciler } from '../../user-groups/services/membership-reconciler.service';
 import { UserGroupMatchingEngine } from '../../user-groups/services/user-group-matching.engine';
@@ -29,6 +31,7 @@ describe('AuthorizationReconciliationWorker', () => {
   let mockOutboxRepo: Partial<AuthSecurityEventOutboxRepository>;
   let mockTransactionService: Partial<TransactionService>;
   let mockLockAdapter: Partial<DistributedLockAdapter>;
+  let mockUserRepository: Partial<UserRepository>;
 
   beforeEach(() => {
     mockSyncJobRepo = {
@@ -51,9 +54,12 @@ describe('AuthorizationReconciliationWorker', () => {
     };
 
     mockEmployeeRepo = {
-      countEmployeesByTenant: jest.fn(),
-      findEmployeesBatch: jest.fn(),
       getMatchedEmployeeIds: jest.fn().mockResolvedValue([]),
+    };
+
+    mockUserRepository = {
+      countActive: jest.fn(),
+      findBatchWithEmployee: jest.fn(),
     };
 
     mockUserGroupMatchingEngine = {
@@ -95,6 +101,7 @@ describe('AuthorizationReconciliationWorker', () => {
       mockOutboxRepo as unknown as AuthSecurityEventOutboxRepository,
       mockTransactionService as unknown as TransactionService,
       mockLockAdapter as unknown as DistributedLockAdapter,
+      mockUserRepository as unknown as UserRepository,
     );
   });
 
@@ -114,7 +121,7 @@ describe('AuthorizationReconciliationWorker', () => {
         'authz:reconciliation-worker:lock:TEST_TENANT',
       );
       expect(mockSyncJobRepo.claimNextPendingJob).toHaveBeenCalledWith('TEST_TENANT');
-      expect(mockEmployeeRepo.countEmployeesByTenant).not.toHaveBeenCalled();
+      expect(mockUserRepository.countActive).not.toHaveBeenCalled();
       expect(mockLockAdapter.releaseLock).toHaveBeenCalledWith(
         'authz:reconciliation-worker:lock:TEST_TENANT',
       );
@@ -147,10 +154,10 @@ describe('AuthorizationReconciliationWorker', () => {
 
       (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(true);
       (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
-      (mockEmployeeRepo.countEmployeesByTenant as jest.Mock).mockResolvedValue(2);
-      (mockEmployeeRepo.findEmployeesBatch as jest.Mock).mockResolvedValue([
-        { employeeId: 'emp-1' },
-        { employeeId: 'emp-2' },
+      (mockUserRepository.countActive as jest.Mock).mockResolvedValue(2);
+      (mockUserRepository.findBatchWithEmployee as jest.Mock).mockResolvedValue([
+        { id: 'user-1' } as User,
+        { id: 'user-2' } as User,
       ]);
 
       const result = await worker.processNextJob('TEST_TENANT');
@@ -182,9 +189,9 @@ describe('AuthorizationReconciliationWorker', () => {
 
       (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(true);
       (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
-      (mockEmployeeRepo.countEmployeesByTenant as jest.Mock).mockResolvedValue(1);
-      (mockEmployeeRepo.findEmployeesBatch as jest.Mock).mockResolvedValue([
-        { employeeId: 'emp-1' },
+      (mockUserRepository.countActive as jest.Mock).mockResolvedValue(1);
+      (mockUserRepository.findBatchWithEmployee as jest.Mock).mockResolvedValue([
+        { id: 'user-1' } as User,
       ]);
 
       const result = await worker.processNextJob('TEST_TENANT');
@@ -193,7 +200,7 @@ describe('AuthorizationReconciliationWorker', () => {
       expect(mockMembershipReconciler.reconcileGroupPopulation).not.toHaveBeenCalled();
       expect(mockEffectiveRoleProjectionService.recomputeUserEffectiveRoles).toHaveBeenCalledWith(
         'TEST_TENANT',
-        'emp-1',
+        'user-1',
       );
       expect(mockRoleRepo.updateProjectionVersion).toHaveBeenCalledWith('TEST_TENANT', 'role-1', 2);
       expect(mockSyncJobRepo.markCompleted).toHaveBeenCalledWith('job-role-1', 1);
@@ -219,9 +226,9 @@ describe('AuthorizationReconciliationWorker', () => {
 
       (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(true);
       (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
-      (mockEmployeeRepo.countEmployeesByTenant as jest.Mock).mockResolvedValue(550); // >= 500 threshold
-      const mockBatch = Array.from({ length: 550 }, (_, i) => ({ employeeId: `emp-${i}` }));
-      (mockEmployeeRepo.findEmployeesBatch as jest.Mock)
+      (mockUserRepository.countActive as jest.Mock).mockResolvedValue(550); // >= 500 threshold
+      const mockBatch = Array.from({ length: 550 }, (_, i) => ({ id: `user-${i}` }) as User);
+      (mockUserRepository.findBatchWithEmployee as jest.Mock)
         .mockResolvedValueOnce(mockBatch.slice(0, 500))
         .mockResolvedValueOnce(mockBatch.slice(500, 550))
         .mockResolvedValueOnce([]);
@@ -254,7 +261,7 @@ describe('AuthorizationReconciliationWorker', () => {
 
       (mockLockAdapter.acquireLock as jest.Mock).mockResolvedValue(true);
       (mockSyncJobRepo.claimNextPendingJob as jest.Mock).mockResolvedValue(job);
-      (mockEmployeeRepo.countEmployeesByTenant as jest.Mock).mockRejectedValue(
+      (mockUserRepository.countActive as jest.Mock).mockRejectedValue(
         new Error('DB Connection Failed'),
       );
 

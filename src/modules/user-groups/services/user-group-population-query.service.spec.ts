@@ -25,7 +25,7 @@ describe('UserGroupPopulationQueryService', () => {
       findById: jest.fn(),
     } as unknown as jest.Mocked<UserGroupRepository>;
     mockMembershipRepo = {
-      findMembershipsByGroup: jest.fn(),
+      findByGroup: jest.fn(),
       findMemberEmployeeIdsByGroup: jest.fn(),
     } as unknown as jest.Mocked<UserGroupMembershipRepository>;
     mockMatchingEngine = {
@@ -65,10 +65,10 @@ describe('UserGroupPopulationQueryService', () => {
     it('returns paginated materialized members when group exists', async () => {
       mockUserGroupRepo.findById.mockResolvedValueOnce({ id: 'grp-1' } as UserGroup);
       const fakeMembership = {
-        employeeId: 'emp-1',
+        userId: 'emp-1',
         matchedAt: new Date('2026-08-29T10:00:00Z'),
         employee: {
-          employeeId: 'emp-1',
+          id: 'emp-1',
           employeeCode: 'EMP001',
           departmentId: 'dept-1',
           locationId: 'loc-1',
@@ -119,7 +119,7 @@ describe('UserGroupPopulationQueryService', () => {
       mockEmployeeRefRepo.getMatchedEmployeeIds.mockResolvedValueOnce(['emp-1']);
       mockEmployeeRefRepo.findByIds.mockResolvedValueOnce([
         {
-          employeeId: 'emp-1',
+          id: 'emp-1',
           employeeCode: 'EMP001',
           departmentId: 'dept-1',
           locationId: null,

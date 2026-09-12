@@ -1,91 +1,103 @@
 import { EmployeeLifecycleConsumer } from './employee-lifecycle.consumer';
-import { EmployeeReferenceRepository } from '../../modules/employee/repositories/employee-reference.repository';
+import { EventType } from '../../enums';
 import { ProvisioningApplicationService } from '../../modules/provisioning/services/provisioning.application.service';
 import { EmployeeAttributePropagationService } from '../../modules/user-groups/services/employee-attribute-propagation.service';
 
 describe('EmployeeLifecycleConsumer', () => {
   let consumer: EmployeeLifecycleConsumer;
   let mockProvisioningService: jest.Mocked<ProvisioningApplicationService>;
-  let mockEmployeeRepo: jest.Mocked<EmployeeReferenceRepository>;
   let mockPropagationService: jest.Mocked<EmployeeAttributePropagationService>;
 
   beforeEach(() => {
     mockProvisioningService = {
       synchronizeEmployeeStatus: jest.fn(),
     } as unknown as jest.Mocked<ProvisioningApplicationService>;
-    mockEmployeeRepo = {
-      updateReporteesCount: jest.fn(),
-      upsertProjection: jest.fn(),
-    } as unknown as jest.Mocked<EmployeeReferenceRepository>;
     mockPropagationService = {
-      handleEmployeeAttributeChange: jest.fn(),
+      handleEmployeeReportingLineChanged: jest.fn(),
+      handleEmployeeUpsert: jest.fn(),
     } as unknown as jest.Mocked<EmployeeAttributePropagationService>;
 
     consumer = new EmployeeLifecycleConsumer(
       mockProvisioningService,
-      mockEmployeeRepo,
       mockPropagationService,
     );
   });
 
-  it('handles reporting line changed event by updating manager reportee counts and triggering propagation', async () => {
-    mockEmployeeRepo.upsertProjection.mockResolvedValueOnce(false);
-
-    await consumer.handleEmployeeLifecycleEvent({
+  it('handles terminated event by delegating to provisioning service', async () => {
+    const envelope = {
       id: 'event-1',
       topic: 'employee.lifecycle-events',
       producer: 'directory-service',
       timestamp: new Date().toISOString(),
       version: '1.0',
       correlationId: 'corr-1',
-      eventType: 'employee.reporting-line-changed',
+      eventType: EventType.EMPLOYEE_TERMINATED,
       payload: {
         tenantCode: 'DEFAULT',
         id: 'emp-1',
-        oldManagerEmployeeId: 'mgr-old',
-        newManagerEmployeeId: 'mgr-new',
+        employeeCode: 'EMP-001',
         sourceVersion: 10,
       },
-    });
+    };
 
-    expect(mockEmployeeRepo.updateReporteesCount).toHaveBeenCalledWith('DEFAULT', 'mgr-old', -1);
-    expect(mockEmployeeRepo.updateReporteesCount).toHaveBeenCalledWith('DEFAULT', 'mgr-new', 1);
-    expect(mockPropagationService.handleEmployeeAttributeChange).toHaveBeenCalledWith(
-      'DEFAULT',
-      'mgr-old',
-      ['reporteesCount', 'hasReportees'],
-    );
-    expect(mockPropagationService.handleEmployeeAttributeChange).toHaveBeenCalledWith(
-      'DEFAULT',
-      'mgr-new',
-      ['reporteesCount', 'hasReportees'],
+    await consumer.handleEmployeeTerminated(envelope);
+
+    expect(mockProvisioningService.synchronizeEmployeeStatus).toHaveBeenCalledWith(
+      EventType.EMPLOYEE_TERMINATED,
+      envelope.payload,
     );
   });
 
-  it('handles attribute update and triggers propagation for changed attributes', async () => {
-    mockEmployeeRepo.upsertProjection.mockResolvedValueOnce(true);
-
-    await consumer.handleEmployeeLifecycleEvent({
+  it('handles reporting line changed event by delegating to propagation service', async () => {
+    const envelope = {
       id: 'event-2',
       topic: 'employee.lifecycle-events',
       producer: 'directory-service',
       timestamp: new Date().toISOString(),
       version: '1.0',
       correlationId: 'corr-2',
-      eventType: 'employee.department-changed',
+      eventType: EventType.EMPLOYEE_REPORTING_LINE_CHANGED,
+      payload: {
+        tenantCode: 'DEFAULT',
+        id: 'emp-1',
+        employeeCode: 'EMP-001',
+        oldManagerEmployeeId: 'mgr-old',
+        newManagerEmployeeId: 'mgr-new',
+        sourceVersion: 10,
+      },
+    };
+
+    await consumer.handleEmployeeReportingLineChanged(envelope);
+
+    expect(mockPropagationService.handleEmployeeReportingLineChanged).toHaveBeenCalledWith(
+      'DEFAULT',
+      'mgr-old',
+      'mgr-new',
+    );
+  });
+
+  it('handles employee updated event by delegating to propagation service', async () => {
+    const envelope = {
+      id: 'event-3',
+      topic: 'employee.lifecycle-events',
+      producer: 'directory-service',
+      timestamp: new Date().toISOString(),
+      version: '1.0',
+      correlationId: 'corr-3',
+      eventType: EventType.EMPLOYEE_UPDATED,
       payload: {
         tenantCode: 'DEFAULT',
         id: 'emp-2',
+        employeeCode: 'EMP-002',
         departmentId: 'dept-finance',
         sourceVersion: 12,
       },
-    });
+    };
 
-    expect(mockEmployeeRepo.upsertProjection).toHaveBeenCalled();
-    expect(mockPropagationService.handleEmployeeAttributeChange).toHaveBeenCalledWith(
-      'DEFAULT',
-      'emp-2',
-      ['departmentId'],
+    await consumer.handleEmployeeUpdated(envelope);
+
+    expect(mockPropagationService.handleEmployeeUpsert).toHaveBeenCalledWith(
+      envelope.payload,
     );
   });
 });

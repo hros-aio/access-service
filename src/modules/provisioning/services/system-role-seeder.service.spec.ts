@@ -9,7 +9,7 @@ import { RoleCacheService } from '../../roles/services/role-cache.service';
 
 describe('SystemRoleSeederService', () => {
   let service: SystemRoleSeederService;
-  let mockRoleRepository: { findBySystemKey: jest.Mock; save: jest.Mock };
+  let mockRoleRepository: { findBySystemKey: jest.Mock; create: jest.Mock; save: jest.Mock };
   let mockRolePermissionRepository: { bulkSave: jest.Mock };
   let mockRoleCacheService: { syncRole: jest.Mock };
   let mockTransactionService: { runInTransaction: jest.Mock };
@@ -17,6 +17,9 @@ describe('SystemRoleSeederService', () => {
   beforeEach(async () => {
     mockRoleRepository = {
       findBySystemKey: jest.fn().mockResolvedValue(null),
+      create: jest
+        .fn()
+        .mockImplementation((role) => ({ id: `role-uuid-${role.systemRoleKey}`, ...role })),
       save: jest
         .fn()
         .mockImplementation((role) => ({ id: `role-uuid-${role.systemRoleKey}`, ...role })),
@@ -57,7 +60,7 @@ describe('SystemRoleSeederService', () => {
     const seeded = await service.seedBaselineSystemRoles(tenantCode);
 
     expect(seeded.length).toBe(3);
-    expect(mockRoleRepository.save).toHaveBeenCalledTimes(3);
+    expect(mockRoleRepository.create).toHaveBeenCalledTimes(3);
     expect(mockRolePermissionRepository.bulkSave).toHaveBeenCalledTimes(3);
     expect(mockRoleCacheService.syncRole).toHaveBeenCalledTimes(3);
 
@@ -87,6 +90,6 @@ describe('SystemRoleSeederService', () => {
     const seeded = await service.seedBaselineSystemRoles(tenantCode);
 
     expect(seeded.length).toBe(3);
-    expect(mockRoleRepository.save).toHaveBeenCalledTimes(2);
+    expect(mockRoleRepository.create).toHaveBeenCalledTimes(2);
   });
 });
