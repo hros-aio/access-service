@@ -17,10 +17,7 @@ describe('EmployeeLifecycleConsumer', () => {
       handleEmployeeUpsert: jest.fn(),
     } as unknown as jest.Mocked<EmployeeAttributePropagationService>;
 
-    consumer = new EmployeeLifecycleConsumer(
-      mockProvisioningService,
-      mockPropagationService,
-    );
+    consumer = new EmployeeLifecycleConsumer(mockProvisioningService, mockPropagationService);
   });
 
   it('handles terminated event by delegating to provisioning service', async () => {
@@ -96,8 +93,6 @@ describe('EmployeeLifecycleConsumer', () => {
 
     await consumer.handleEmployeeUpdated(envelope);
 
-    expect(mockPropagationService.handleEmployeeUpsert).toHaveBeenCalledWith(
-      envelope.payload,
-    );
+    expect(mockPropagationService.handleEmployeeUpsert).toHaveBeenCalledWith(envelope.payload);
   });
 });

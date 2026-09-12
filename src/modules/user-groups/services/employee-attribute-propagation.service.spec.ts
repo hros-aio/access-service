@@ -108,20 +108,20 @@ describe('EmployeeAttributePropagationService', () => {
     const oldManager = { id: 'mgr-old', tenantCode: 'DEFAULT' } as EmployeeReference;
     const newManager = { id: 'mgr-new', tenantCode: 'DEFAULT' } as EmployeeReference;
 
-    mockEmployeeRepo.findById
-      .mockResolvedValueOnce(oldManager)
-      .mockResolvedValueOnce(newManager);
+    mockEmployeeRepo.findById.mockResolvedValueOnce(oldManager).mockResolvedValueOnce(newManager);
 
     mockUserGroupRepo.findByAttributeKeys
       .mockResolvedValueOnce([{ id: 'grp-1' } as UserGroup])
       .mockResolvedValueOnce([{ id: 'grp-1' } as UserGroup]);
     mockUserGroupRepo.findActiveGroups
-      .mockResolvedValueOnce([{ id: 'grp-1', matchingRule: { clauses: [] } } as unknown as UserGroup])
-      .mockResolvedValueOnce([{ id: 'grp-1', matchingRule: { clauses: [] } } as unknown as UserGroup]);
+      .mockResolvedValueOnce([
+        { id: 'grp-1', matchingRule: { clauses: [] } } as unknown as UserGroup,
+      ])
+      .mockResolvedValueOnce([
+        { id: 'grp-1', matchingRule: { clauses: [] } } as unknown as UserGroup,
+      ]);
 
-    mockMatchingEngine.evaluate
-      .mockReturnValueOnce(true)
-      .mockReturnValueOnce(true);
+    mockMatchingEngine.evaluate.mockReturnValueOnce(true).mockReturnValueOnce(true);
 
     mockUserRepo.findByEmployeeId
       .mockResolvedValueOnce({ id: 'user-mgr-old' } as User)
@@ -131,7 +131,11 @@ describe('EmployeeAttributePropagationService', () => {
 
     expect(mockEmployeeRepo.updateReporteesCount).toHaveBeenCalledWith('DEFAULT', 'mgr-old', -1);
     expect(mockEmployeeRepo.updateReporteesCount).toHaveBeenCalledWith('DEFAULT', 'mgr-new', 1);
-    expect(mockReconciler.reconcileSingleUser).toHaveBeenCalledWith('DEFAULT', 'user-mgr-old', ['grp-1']);
-    expect(mockReconciler.reconcileSingleUser).toHaveBeenCalledWith('DEFAULT', 'user-mgr-new', ['grp-1']);
+    expect(mockReconciler.reconcileSingleUser).toHaveBeenCalledWith('DEFAULT', 'user-mgr-old', [
+      'grp-1',
+    ]);
+    expect(mockReconciler.reconcileSingleUser).toHaveBeenCalledWith('DEFAULT', 'user-mgr-new', [
+      'grp-1',
+    ]);
   });
 });
