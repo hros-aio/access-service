@@ -18,14 +18,11 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
     super(UserEffectiveRoleEntity, transactionService);
   }
 
-  async findByEmployee(employeeId: string): Promise<UserEffectiveRoleEntity[]> {
-    return this.find({
-      employeeId,
+  async deleteByUserId(userId: string): Promise<number> {
+    const result = await this.repository.delete({
+      tenantCode: this.tenantCode,
+      userId,
     });
-  }
-
-  async deleteByEmployee(employeeId: string): Promise<number> {
-    const result = await this.repository.delete({ tenantCode: this.tenantCode, employeeId });
     return result.affected || 0;
   }
 
@@ -43,7 +40,7 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
     targetEntries: PersistUserEffectiveRoleEntry[],
   ): Promise<{ inserted: number; deleted: number }> {
     const currentRows = await this.find({
-      employeeId,
+      userId: employeeId,
     });
 
     const currentMap = new Map(currentRows.map((r) => [GenerateUserEffectiveRoleKey(r), r]));

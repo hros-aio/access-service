@@ -56,7 +56,7 @@ describe('MembershipReconciler', () => {
   });
 
   it('reconcileSingleEmployee adds new groups and syncs roles', async () => {
-    mockMembershipRepo.findMembershipsByEmployee.mockResolvedValueOnce([]);
+    mockMembershipRepo.findByUserId.mockResolvedValueOnce([]);
     mockUserGroupRepo.findById.mockResolvedValueOnce({
       id: 'grp-1',
       status: 'ACTIVE',
@@ -67,11 +67,11 @@ describe('MembershipReconciler', () => {
       { roleId: 'role-1' } as UserGroupRole,
     ]);
 
-    const result = await reconciler.reconcileSingleEmployee('DEFAULT', 'emp-1', ['grp-1']);
+    const result = await reconciler.reconcileSingleUser('DEFAULT', 'emp-1', ['grp-1']);
 
     expect(result.addedGroupIds).toEqual(['grp-1']);
     expect(mockMembershipRepo.insertSingleMembership).toHaveBeenCalledWith('emp-1', 'grp-1');
-    expect(mockEffectiveRoleRepo.syncEffectiveRolesForEmployee).toHaveBeenCalledWith('emp-1', [
+    expect(mockEffectiveRoleRepo.syncEffectiveRolesForUser).toHaveBeenCalledWith('emp-1', [
       {
         roleId: 'role-1',
         sourceGroupId: 'grp-1',

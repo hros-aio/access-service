@@ -29,11 +29,11 @@ describe('EffectiveRoleProjectionService - Unassignment & Partial Revocation', (
       findByGroup: jest.fn(),
     };
     membershipRepo = {
-      findMembershipsByEmployee: jest.fn(),
+      findByUserId: jest.fn(),
     };
     effectiveRoleRepo = {
       syncUserEffectiveRoles: jest.fn(),
-      deleteByEmployee: jest.fn(),
+      deleteByUserId: jest.fn(),
     };
     cacheService = {
       syncUserCache: jest.fn(),
@@ -55,9 +55,11 @@ describe('EffectiveRoleProjectionService - Unassignment & Partial Revocation', (
 
   it('should remove only unassigned group capabilities while retaining remaining active groups', async () => {
     // User was in Group A and Group B, but Group B was removed, leaving only Group A
-    membershipRepo.findMembershipsByEmployee = jest
+    membershipRepo.findByUserId = jest
       .fn()
-      .mockResolvedValue([{ tenantCode, employeeId, groupId: 'group-a' } as UserGroupMembership]);
+      .mockResolvedValue([
+        { tenantCode, userId: employeeId, groupId: 'group-a' } as UserGroupMembership,
+      ]);
 
     userGroupRepo.findById = jest.fn().mockResolvedValue({
       id: 'group-a',

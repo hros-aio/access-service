@@ -50,8 +50,6 @@ describe('EmployeeAttributePropagationService', () => {
 
     await service.handleEmployeeAttributeChange('DEFAULT', 'emp-1', ['departmentId']);
 
-    expect(mockReconciler.reconcileSingleEmployee).toHaveBeenCalledWith('DEFAULT', 'emp-1', [
-      'grp-1',
-    ]);
+    expect(mockReconciler.reconcileSingleUser).toHaveBeenCalledWith('DEFAULT', 'emp-1', ['grp-1']);
   });
 });

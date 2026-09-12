@@ -77,7 +77,7 @@ describe('UserGroupPopulationQueryService', () => {
         },
       } as unknown as UserGroupMembership;
 
-      mockMembershipRepo.findMembershipsByGroup.mockResolvedValueOnce({
+      mockMembershipRepo.findByGroup.mockResolvedValueOnce({
         data: [fakeMembership],
         total: 1,
         page: 1,
@@ -96,7 +96,7 @@ describe('UserGroupPopulationQueryService', () => {
 
     it('returns clean empty array when group has 0 materialized members', async () => {
       mockUserGroupRepo.findById.mockResolvedValueOnce({ id: 'grp-empty' } as UserGroup);
-      mockMembershipRepo.findMembershipsByGroup.mockResolvedValueOnce({
+      mockMembershipRepo.findByGroup.mockResolvedValueOnce({
         data: [],
         total: 0,
         page: 1,

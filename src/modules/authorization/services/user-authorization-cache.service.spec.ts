@@ -34,7 +34,7 @@ describe('UserAuthorizationCacheService', () => {
         {
           id: 'row-1',
           tenantCode,
-          employeeId: userId,
+          userId,
           roleId: 'role-1',
           sourceGroupId: 'group-1',
           scopeType: 'SELF',

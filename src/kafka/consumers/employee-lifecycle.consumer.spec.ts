@@ -41,7 +41,7 @@ describe('EmployeeLifecycleConsumer', () => {
       eventType: 'employee.reporting-line-changed',
       payload: {
         tenantCode: 'DEFAULT',
-        employeeId: 'emp-1',
+        id: 'emp-1',
         oldManagerEmployeeId: 'mgr-old',
         newManagerEmployeeId: 'mgr-new',
         sourceVersion: 10,
@@ -75,7 +75,7 @@ describe('EmployeeLifecycleConsumer', () => {
       eventType: 'employee.department-changed',
       payload: {
         tenantCode: 'DEFAULT',
-        employeeId: 'emp-2',
+        id: 'emp-2',
         departmentId: 'dept-finance',
         sourceVersion: 12,
       },

@@ -53,14 +53,12 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
     });
   }
 
-  async syncEffectiveRolesForEmployee(
-    employeeId: string,
+  async syncEffectiveRolesForUser(
+    userId: string,
     targetRoles: UserEffectiveRoleEntry[],
   ): Promise<{ inserted: number; deleted: number }> {
     // 1. Fetch current effective roles
-    const currentRoles = await this.find({
-      employeeId,
-    });
+    const currentRoles = await this.find({ userId });
 
     const currentMap = new Map(currentRoles.map((r) => [GenerateUserEffectiveRoleKey(r), r]));
     const targetMap = new Map(targetRoles.map((r) => [GenerateUserEffectiveRoleKey(r), r]));
@@ -86,7 +84,7 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
     if (toInsert.length > 0) {
       const entities = toInsert.map((item) => ({
         tenantCode: this.tenantCode,
-        employeeId,
+        userId,
         roleId: item.roleId,
         sourceGroupId: item.sourceGroupId,
         scopeType: item.scopeType,

@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
-import { FindOneOptions } from 'typeorm';
 
 import { User } from '../entities/user.entity';
+
+import { UserStatus } from '@/enums';
 
 @Injectable()
 export class UserRepository extends BaseRepository<User> {
@@ -56,10 +57,6 @@ export class UserRepository extends BaseRepository<User> {
     return this.findOne(where, { where });
   }
 
-  async findOneWithOptions(options: FindOneOptions<User>): Promise<User | null> {
-    return this.repository.findOne(options);
-  }
-
   async findByIdWithLock(id: string): Promise<User | null> {
     return this.repository.findOne({
       where: { id },
@@ -104,5 +101,22 @@ export class UserRepository extends BaseRepository<User> {
       .execute();
 
     return result.affected ?? 0;
+  }
+
+  async countActive(): Promise<number> {
+    return this.repository.count({
+      where: { tenantCode: this.tenantCode, status: UserStatus.ACTIVE },
+    });
+  }
+
+  async findBatchWithEmployee(skip: number, take: number): Promise<User[]> {
+    return this.find(
+      { status: UserStatus.ACTIVE },
+      {
+        skip,
+        take,
+        relations: ['employee'],
+      },
+    );
   }
 }

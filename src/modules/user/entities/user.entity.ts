@@ -35,15 +35,15 @@ export class User extends BaseEntity {
   mfaEnrollmentRequired: boolean;
 
   @Column({ name: 'mfa_reenrollment_required', type: 'boolean', default: false })
-  mfaReenrollmentRequired: boolean;
+  mfaReEnrollmentRequired: boolean;
 
   @Column({ name: 'external_identity_id', type: 'varchar', length: 100, nullable: true })
   externalIdentityId?: string;
 
   @OneToOne(() => EmployeeReference, { onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
   @JoinColumn([
-    { name: 'tenant_code', referencedColumnName: 'tenantCode' },
-    { name: 'employee_ref_id', referencedColumnName: 'employeeId' },
+    { name: 'tenant_code', referencedColumnName: 'tenant_code' },
+    { name: 'employee_ref_id', referencedColumnName: 'id' },
   ])
-  employeeReference?: EmployeeReference;
+  employee?: EmployeeReference;
 }

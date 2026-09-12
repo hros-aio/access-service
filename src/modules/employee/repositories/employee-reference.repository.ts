@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionService } from '@new-hros/libs-sql';
-import { FindOneOptions, In, Repository } from 'typeorm';
+import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
+import { In } from 'typeorm';
 
 import { EmployeeReference } from '../entities/employee-reference.entity';
 
+import { EmployeeStatus } from '@/enums/employee-status.enum';
+
 export interface UpsertEmployeeProjectionInput {
-  employeeId: string;
+  id: string;
   tenantCode: string;
   employeeCode: string;
   companyId?: string | null;
@@ -20,90 +22,24 @@ export interface UpsertEmployeeProjectionInput {
 }
 
 @Injectable()
-export class EmployeeReferenceRepository {
-  constructor(private readonly transactionService: TransactionService) {}
-
-  private get repository(): Repository<EmployeeReference> {
-    return this.transactionService.getManager().getRepository(EmployeeReference);
-  }
-
-  async save(employeeRef: EmployeeReference): Promise<EmployeeReference> {
-    return this.repository.save(employeeRef);
-  }
-
-  async findById(employeeId: string): Promise<EmployeeReference | null> {
-    return this.repository.findOne({ where: { employeeId } });
+export class EmployeeReferenceRepository extends BaseRepository<EmployeeReference> {
+  constructor(transactionService: TransactionService) {
+    super(EmployeeReference, transactionService);
   }
 
   async findByEmployeeId(
     tenantCode: string,
     employeeId: string,
   ): Promise<EmployeeReference | null> {
-    return this.repository.findOne({ where: { tenantCode, employeeId } });
-  }
-
-  async findOne(options: FindOneOptions<EmployeeReference>): Promise<EmployeeReference | null> {
-    return this.repository.findOne(options);
+    return this.findOne({ tenantCode, id: employeeId });
   }
 
   async findByCode(tenantCode: string, employeeCode: string): Promise<EmployeeReference | null> {
     return this.repository.findOne({ where: { tenantCode, employeeCode } });
   }
 
-  async exists(employeeId: string): Promise<boolean> {
-    const count = await this.repository.count({ where: { employeeId } });
-    return count > 0;
-  }
-
-  /**
-   * Upserts the projection if sourceVersion is greater than stored version.
-   * Returns true if row was inserted or updated, false if discarded due to stale version.
-   */
-  async upsertProjection(data: UpsertEmployeeProjectionInput): Promise<boolean> {
-    const manager = this.transactionService.getManager();
-    const result = await manager.query(
-      `
-      INSERT INTO employee_references (
-        employee_id, tenant_code, employee_code, company_id, location_id,
-        department_id, grade_id, job_title_id, employment_status, status,
-        manager_employee_id, source_version, synchronized_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
-      ON CONFLICT (tenant_code, employee_id) DO UPDATE SET
-        employee_code = EXCLUDED.employee_code,
-        company_id = EXCLUDED.company_id,
-        location_id = EXCLUDED.location_id,
-        department_id = EXCLUDED.department_id,
-        grade_id = EXCLUDED.grade_id,
-        job_title_id = EXCLUDED.job_title_id,
-        employment_status = EXCLUDED.employment_status,
-        status = EXCLUDED.status,
-        manager_employee_id = EXCLUDED.manager_employee_id,
-        source_version = EXCLUDED.source_version,
-        synchronized_at = NOW()
-      WHERE EXCLUDED.source_version > employee_references.source_version
-      RETURNING employee_id;
-      `,
-      [
-        data.employeeId,
-        data.tenantCode,
-        data.employeeCode,
-        data.companyId || null,
-        data.locationId || null,
-        data.departmentId || null,
-        data.gradeId || null,
-        data.jobTitleId || null,
-        data.employmentStatus || 'ACTIVE',
-        data.status || 'ACTIVE',
-        data.managerEmployeeId || null,
-        data.sourceVersion,
-      ],
-    );
-
-    return Array.isArray(result) && result.length > 0;
-  }
-
   async countEmployeesByTenant(tenantCode: string): Promise<number> {
-    return this.repository.count({ where: { tenantCode, status: 'ACTIVE' } });
+    return this.repository.count({ where: { tenantCode, status: EmployeeStatus.ACTIVE } });
   }
 
   async findEmployeesBatch(
@@ -130,7 +66,7 @@ export class EmployeeReferenceRepository {
       UPDATE employee_references
       SET reportees_count = GREATEST(0, reportees_count + $1),
           synchronized_at = NOW()
-      WHERE tenant_code = $2 AND employee_id = $3
+      WHERE tenant_code = $2 AND id = $3
       `,
       [delta, tenantCode, employeeId],
     );
@@ -148,13 +84,13 @@ export class EmployeeReferenceRepository {
     return matchedEmployeeIds;
   }
 
-  async findByIds(tenantCode: string, employeeIds: string[]): Promise<EmployeeReference[]> {
-    if (employeeIds.length === 0) {
+  async findByIds(tenantCode: string, ids: string[]): Promise<EmployeeReference[]> {
+    if (ids.length === 0) {
       return [];
     }
 
     return this.repository.find({
-      where: { tenantCode, employeeId: In(employeeIds) },
+      where: { tenantCode, id: In(ids) },
     });
   }
 }

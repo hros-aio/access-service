@@ -30,7 +30,7 @@ export class UserGroupPopulationQueryService {
   ): Promise<PaginatedResult<MatchedMemberDto>> {
     const group = await this.userGroupRepo.findById(groupId, { required: true });
 
-    const { data, ...pagination } = await this.membershipRepo.findMembershipsByGroup(group.id, {
+    const { data, ...pagination } = await this.membershipRepo.findByGroup(group.id, {
       page,
       limit,
     });
@@ -64,7 +64,7 @@ export class UserGroupPopulationQueryService {
 
     return {
       matchedCount: matchedEmployeeIds.length,
-      sampleEmployees,
+      sampleEmployees: sampleEmployees.map((e) => ({ ...e, employeeId: e.id })),
     };
   }
 

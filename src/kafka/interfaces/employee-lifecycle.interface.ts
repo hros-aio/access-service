@@ -1,7 +1,7 @@
 export interface EmployeeLifecyclePayload {
-  employeeId: string;
+  id: string;
   tenantCode: string;
-  employeeCode?: string;
+  employeeCode: string;
   companyId?: string | null;
   locationId?: string | null;
   departmentId?: string | null;

@@ -30,11 +30,8 @@ export class EffectiveRoleProjectionService {
     private readonly cacheService: UserAuthorizationCacheService,
   ) {}
 
-  async recomputeUserEffectiveRoles(
-    tenantCode: string,
-    employeeId: string,
-  ): Promise<RecomputeResult> {
-    const activeMemberships = await this.membershipRepo.findMembershipsByEmployee(employeeId);
+  async recomputeUserEffectiveRoles(tenantCode: string, userId: string): Promise<RecomputeResult> {
+    const activeMemberships = await this.membershipRepo.findByUserId(userId);
 
     const targetEntries: PersistUserEffectiveRoleEntry[] = [];
     const memoryRoles: EffectiveUserRole[] = [];
@@ -74,14 +71,14 @@ export class EffectiveRoleProjectionService {
 
     if (targetEntries.length === 0) {
       // Zero matching active groups: remove all effective roles
-      const deletedCount = await this.effectiveRoleRepo.deleteByEmployee(employeeId);
+      const deletedCount = await this.effectiveRoleRepo.deleteByUserId(userId);
       diff = { inserted: 0, deleted: deletedCount };
     } else {
-      diff = await this.effectiveRoleRepo.syncUserEffectiveRoles(employeeId, targetEntries);
+      diff = await this.effectiveRoleRepo.syncUserEffectiveRoles(userId, targetEntries);
     }
 
     // Sync to Redis user authorization cache
-    await this.cacheService.syncUserCache(tenantCode, employeeId, memoryRoles);
+    await this.cacheService.syncUserCache(tenantCode, userId, memoryRoles);
 
     return {
       inserted: diff.inserted,

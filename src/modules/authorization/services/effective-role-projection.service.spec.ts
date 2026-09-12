@@ -29,11 +29,11 @@ describe('EffectiveRoleProjectionService', () => {
       findByGroup: jest.fn(),
     };
     membershipRepo = {
-      findMembershipsByEmployee: jest.fn(),
+      findByUserId: jest.fn(),
     };
     effectiveRoleRepo = {
       syncUserEffectiveRoles: jest.fn().mockResolvedValue({ inserted: 2, deleted: 0 }),
-      deleteByEmployee: jest.fn().mockResolvedValue(2),
+      deleteByUserId: jest.fn().mockResolvedValue(2),
     };
     cacheService = {
       syncUserCache: jest.fn().mockResolvedValue({ version: 1, roles: [] }),
@@ -54,11 +54,11 @@ describe('EffectiveRoleProjectionService', () => {
   });
 
   it('should recompute multiple roles and scopes across matching active user groups', async () => {
-    membershipRepo.findMembershipsByEmployee = jest
+    membershipRepo.findByUserId = jest
       .fn()
       .mockResolvedValue([
-        { tenantCode, employeeId, groupId: 'group-a' } as UserGroupMembership,
-        { tenantCode, employeeId, groupId: 'group-b' } as UserGroupMembership,
+        { tenantCode, userId: employeeId, groupId: 'group-a' } as UserGroupMembership,
+        { tenantCode, userId: employeeId, groupId: 'group-b' } as UserGroupMembership,
       ]);
 
     userGroupRepo.findById = jest.fn().mockImplementation((id: string) => {
@@ -117,12 +117,12 @@ describe('EffectiveRoleProjectionService', () => {
   });
 
   it('should clear all effective roles when matching zero groups', async () => {
-    membershipRepo.findMembershipsByEmployee = jest.fn().mockResolvedValue([]);
+    membershipRepo.findByUserId = jest.fn().mockResolvedValue([]);
 
     const result = await service.recomputeUserEffectiveRoles(tenantCode, employeeId);
 
     expect(result.activeRolesCount).toBe(0);
-    expect(effectiveRoleRepo.deleteByEmployee).toHaveBeenCalledWith(employeeId);
+    expect(effectiveRoleRepo.deleteByUserId).toHaveBeenCalledWith(employeeId);
     expect(cacheService.syncUserCache).toHaveBeenCalledWith(tenantCode, employeeId, []);
   });
 });

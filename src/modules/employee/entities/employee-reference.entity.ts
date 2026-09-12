@@ -1,15 +1,9 @@
 import { BaseEntity } from '@new-hros/libs-sql';
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryColumn, Unique } from 'typeorm';
-
-import { Tenant } from '../../tenant/entities/tenant.entity';
+import { Column, Entity, Unique } from 'typeorm';
 
 @Entity('employee_references')
-@Unique('uq_employee_references_tenant_employee_code', ['tenantCode', 'employeeCode'])
-@Unique('uq_employee_references_tenant_employee_id', ['tenantCode', 'employeeId'])
+@Unique('uq_employee_references_tenant_employee_code', ['tenant_code', 'employee_code'])
 export class EmployeeReference extends BaseEntity {
-  @PrimaryColumn({ name: 'employee_id', type: 'uuid' })
-  employeeId: string;
-
   @Column({ name: 'employee_code', type: 'varchar', length: 100 })
   employeeCode: string;
 
@@ -45,8 +39,4 @@ export class EmployeeReference extends BaseEntity {
 
   @Column({ name: 'synchronized_at', type: 'timestamptz', default: () => 'NOW()' })
   synchronizedAt: Date;
-
-  @ManyToOne(() => Tenant)
-  @JoinColumn({ name: 'tenant_code', referencedColumnName: 'tenantCode' })
-  tenant?: Tenant;
 }

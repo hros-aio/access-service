@@ -3,22 +3,20 @@ import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 
 import { UserGroup } from './user-group.entity';
 import { TableName } from '../../../enums';
-import { EmployeeReference } from '../../employee/entities/employee-reference.entity';
 import { Role } from '../../roles/entities/role.entity';
-import { Tenant } from '../../tenant/entities/tenant.entity';
 
 @Entity(TableName.USER_EFFECTIVE_ROLES)
 @Unique('uq_user_effective_roles_grant', [
   'tenantCode',
-  'employeeId',
+  'user_id',
   'roleId',
   'sourceGroupId',
   'scopeType',
   'scopeEntityId',
 ])
 export class UserEffectiveRole extends BaseEntity {
-  @Column({ name: 'employee_id', type: 'uuid' })
-  employeeId: string;
+  @Column({ name: 'user_id', type: 'uuid' })
+  userId: string;
 
   @Column({ name: 'role_id', type: 'uuid' })
   roleId: string;
@@ -31,14 +29,6 @@ export class UserEffectiveRole extends BaseEntity {
 
   @Column({ name: 'scope_entity_id', type: 'uuid', nullable: true })
   scopeEntityId?: string | null;
-
-  @ManyToOne(() => Tenant)
-  @JoinColumn({ name: 'tenant_code', referencedColumnName: 'tenantCode' })
-  tenant?: Tenant;
-
-  @ManyToOne(() => EmployeeReference, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'employee_id' })
-  employee?: EmployeeReference;
 
   @ManyToOne(() => Role, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'role_id' })
