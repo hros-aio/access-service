@@ -1,14 +1,15 @@
-import { Controller } from '@nestjs/common';
+import { Controller, UseFilters } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { RequestContext, RequestContextService } from '@new-hros/libs-core';
-import { EventEnvelope } from '@new-hros/libs-events';
+import { EventEnvelope, EventPublishException } from '@new-hros/libs-events';
 
 import { EventType } from '../../enums';
 import { ProvisioningApplicationService } from '../../modules/provisioning/services/provisioning.application.service';
 
-import { TenantCreatedPayload } from '@/modules/provisioning/interfaces/tenant-created.interface';
+import { TenantCreatedPayload } from '@/kafka/interfaces/tenant-created.interface';
 
 @Controller()
+@UseFilters(EventPublishException)
 export class TenantProvisioningConsumer {
   constructor(private readonly provisioningService: ProvisioningApplicationService) {}
 

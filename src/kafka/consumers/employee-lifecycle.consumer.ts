@@ -1,7 +1,7 @@
-import { Controller, Logger } from '@nestjs/common';
+import { Controller, Logger, UseFilters } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { RequestContext, RequestContextService } from '@new-hros/libs-core';
-import { EventEnvelope } from '@new-hros/libs-events';
+import { EventEnvelope, EventPublishException } from '@new-hros/libs-events';
 
 import { EventType } from '../../enums';
 import { ProvisioningApplicationService } from '../../modules/provisioning/services/provisioning.application.service';
@@ -9,6 +9,7 @@ import { EmployeeAttributePropagationService } from '../../modules/user-groups/s
 import { EmployeeLifecyclePayload } from '../interfaces/employee-lifecycle.interface';
 
 @Controller()
+@UseFilters(EventPublishException)
 export class EmployeeLifecycleConsumer {
   private readonly logger = new Logger(EmployeeLifecycleConsumer.name);
 
@@ -138,6 +139,32 @@ export class EmployeeLifecycleConsumer {
 
   @EventPattern(EventType.EMPLOYEE_UPDATED)
   async handleEmployeeUpdated(
+    @Payload() envelope: EventEnvelope<EmployeeLifecyclePayload>,
+  ): Promise<unknown> {
+    const payload = envelope.payload;
+
+    if (!payload || !payload.tenantCode || !payload.id) {
+      this.logger.error('Payload is missing required fields or empty', payload);
+      return;
+    }
+
+    const context: RequestContext = {
+      traceId: envelope.correlationId || envelope.id,
+      requestId: envelope.id,
+      tenantCode: payload.tenantCode,
+      clientMetadata: {
+        ip: '127.0.0.1',
+      },
+      requestTimestamp: new Date(),
+    };
+
+    return RequestContextService.run(context, async () => {
+      await this.propagationService.handleEmployeeUpsert(payload);
+    });
+  }
+
+  @EventPattern(EventType.EMPLOYEE_CREATED)
+  async handleEmployeeCreated(
     @Payload() envelope: EventEnvelope<EmployeeLifecyclePayload>,
   ): Promise<unknown> {
     const payload = envelope.payload;

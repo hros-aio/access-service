@@ -10,7 +10,7 @@ import { EmployeeReference } from '../../employee/entities/employee-reference.en
 import { EmployeeReferenceRepository } from '../../employee/repositories/employee-reference.repository';
 import { Invitation } from '../../invite/entities/invitation.entity';
 import { InvitationRepository } from '../../invite/repositories/invitation.repository';
-import { AuthSecurityEventOutboxRepository } from '../../security-event';
+import { SecurityEventService } from '../../security-event/services/security-event.service';
 import { User } from '../../user/entities/user.entity';
 import { UserRepository } from '../../user/repositories/user.repository';
 
@@ -22,7 +22,11 @@ describe('ProvisioningApplicationService', () => {
   let mockUserRepository: { findOne: jest.Mock; create: jest.Mock; update: jest.Mock };
   let mockEmployeeReferenceRepository: { findById: jest.Mock; update: jest.Mock };
   let mockInvitationRepository: { find: jest.Mock; bulkSave: jest.Mock; create: jest.Mock };
-  let mockOutboxRepository: { save: jest.Mock; create: jest.Mock };
+  let mockSecurityEventService: {
+    logUserProvisioned: jest.Mock;
+    logSessionsRevoked: jest.Mock;
+    logUserInvited: jest.Mock;
+  };
   let mockSessionService: { revokeAllSessions: jest.Mock };
   let mockSystemRoleSeederService: { seedBaselineSystemRoles: jest.Mock };
 
@@ -48,9 +52,10 @@ describe('ProvisioningApplicationService', () => {
       create: jest.fn().mockImplementation((data) => ({ id: 'new-invitation-uuid', ...data })),
     };
 
-    mockOutboxRepository = {
-      save: jest.fn().mockImplementation((o) => o),
-      create: jest.fn().mockImplementation((o) => o),
+    mockSecurityEventService = {
+      logUserProvisioned: jest.fn().mockResolvedValue(undefined),
+      logSessionsRevoked: jest.fn().mockResolvedValue(undefined),
+      logUserInvited: jest.fn().mockResolvedValue(undefined),
     };
 
     mockSessionService = {
@@ -67,7 +72,7 @@ describe('ProvisioningApplicationService', () => {
         { provide: TransactionService, useValue: mockTransactionService },
         { provide: UserRepository, useValue: mockUserRepository },
         { provide: EmployeeReferenceRepository, useValue: mockEmployeeReferenceRepository },
-        { provide: AuthSecurityEventOutboxRepository, useValue: mockOutboxRepository },
+        { provide: SecurityEventService, useValue: mockSecurityEventService },
         { provide: InvitationRepository, useValue: mockInvitationRepository },
         { provide: SessionApplicationService, useValue: mockSessionService },
         { provide: SystemRoleSeederService, useValue: mockSystemRoleSeederService },
@@ -131,7 +136,13 @@ describe('ProvisioningApplicationService', () => {
       expect(result).toEqual({ success: true });
       expect(mockUserRepository.create).toHaveBeenCalled();
       expect(mockSystemRoleSeederService.seedBaselineSystemRoles).toHaveBeenCalledWith('TENANT_A');
-      expect(mockOutboxRepository.save).toHaveBeenCalled();
+      expect(mockSecurityEventService.logUserProvisioned).toHaveBeenCalledWith(
+        'TENANT_A',
+        'new-user-uuid',
+        'root@tenant-a.com',
+        'BUILT_IN_ADMIN',
+        'ACTIVE',
+      );
     });
   });
 
@@ -192,11 +203,11 @@ describe('ProvisioningApplicationService', () => {
         sourceVersion: '10',
       });
 
-      expect(mockOutboxRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: EventType.AUTHENTICATION_SESSIONS_REVOKED,
-          userId: 'user-123',
-        }),
+      expect(mockSecurityEventService.logSessionsRevoked).toHaveBeenCalledWith(
+        'TENANT_A',
+        'user-123',
+        'EMPLOYMENT_STATUS_CHANGED',
+        'DISABLED',
       );
       expect(mockSessionService.revokeAllSessions).toHaveBeenCalledWith('TENANT_A', 'user-123');
     });
@@ -247,14 +258,11 @@ describe('ProvisioningApplicationService', () => {
         }),
       ]);
 
-      expect(mockOutboxRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: EventType.AUTHENTICATION_SESSIONS_REVOKED,
-          userId: 'user-123',
-          sanitizedPayload: expect.objectContaining({
-            newStatus: 'ARCHIVED',
-          }),
-        }),
+      expect(mockSecurityEventService.logSessionsRevoked).toHaveBeenCalledWith(
+        'TENANT_A',
+        'user-123',
+        'EMPLOYMENT_STATUS_CHANGED',
+        'ARCHIVED',
       );
       expect(mockSessionService.revokeAllSessions).toHaveBeenCalledWith('TENANT_A', 'user-123');
     });
@@ -319,16 +327,11 @@ describe('ProvisioningApplicationService', () => {
       );
 
       // Verify write user-invited to outbox
-      expect(mockOutboxRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          eventType: EventType.AUTHENTICATION_USER_INVITED,
-          userId: 'user-123',
-          sanitizedPayload: expect.objectContaining({
-            userId: 'user-123',
-            email: 'rehire@tenant.com',
-            invitationId: 'new-invitation-uuid',
-          }),
-        }),
+      expect(mockSecurityEventService.logUserInvited).toHaveBeenCalledWith(
+        'TENANT_A',
+        'user-123',
+        'new-invitation-uuid',
+        'rehire@tenant.com',
       );
     });
   });

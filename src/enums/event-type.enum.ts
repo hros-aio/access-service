@@ -6,6 +6,7 @@ export enum EventType {
   EMPLOYEE_REACTIVATED = 'employee.reactivated',
   EMPLOYEE_REPORTING_LINE_CHANGED = 'employee.reporting-line-changed',
   EMPLOYEE_UPDATED = 'employee.updated',
+  EMPLOYEE_CREATED = 'employee.created',
   AUTHENTICATION_SESSIONS_REVOKED = 'authentication.sessions-revoked',
   AUTHENTICATION_USER_INVITED = 'authentication.user-invited',
   AUTHENTICATION_INVITATION_ACCEPTED = 'authentication.invitation-accepted',
