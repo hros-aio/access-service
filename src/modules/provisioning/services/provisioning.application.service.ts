@@ -6,12 +6,12 @@ import { isEmail } from 'class-validator';
 
 import { SystemRoleSeederService } from './system-role-seeder.service';
 import { CredentialStatus, EventType, InvitationStatus, UserStatus } from '../../../enums';
+import { TenantCreatedPayload } from '../../../kafka/interfaces/tenant-created.interface';
 import { SessionApplicationService } from '../../auth/services/session.application.service';
 import { EmployeeReferenceRepository } from '../../employee/repositories/employee-reference.repository';
 import { InvitationRepository } from '../../invite/repositories/invitation.repository';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { SecurityEventService } from '../../security-event/services/security-event.service';
 import { UserRepository } from '../../user/repositories/user.repository';
-import { TenantCreatedPayload } from '../interfaces/tenant-created.interface';
 
 import { EmployeeStatus } from '@/enums/employee-status.enum';
 import { EmployeeReference } from '@/modules/employee/entities/employee-reference.entity';
@@ -24,10 +24,10 @@ export class ProvisioningApplicationService {
     private readonly transactionService: TransactionService,
     private readonly userRepository: UserRepository,
     private readonly employeeReferenceRepository: EmployeeReferenceRepository,
-    private readonly authSecurityEventOutboxRepository: AuthSecurityEventOutboxRepository,
     private readonly invitationRepository: InvitationRepository,
     private readonly sessionService: SessionApplicationService,
     private readonly systemRoleSeederService: SystemRoleSeederService,
+    private readonly securityEventService: SecurityEventService,
   ) {}
 
   async bootstrapRootAdmin(
@@ -63,20 +63,13 @@ export class ProvisioningApplicationService {
       await this.systemRoleSeederService.seedBaselineSystemRoles(tenantCode);
 
       // 6. Append security outbox event
-      const outbox = new AuthSecurityEventOutbox();
-      outbox.tenantCode = tenantCode;
-      outbox.userId = savedUser.id;
-      outbox.eventType = EventType.AUTHENTICATION_USER_PROVISIONED;
-      outbox.sanitizedPayload = {
-        userId: savedUser.id,
+      await this.securityEventService.logUserProvisioned(
         tenantCode,
-        email: savedUser.normalizedEmail,
-        accountType: 'BUILT_IN_ADMIN',
-        status: 'ACTIVE',
-      };
-      outbox.publishStatus = 'pending';
-
-      await this.authSecurityEventOutboxRepository.save(outbox);
+        savedUser.id,
+        savedUser.normalizedEmail,
+        'BUILT_IN_ADMIN',
+        'ACTIVE',
+      );
 
       return { success: true };
     });
@@ -156,18 +149,12 @@ export class ProvisioningApplicationService {
     });
 
     // Write outbox security event
-    const outbox = new AuthSecurityEventOutbox();
-    outbox.tenantCode = user.tenantCode;
-    outbox.userId = user.id;
-    outbox.eventType = EventType.AUTHENTICATION_SESSIONS_REVOKED;
-    outbox.sanitizedPayload = {
-      userId: user.id,
-      tenantCode: user.tenantCode,
-      reason: 'EMPLOYMENT_STATUS_CHANGED',
-      newStatus: 'DISABLED',
-    };
-    outbox.publishStatus = 'pending';
-    await this.authSecurityEventOutboxRepository.create(outbox);
+    await this.securityEventService.logSessionsRevoked(
+      user.tenantCode,
+      user.id,
+      'EMPLOYMENT_STATUS_CHANGED',
+      'DISABLED',
+    );
 
     // Revoke active session
     await this.sessionService.revokeAllSessions(user.tenantCode, user.id);
@@ -204,18 +191,12 @@ export class ProvisioningApplicationService {
     }
 
     // Write outbox security event
-    const outbox = new AuthSecurityEventOutbox();
-    outbox.tenantCode = user.tenantCode;
-    outbox.userId = user.id;
-    outbox.eventType = EventType.AUTHENTICATION_SESSIONS_REVOKED;
-    outbox.sanitizedPayload = {
-      userId: user.id,
-      tenantCode: user.tenantCode,
-      reason: 'EMPLOYMENT_STATUS_CHANGED',
-      newStatus: 'ARCHIVED',
-    };
-    outbox.publishStatus = 'pending';
-    await this.authSecurityEventOutboxRepository.create(outbox);
+    await this.securityEventService.logSessionsRevoked(
+      user.tenantCode,
+      user.id,
+      'EMPLOYMENT_STATUS_CHANGED',
+      'ARCHIVED',
+    );
 
     // Revoke active session
     await this.sessionService.revokeAllSessions(user.tenantCode, user.id);
@@ -262,18 +243,12 @@ export class ProvisioningApplicationService {
     });
 
     // Write outbox security event (user-invited)
-    const outbox = new AuthSecurityEventOutbox();
-    outbox.tenantCode = user.tenantCode;
-    outbox.userId = user.id;
-    outbox.eventType = EventType.AUTHENTICATION_USER_INVITED;
-    outbox.sanitizedPayload = {
-      userId: user.id,
-      tenantCode: user.tenantCode,
-      invitationId: savedInvite.id,
-      email: user.displayEmail,
-    };
-    outbox.publishStatus = 'pending';
-    await this.authSecurityEventOutboxRepository.create(outbox);
+    await this.securityEventService.logUserInvited(
+      user.tenantCode,
+      user.id,
+      savedInvite.id,
+      user.displayEmail,
+    );
     return true;
   }
 }

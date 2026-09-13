@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
+import { EventType } from '../../../enums';
 import { AuthSecurityEventOutboxRepository } from '../repositories/auth-security-event-outbox.repository';
 
 @Injectable()
@@ -143,6 +144,74 @@ export class SecurityEventService {
       tenantCode,
       userId: userId || undefined,
       eventType: 'authentication.sso-login-failed',
+      sanitizedPayload: payload,
+      publishStatus: 'pending',
+    });
+  }
+
+  async logUserProvisioned(
+    tenantCode: string,
+    userId: string,
+    email: string,
+    accountType = 'BUILT_IN_ADMIN',
+    status = 'ACTIVE',
+  ): Promise<void> {
+    const payload = {
+      userId,
+      tenantCode,
+      email,
+      accountType,
+      status,
+    };
+
+    await this.outboxRepository.create({
+      tenantCode,
+      userId,
+      eventType: EventType.AUTHENTICATION_USER_PROVISIONED,
+      sanitizedPayload: payload,
+      publishStatus: 'pending',
+    });
+  }
+
+  async logSessionsRevoked(
+    tenantCode: string,
+    userId: string,
+    reason: string,
+    newStatus: string,
+  ): Promise<void> {
+    const payload = {
+      userId,
+      tenantCode,
+      reason,
+      newStatus,
+    };
+
+    await this.outboxRepository.create({
+      tenantCode,
+      userId,
+      eventType: EventType.AUTHENTICATION_SESSIONS_REVOKED,
+      sanitizedPayload: payload,
+      publishStatus: 'pending',
+    });
+  }
+
+  async logUserInvited(
+    tenantCode: string,
+    userId: string,
+    invitationId: string,
+    email: string,
+  ): Promise<void> {
+    const payload = {
+      userId,
+      tenantCode,
+      invitationId,
+      email,
+    };
+
+    await this.outboxRepository.create({
+      tenantCode,
+      userId,
+      eventType: EventType.AUTHENTICATION_USER_INVITED,
       sanitizedPayload: payload,
       publishStatus: 'pending',
     });

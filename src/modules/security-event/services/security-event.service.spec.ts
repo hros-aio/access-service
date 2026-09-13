@@ -166,4 +166,64 @@ describe('SecurityEventService', () => {
       );
     });
   });
+
+  describe('logUserProvisioned', () => {
+    it('should insert a user-provisioned event', async () => {
+      await service.logUserProvisioned('TENANT_123', 'user-123', 'admin@tenant.com');
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.user-provisioned',
+        publishStatus: 'pending',
+        sanitizedPayload: {
+          userId: 'user-123',
+          tenantCode: 'TENANT_123',
+          email: 'admin@tenant.com',
+          accountType: 'BUILT_IN_ADMIN',
+          status: 'ACTIVE',
+        },
+      });
+    });
+  });
+
+  describe('logSessionsRevoked', () => {
+    it('should insert a sessions-revoked event', async () => {
+      await service.logSessionsRevoked(
+        'TENANT_123',
+        'user-123',
+        'EMPLOYMENT_STATUS_CHANGED',
+        'DISABLED',
+      );
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.sessions-revoked',
+        publishStatus: 'pending',
+        sanitizedPayload: {
+          userId: 'user-123',
+          tenantCode: 'TENANT_123',
+          reason: 'EMPLOYMENT_STATUS_CHANGED',
+          newStatus: 'DISABLED',
+        },
+      });
+    });
+  });
+
+  describe('logUserInvited', () => {
+    it('should insert a user-invited event', async () => {
+      await service.logUserInvited('TENANT_123', 'user-123', 'invite-123', 'user@tenant.com');
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.user-invited',
+        publishStatus: 'pending',
+        sanitizedPayload: {
+          userId: 'user-123',
+          tenantCode: 'TENANT_123',
+          invitationId: 'invite-123',
+          email: 'user@tenant.com',
+        },
+      });
+    });
+  });
 });

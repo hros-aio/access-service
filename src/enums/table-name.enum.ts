@@ -4,7 +4,6 @@ export enum TableName {
   EMPLOYEE_REFERENCES = 'employee_references',
   INVITATIONS = 'invitations',
   MFA_METHODS = 'mfa_methods',
-  KAFKA_CONSUMED_EVENTS = 'kafka_consumed_events',
   AUTHENTICATION_SETTINGS = 'authentication_settings',
   TENANTS = 'tenants',
   USERS = 'users',

@@ -1,23 +1,14 @@
-import { Controller, Logger } from '@nestjs/common';
+import { Controller, Logger, UseFilters } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { RequestContext, RequestContextService } from '@new-hros/libs-core';
-import { EventEnvelope } from '@new-hros/libs-events';
+import { EventEnvelope, EventPublishException } from '@new-hros/libs-events';
 
 import { EventType } from '../../enums';
 import { AuthorizationReconciliationWorker } from '../../modules/authorization/services/authorization-reconciliation-worker.service';
-
-export interface AuthorizationSyncRequestedPayload {
-  jobId: string;
-  tenantCode: string;
-  sourceType: string;
-  sourceId: string;
-  sourceVersion: number;
-  triggerType: string;
-  initiatedBy?: string;
-  timestamp?: string;
-}
+import { AuthorizationSyncRequestedPayload } from '../interfaces/authorization-sync-requested.interface';
 
 @Controller()
+@UseFilters(EventPublishException)
 export class AuthorizationConsumer {
   private readonly logger = new Logger(AuthorizationConsumer.name);
 
