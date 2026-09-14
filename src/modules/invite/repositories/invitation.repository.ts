@@ -21,13 +21,14 @@ export class InvitationRepository extends BaseRepository<Invitation> {
   }
 
   async findByTokenHashForUpdateUnscoped(tokenHash: string): Promise<Invitation> {
-    const where = { tokenHash };
-    return this.findOne(where, {
-      where,
-      withTenancy: false,
-      required: true,
-      lock: { mode: 'pessimistic_write' },
-    });
+    return this.findOne(
+      { tokenHash },
+      {
+        withTenancy: false,
+        required: true,
+        lock: { mode: 'pessimistic_write' },
+      },
+    );
   }
 
   async findPreviousByUser(userId: string): Promise<Invitation | null> {

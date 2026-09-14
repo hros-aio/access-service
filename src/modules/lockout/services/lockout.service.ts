@@ -96,9 +96,10 @@ export class LockoutService {
         const lockedUser = await this.userRepository.findByIdWithLock(userId);
 
         if (lockedUser && lockedUser.status !== UserStatus.LOCKED) {
-          lockedUser.status = UserStatus.LOCKED;
-          lockedUser.securityVersion = (lockedUser.securityVersion || 1) + 1;
-          await this.userRepository.save(lockedUser);
+          await this.userRepository.update(lockedUser.id, {
+            status: UserStatus.LOCKED,
+            securityVersion: (lockedUser.securityVersion || 1) + 1,
+          });
           await this.resetFailureCount(tenantCode, userId);
           return true;
         }

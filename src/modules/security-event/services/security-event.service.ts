@@ -216,4 +216,126 @@ export class SecurityEventService {
       publishStatus: 'pending',
     });
   }
+
+  async logInvitationAccepted(
+    tenantCode: string,
+    userId: string,
+    invitationId: string,
+    acceptedAt?: string | Date,
+    supersededBy?: string,
+  ): Promise<void> {
+    const payload: Record<string, unknown> = {
+      userId,
+      tenantCode,
+      invitationId,
+      acceptedAt:
+        acceptedAt instanceof Date
+          ? acceptedAt.toISOString()
+          : (acceptedAt ?? new Date().toISOString()),
+    };
+
+    if (supersededBy) {
+      payload.supersededBy = supersededBy;
+    }
+
+    await this.outboxRepository.create({
+      tenantCode,
+      userId,
+      eventType: EventType.AUTHENTICATION_INVITATION_ACCEPTED,
+      sanitizedPayload: payload,
+      publishStatus: 'pending',
+    });
+  }
+
+  async logInvitationResent(
+    tenantCode: string,
+    userId: string,
+    invitationId: string,
+    recipientEmail: string,
+    expiresAt: string | Date,
+    resentByActorId: string,
+  ): Promise<void> {
+    const payload = {
+      invitationId,
+      recipientEmail,
+      expiresAt: expiresAt instanceof Date ? expiresAt.toISOString() : expiresAt,
+      resentByActorId,
+    };
+
+    await this.outboxRepository.create({
+      tenantCode,
+      userId,
+      eventType: EventType.AUTHENTICATION_INVITATION_RESENT,
+      sanitizedPayload: payload,
+      publishStatus: 'pending',
+    });
+  }
+
+  async logPasswordResetRequested(
+    tenantCode: string,
+    userId: string,
+    deliveryEmail: string,
+    challengeId: string,
+    initiatedByAdmin = false,
+  ): Promise<void> {
+    const payload = {
+      tenantCode,
+      userId,
+      deliveryEmail,
+      challengeId,
+      initiatedByAdmin,
+    };
+
+    await this.outboxRepository.create({
+      tenantCode,
+      userId,
+      eventType: EventType.AUTHENTICATION_PASSWORD_RESET_REQUESTED,
+      sanitizedPayload: payload,
+      publishStatus: 'pending',
+    });
+  }
+
+  async logPasswordResetCompleted(
+    tenantCode: string,
+    userId: string,
+    resetMethod = 'self_service',
+  ): Promise<void> {
+    const payload = {
+      tenantCode,
+      userId,
+      resetMethod,
+    };
+
+    await this.outboxRepository.create({
+      tenantCode,
+      userId,
+      eventType: EventType.AUTHENTICATION_PASSWORD_RESET_COMPLETED,
+      sanitizedPayload: payload,
+      publishStatus: 'pending',
+    });
+  }
+
+  async logPasswordChanged(
+    tenantCode: string,
+    userId: string,
+    changeReason: string,
+    actor?: { userId: string; type: string },
+  ): Promise<void> {
+    const payload = {
+      userId,
+      changeReason,
+      actor: actor ?? {
+        userId,
+        type: 'USER',
+      },
+    };
+
+    await this.outboxRepository.create({
+      tenantCode,
+      userId,
+      eventType: EventType.AUTHENTICATION_PASSWORD_CHANGED,
+      sanitizedPayload: payload,
+      publishStatus: 'pending',
+    });
+  }
 }
