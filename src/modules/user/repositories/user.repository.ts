@@ -64,10 +64,6 @@ export class UserRepository extends BaseRepository<User> {
     });
   }
 
-  async save(user: User): Promise<User> {
-    return this.repository.save(user);
-  }
-
   /**
    * Atomically increments security_version for target user in tenant context.
    */

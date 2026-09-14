@@ -8,10 +8,11 @@ import { InvitationRepository } from './repositories/invitation.repository';
 import { CryptoAdapter } from './services/crypto.adapter';
 import { InvitationApplicationService } from './services/invitation.application.service';
 import { AuthModule } from '../auth/auth.module';
+import { SecurityEventModule } from '../security-event/security-event.module';
 import { UserModule } from '../user/user.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Invitation]), AuthModule, UserModule],
+  imports: [TypeOrmModule.forFeature([Invitation]), AuthModule, UserModule, SecurityEventModule],
   controllers: [InvitationController, AdminInvitationController],
   providers: [InvitationRepository, InvitationApplicationService, CryptoAdapter],
   exports: [InvitationRepository, InvitationApplicationService, CryptoAdapter],

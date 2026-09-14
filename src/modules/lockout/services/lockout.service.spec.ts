@@ -38,12 +38,12 @@ describe('LockoutService', () => {
       findOneWithOptions: jest
         .fn()
         .mockImplementation((opts) => mockTypeormRepository.findOne(opts)),
-      save: jest.fn().mockImplementation((u) => mockTypeormRepository.save(u)),
+      update: jest.fn().mockImplementation((id, data) => mockTypeormRepository.update(id, data)),
     };
 
     mockTypeormRepository = {
       findOne: jest.fn(),
-      save: jest.fn(),
+      update: jest.fn(),
     };
 
     mockEntityManager = {
@@ -163,9 +163,10 @@ describe('LockoutService', () => {
 
       const result = await service.handleFailure('TENANT_123', 'user-123', settings);
       expect(result).toBe(true);
-      expect(mockUser.status).toBe(UserStatus.LOCKED);
-      expect(mockUser.securityVersion).toBe(2);
-      expect(mockTypeormRepository.save).toHaveBeenCalledWith(mockUser);
+      expect(mockUserRepository.update).toHaveBeenCalledWith('user-123', {
+        status: UserStatus.LOCKED,
+        securityVersion: 2,
+      });
     });
   });
 });

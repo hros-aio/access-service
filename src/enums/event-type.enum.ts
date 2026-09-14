@@ -12,6 +12,8 @@ export enum EventType {
   AUTHENTICATION_INVITATION_ACCEPTED = 'authentication.invitation-accepted',
   AUTHENTICATION_INVITATION_RESENT = 'authentication.invitation-resent',
   AUTHENTICATION_PASSWORD_CHANGED = 'authentication.password-changed',
+  AUTHENTICATION_PASSWORD_RESET_REQUESTED = 'authentication.password-reset-requested',
+  AUTHENTICATION_PASSWORD_RESET_COMPLETED = 'authentication.password-reset-completed',
   AUTHORIZATION_ROLE_UPDATED = 'authorization.role-updated',
   ROLE_CREATED = 'role.created',
   ROLE_COPIED = 'role.copied',

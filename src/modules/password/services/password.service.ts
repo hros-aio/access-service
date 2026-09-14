@@ -5,13 +5,12 @@ import { RedisCacheProvider, RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 import { In } from 'typeorm';
 
-import { CredentialPolicy } from './credential.policy';
-import { CredentialStatus, EventType, InvitationStatus, UserStatus } from '../../../enums';
+import { CredentialStatus, InvitationStatus, UserStatus } from '../../../enums';
 import { CredentialRepository } from '../../auth/repositories/credential.repository';
 import { CredentialDomainService } from '../../auth/services/credential.domain.service';
 import { SessionApplicationService } from '../../auth/services/session.application.service';
 import { InvitationRepository } from '../../invite/repositories/invitation.repository';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { SecurityEventService } from '../../security-event/services/security-event.service';
 import { AuthenticationSettingsRepository } from '../../tenant/repositories/authentication-settings.repository';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { PasswordResetRedisAdapter } from '../adapters/password-reset-redis.adapter';
@@ -33,11 +32,10 @@ export class PasswordService {
   constructor(
     private readonly userRepository: UserRepository,
     private readonly credentialRepository: CredentialRepository,
-    private readonly authSecurityEventOutboxRepository: AuthSecurityEventOutboxRepository,
+    private readonly securityEventService: SecurityEventService,
     private readonly authenticationSettingsRepository: AuthenticationSettingsRepository,
     private readonly transactionService: TransactionService,
     private readonly credentialDomainService: CredentialDomainService,
-    private readonly credentialPolicy: CredentialPolicy,
     private readonly redisCacheProvider: RedisCacheProvider,
     private readonly sessionApplicationService: SessionApplicationService,
     private readonly invitationRepository: InvitationRepository,
@@ -86,19 +84,13 @@ export class PasswordService {
     });
 
     await this.transactionService.runInTransaction(async () => {
-      const event = new AuthSecurityEventOutbox();
-      event.tenantCode = dto.tenantCode;
-      event.userId = user.id;
-      event.eventType = 'authentication.password-reset-requested' as EventType;
-      event.sanitizedPayload = {
-        tenantCode: dto.tenantCode,
-        userId: user.id,
-        deliveryEmail: user.displayEmail,
+      await this.securityEventService.logPasswordResetRequested(
+        dto.tenantCode,
+        user.id,
+        user.displayEmail,
         challengeId,
-        initiatedByAdmin: false,
-      };
-      event.publishStatus = 'pending';
-      await this.authSecurityEventOutboxRepository.save(event);
+        false,
+      );
     });
 
     return { message: 'If an active account exists, recovery instructions have been sent.' };
@@ -190,20 +182,13 @@ export class PasswordService {
         passwordChangedAt: new Date(),
       });
 
-      user.securityVersion += 1;
-      await this.userRepository.save(user);
+      await this.userRepository.update(user.id, { securityVersion: user.securityVersion++ });
 
-      const event = new AuthSecurityEventOutbox();
-      event.tenantCode = dto.tenantCode;
-      event.userId = user.id;
-      event.eventType = 'authentication.password-reset-completed' as EventType;
-      event.sanitizedPayload = {
-        tenantCode: dto.tenantCode,
-        userId: user.id,
-        resetMethod: 'self_service',
-      };
-      event.publishStatus = 'pending';
-      await this.authSecurityEventOutboxRepository.save(event);
+      await this.securityEventService.logPasswordResetCompleted(
+        dto.tenantCode,
+        user.id,
+        'self_service',
+      );
     });
 
     try {
@@ -243,19 +228,13 @@ export class PasswordService {
     });
 
     await this.transactionService.runInTransaction(async () => {
-      const event = new AuthSecurityEventOutbox();
-      event.tenantCode = tenantCode;
-      event.userId = user.id;
-      event.eventType = 'authentication.password-reset-requested' as EventType;
-      event.sanitizedPayload = {
+      await this.securityEventService.logPasswordResetRequested(
         tenantCode,
-        userId: user.id,
-        deliveryEmail: user.displayEmail,
+        user.id,
+        user.displayEmail,
         challengeId,
-        initiatedByAdmin: true,
-      };
-      event.publishStatus = 'pending';
-      await this.authSecurityEventOutboxRepository.save(event);
+        true,
+      );
     });
 
     return { message: 'Password reset workflow initiated for user.' };
@@ -308,34 +287,25 @@ export class PasswordService {
         status: In([InvitationStatus.PENDING, InvitationStatus.SENT]),
       });
       if (pendingInvite) {
-        const invitationAcceptedEvent = new AuthSecurityEventOutbox();
-        invitationAcceptedEvent.tenantCode = tenantCode;
-        invitationAcceptedEvent.userId = user.id;
-        invitationAcceptedEvent.eventType = EventType.AUTHENTICATION_INVITATION_ACCEPTED;
-        invitationAcceptedEvent.sanitizedPayload = {
-          userId: user.id,
-          invitationId: pendingInvite.id,
-          supersededBy: 'SSO_SETUP',
-        };
-        invitationAcceptedEvent.publishStatus = 'pending';
-        await this.authSecurityEventOutboxRepository.save(invitationAcceptedEvent);
+        await this.securityEventService.logInvitationAccepted(
+          tenantCode,
+          user.id,
+          pendingInvite.id,
+          undefined,
+          'SSO_SETUP',
+        );
       }
       await this.invitationRepository.cancelPendingInvitations(user.id);
 
-      const passwordChangedEvent = new AuthSecurityEventOutbox();
-      passwordChangedEvent.tenantCode = tenantCode;
-      passwordChangedEvent.userId = user.id;
-      passwordChangedEvent.eventType = EventType.AUTHENTICATION_PASSWORD_CHANGED;
-      passwordChangedEvent.sanitizedPayload = {
-        userId: user.id,
-        changeReason: 'SSO_FALLBACK_FIRST_TIME_SETUP',
-        actor: {
+      await this.securityEventService.logPasswordChanged(
+        tenantCode,
+        user.id,
+        'SSO_FALLBACK_FIRST_TIME_SETUP',
+        {
           userId: user.id,
           type: 'USER',
         },
-      };
-      passwordChangedEvent.publishStatus = 'pending';
-      await this.authSecurityEventOutboxRepository.save(passwordChangedEvent);
+      );
     });
 
     try {

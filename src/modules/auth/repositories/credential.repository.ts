@@ -12,11 +12,13 @@ export class CredentialRepository extends BaseRepository<Credential> {
   }
 
   async findActiveByUserForUpdateUnscope(userId: string): Promise<Credential | null> {
-    const where = {
-      userId,
-      status: CredentialStatus.ACTIVE,
-    };
-    return this.findOne(where, { where, withTenancy: false, lock: { mode: 'pessimistic_write' } });
+    return this.findOne(
+      {
+        userId,
+        status: CredentialStatus.ACTIVE,
+      },
+      { withTenancy: false, lock: { mode: 'pessimistic_write' } },
+    );
   }
 
   async findActiveByUseUnscope(userId: string): Promise<Credential | null> {

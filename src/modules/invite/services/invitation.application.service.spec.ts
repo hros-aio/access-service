@@ -9,7 +9,7 @@ import { CredentialStatus, InvitationStatus, UserStatus } from '../../../enums';
 import { Credential } from '../../auth/entities/credential.entity';
 import { CredentialRepository } from '../../auth/repositories/credential.repository';
 import { CredentialDomainService } from '../../auth/services/credential.domain.service';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { SecurityEventService } from '../../security-event/services/security-event.service';
 import { User } from '../../user/entities/user.entity';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { Invitation } from '../entities/invitation.entity';
@@ -26,7 +26,7 @@ describe('InvitationApplicationService', () => {
   let mockUserRepository: any;
   let mockInvitationRepository: any;
   let mockCredentialRepository: any;
-  let mockAuthSecurityEventOutboxRepository: any;
+  let mockSecurityEventService: any;
   let mockCryptoAdapter: any;
   let mockCredentialDomainService: any;
   let mockRedisCacheProvider: any;
@@ -35,7 +35,6 @@ describe('InvitationApplicationService', () => {
   let mockTypeormUserRepository: any;
   let mockTypeormInvitationRepository: any;
   let mockTypeormCredentialRepository: any;
-  let mockTypeormOutboxRepository: any;
   let mockEntityManager: any;
 
   beforeEach(async () => {
@@ -54,16 +53,11 @@ describe('InvitationApplicationService', () => {
       save: jest.fn().mockImplementation((c) => c),
     };
 
-    mockTypeormOutboxRepository = {
-      save: jest.fn().mockImplementation((o) => o),
-    };
-
     mockEntityManager = {
       getRepository: jest.fn().mockImplementation((entity) => {
         if (entity === User) return mockTypeormUserRepository;
         if (entity === Invitation) return mockTypeormInvitationRepository;
         if (entity === Credential) return mockTypeormCredentialRepository;
-        if (entity === AuthSecurityEventOutbox) return mockTypeormOutboxRepository;
         return null;
       }),
     };
@@ -140,8 +134,9 @@ describe('InvitationApplicationService', () => {
       update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
-    mockAuthSecurityEventOutboxRepository = {
-      save: jest.fn().mockImplementation((o) => mockTypeormOutboxRepository.save(o)),
+    mockSecurityEventService = {
+      logInvitationAccepted: jest.fn().mockResolvedValue(undefined),
+      logInvitationResent: jest.fn().mockResolvedValue(undefined),
     };
 
     mockCryptoAdapter = {
@@ -174,8 +169,8 @@ describe('InvitationApplicationService', () => {
         { provide: InvitationRepository, useValue: mockInvitationRepository },
         { provide: CredentialRepository, useValue: mockCredentialRepository },
         {
-          provide: AuthSecurityEventOutboxRepository,
-          useValue: mockAuthSecurityEventOutboxRepository,
+          provide: SecurityEventService,
+          useValue: mockSecurityEventService,
         },
         { provide: TransactionService, useValue: mockTransactionService },
         { provide: CryptoAdapter, useValue: mockCryptoAdapter },
@@ -286,7 +281,12 @@ describe('InvitationApplicationService', () => {
         expect.objectContaining({ status: UserStatus.ACTIVE }),
       );
       expect(mockCredentialRepository.create).toHaveBeenCalled();
-      expect(mockAuthSecurityEventOutboxRepository.save).toHaveBeenCalled();
+      expect(mockSecurityEventService.logInvitationAccepted).toHaveBeenCalledWith(
+        'tenant-123',
+        'user-uuid',
+        'invite-uuid',
+        expect.any(Date),
+      );
       expect(mockRedisClient.smembers).toHaveBeenCalled();
     });
 
@@ -418,7 +418,14 @@ describe('InvitationApplicationService', () => {
       expect(result.success).toBe(true);
       expect(result.rawToken).toBe('raw-token');
       expect(mockInvitationRepository.create).toHaveBeenCalled();
-      expect(mockAuthSecurityEventOutboxRepository.save).toHaveBeenCalled();
+      expect(mockSecurityEventService.logInvitationResent).toHaveBeenCalledWith(
+        'tenant-123',
+        'target-user-uuid',
+        'saved-invite-id',
+        'employee@tenant.com',
+        expect.any(Date),
+        'admin-uuid',
+      );
     });
 
     it('should throw InvitationNotAllowedError if active credential already exists', async () => {

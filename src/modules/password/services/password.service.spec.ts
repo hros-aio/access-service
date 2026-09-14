@@ -12,7 +12,7 @@ import { CredentialDomainService } from '../../auth/services/credential.domain.s
 import { SessionApplicationService } from '../../auth/services/session.application.service';
 import { Invitation } from '../../invite/entities/invitation.entity';
 import { InvitationRepository } from '../../invite/repositories/invitation.repository';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { SecurityEventService } from '../../security-event/services/security-event.service';
 import { AuthenticationSettings } from '../../tenant/entities/authentication-settings.entity';
 import { AuthenticationSettingsRepository } from '../../tenant/repositories/authentication-settings.repository';
 import { User } from '../../user/entities/user.entity';
@@ -30,7 +30,7 @@ describe('PasswordService', () => {
   let mockTransactionService: any;
   let mockUserRepository: any;
   let mockCredentialRepository: any;
-  let mockAuthSecurityEventOutboxRepository: any;
+  let mockSecurityEventService: any;
   let mockAuthenticationSettingsRepository: any;
   let mockCredentialDomainService: any;
   let mockRedisCacheProvider: any;
@@ -42,7 +42,6 @@ describe('PasswordService', () => {
   let mockTypeormUserRepository: any;
   let mockTypeormCredentialRepository: any;
   let mockTypeormInvitationRepository: any;
-  let mockTypeormOutboxRepository: any;
   let mockTypeormSettingsRepository: any;
   let mockEntityManager: any;
 
@@ -62,10 +61,6 @@ describe('PasswordService', () => {
       save: jest.fn().mockImplementation((i) => i),
     };
 
-    mockTypeormOutboxRepository = {
-      save: jest.fn().mockImplementation((o) => o),
-    };
-
     mockTypeormSettingsRepository = {
       findOne: jest.fn().mockResolvedValue(null),
     };
@@ -75,7 +70,6 @@ describe('PasswordService', () => {
         if (entity === User) return mockTypeormUserRepository;
         if (entity === Credential) return mockTypeormCredentialRepository;
         if (entity === Invitation) return mockTypeormInvitationRepository;
-        if (entity === AuthSecurityEventOutbox) return mockTypeormOutboxRepository;
         if (entity === AuthenticationSettings) return mockTypeormSettingsRepository;
         return null;
       }),
@@ -93,6 +87,9 @@ describe('PasswordService', () => {
       findOneWithOptions: jest
         .fn()
         .mockImplementation((opts) => mockTypeormUserRepository.findOne(opts)),
+      findById: jest.fn(),
+      findByIdForUpdateUnscoped: jest.fn(),
+      update: jest.fn().mockResolvedValue(undefined),
       save: jest.fn().mockImplementation((u) => mockTypeormUserRepository.save(u)),
     };
 
@@ -100,11 +97,17 @@ describe('PasswordService', () => {
       findOne: jest
         .fn()
         .mockImplementation((opts) => mockTypeormCredentialRepository.findOne(opts)),
+      findActiveByUserForUpdateUnscope: jest.fn(),
+      create: jest.fn().mockImplementation((c) => mockTypeormCredentialRepository.save(c)),
+      update: jest.fn().mockResolvedValue(undefined),
       save: jest.fn().mockImplementation((c) => mockTypeormCredentialRepository.save(c)),
     };
 
-    mockAuthSecurityEventOutboxRepository = {
-      save: jest.fn().mockImplementation((o) => mockTypeormOutboxRepository.save(o)),
+    mockSecurityEventService = {
+      logPasswordResetRequested: jest.fn().mockResolvedValue(undefined),
+      logPasswordResetCompleted: jest.fn().mockResolvedValue(undefined),
+      logPasswordChanged: jest.fn().mockResolvedValue(undefined),
+      logInvitationAccepted: jest.fn().mockResolvedValue(undefined),
     };
 
     mockAuthenticationSettingsRepository = {
@@ -116,7 +119,9 @@ describe('PasswordService', () => {
     };
 
     mockCredentialDomainService = {
-      hashPassword: jest.fn().mockResolvedValue('hashed-password-123'),
+      hashPassword: jest
+        .fn()
+        .mockResolvedValue({ hash: 'hashed-password-123', algorithm: 'argon2id' }),
     };
 
     mockRedisClient = {
@@ -125,6 +130,7 @@ describe('PasswordService', () => {
 
     mockRedisCacheProvider = {
       client: mockRedisClient,
+      getClient: jest.fn().mockReturnValue(mockRedisClient),
     };
 
     mockSessionApplicationService = {
@@ -153,8 +159,8 @@ describe('PasswordService', () => {
         { provide: UserRepository, useValue: mockUserRepository },
         { provide: CredentialRepository, useValue: mockCredentialRepository },
         {
-          provide: AuthSecurityEventOutboxRepository,
-          useValue: mockAuthSecurityEventOutboxRepository,
+          provide: SecurityEventService,
+          useValue: mockSecurityEventService,
         },
         {
           provide: AuthenticationSettingsRepository,
@@ -212,7 +218,13 @@ describe('PasswordService', () => {
       });
       expect(res.message).toContain('If an active account exists');
       expect(mockPasswordResetRedisAdapter.saveChallenge).toHaveBeenCalled();
-      expect(mockTypeormOutboxRepository.save).toHaveBeenCalled();
+      expect(mockSecurityEventService.logPasswordResetRequested).toHaveBeenCalledWith(
+        'tenant-1',
+        'user-uuid',
+        'user@example.com',
+        expect.any(String),
+        false,
+      );
     });
   });
 
@@ -261,6 +273,44 @@ describe('PasswordService', () => {
     });
   });
 
+  describe('confirmPasswordReset', () => {
+    it('should successfully confirm password reset and log event', async () => {
+      mockPasswordResetRedisAdapter.getChallenge.mockResolvedValue({
+        codeVerified: true,
+        resetToken: 'valid-token',
+      });
+      const user = new User();
+      user.id = 'u-1';
+      user.securityVersion = 1;
+      mockUserRepository.findByIdForUpdateUnscoped.mockResolvedValue(user);
+      mockCredentialRepository.findActiveByUserForUpdateUnscope.mockResolvedValue(null);
+
+      const res = await service.confirmPasswordReset({
+        challengeId: 'ch-1',
+        tenantCode: 'tenant-1',
+        userId: 'u-1',
+        resetToken: 'valid-token',
+        newPassword: 'NewPassword123!',
+      });
+
+      expect(res.success).toBe(true);
+      expect(mockSecurityEventService.logPasswordResetCompleted).toHaveBeenCalledWith(
+        'tenant-1',
+        'u-1',
+        'self_service',
+      );
+      expect(mockSessionApplicationService.revokeAllSessions).toHaveBeenCalledWith(
+        'tenant-1',
+        'u-1',
+      );
+      expect(mockPasswordResetRedisAdapter.deleteChallenge).toHaveBeenCalledWith(
+        'ch-1',
+        'tenant-1',
+        'u-1',
+      );
+    });
+  });
+
   describe('adminInitiateReset', () => {
     it('should initiate reset workflow for target user', async () => {
       jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue('tenant-1');
@@ -276,7 +326,47 @@ describe('PasswordService', () => {
       const res = await service.adminInitiateReset('user-target');
       expect(res.message).toContain('Password reset workflow initiated');
       expect(mockPasswordResetRedisAdapter.saveChallenge).toHaveBeenCalled();
-      expect(mockTypeormOutboxRepository.save).toHaveBeenCalled();
+      expect(mockSecurityEventService.logPasswordResetRequested).toHaveBeenCalledWith(
+        'tenant-1',
+        'user-target',
+        'target@example.com',
+        expect.any(String),
+        true,
+      );
+    });
+  });
+
+  describe('setupPasswordViaSsoFallback', () => {
+    it('should setup password and log events', async () => {
+      jest.spyOn(RequestContextService, 'getTenantCode').mockReturnValue('tenant-1');
+      const user = new User();
+      user.id = 'u-sso';
+      user.securityVersion = 1;
+      mockUserRepository.findById.mockResolvedValue(user);
+      mockCredentialRepository.findOne.mockResolvedValue(null);
+      mockInvitationRepository.findOne.mockResolvedValue({ id: 'inv-1' });
+
+      const res = await service.setupPasswordViaSsoFallback('flow-123', 'u-sso', {
+        password: 'Password123!',
+      });
+
+      expect(res.mfaRequired).toBe(false);
+      expect(mockSecurityEventService.logInvitationAccepted).toHaveBeenCalledWith(
+        'tenant-1',
+        'u-sso',
+        'inv-1',
+        undefined,
+        'SSO_SETUP',
+      );
+      expect(mockSecurityEventService.logPasswordChanged).toHaveBeenCalledWith(
+        'tenant-1',
+        'u-sso',
+        'SSO_FALLBACK_FIRST_TIME_SETUP',
+        {
+          userId: 'u-sso',
+          type: 'USER',
+        },
+      );
     });
   });
 });

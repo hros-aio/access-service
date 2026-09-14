@@ -22,6 +22,23 @@ export class EmployeeAttributePropagationService {
     private readonly reconciler: MembershipReconciler,
   ) {}
 
+  async handleEmployeeCreated(payload: UpsertEmployeeProjectionInput): Promise<void> {
+    await this.employeeRepo.create({
+      id: payload.id,
+      tenantCode: payload.tenantCode,
+      employeeCode: payload.employeeCode,
+      companyId: payload.companyId ?? undefined,
+      locationId: payload.locationId ?? undefined,
+      departmentId: payload.departmentId ?? undefined,
+      gradeId: payload.gradeId ?? undefined,
+      jobTitleId: payload.jobTitleId ?? undefined,
+      employmentStatus: EmployeeStatus.ACTIVE,
+      status: EmployeeStatus.ACTIVE,
+      managerId: payload.managerEmployeeId ?? undefined,
+      sourceVersion: payload.sourceVersion.toString(),
+    });
+  }
+
   async handleEmployeeUpsert(data: UpsertEmployeeProjectionInput): Promise<void> {
     const employee = await this.employeeRepo.findById(data.id);
     if (!employee) {

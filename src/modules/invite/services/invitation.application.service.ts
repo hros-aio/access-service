@@ -3,10 +3,10 @@ import { CACHE_KEY_BUILDER, RedisCacheProvider, RequestContextService } from '@n
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { CryptoAdapter } from './crypto.adapter';
-import { CredentialStatus, EventType, InvitationStatus, UserStatus } from '../../../enums';
+import { CredentialStatus, InvitationStatus, UserStatus } from '../../../enums';
 import { CredentialRepository } from '../../auth/repositories/credential.repository';
 import { CredentialDomainService } from '../../auth/services/credential.domain.service';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { SecurityEventService } from '../../security-event/services/security-event.service';
 import { UserRepository } from '../../user/repositories/user.repository';
 import { AcceptInvitationDto } from '../dto/invitation.dto';
 import {
@@ -22,7 +22,7 @@ export class InvitationApplicationService {
     private readonly userRepository: UserRepository,
     private readonly invitationRepository: InvitationRepository,
     private readonly credentialRepository: CredentialRepository,
-    private readonly authSecurityEventOutboxRepository: AuthSecurityEventOutboxRepository,
+    private readonly securityEventService: SecurityEventService,
     private readonly transactionService: TransactionService,
     private readonly cryptoAdapter: CryptoAdapter,
     private readonly credentialDomainService: CredentialDomainService,
@@ -81,9 +81,10 @@ export class InvitationApplicationService {
         });
       }
 
+      const acceptedAt = new Date();
       await this.invitationRepository.update(invitation.id, {
         status: InvitationStatus.ACCEPTED,
-        acceptedAt: new Date(),
+        acceptedAt,
       });
 
       await this.userRepository.update(user.id, {
@@ -92,18 +93,12 @@ export class InvitationApplicationService {
         securityVersion: user.securityVersion++,
       });
 
-      const outbox = new AuthSecurityEventOutbox();
-      outbox.tenantCode = user.tenantCode;
-      outbox.userId = user.id;
-      outbox.eventType = EventType.AUTHENTICATION_INVITATION_ACCEPTED;
-      outbox.sanitizedPayload = {
-        userId: user.id,
-        tenantCode: user.tenantCode,
-        invitationId: invitation.id,
-        acceptedAt: invitation.acceptedAt?.toISOString(),
-      };
-      outbox.publishStatus = 'pending';
-      await this.authSecurityEventOutboxRepository.save(outbox);
+      await this.securityEventService.logInvitationAccepted(
+        user.tenantCode,
+        user.id,
+        invitation.id,
+        acceptedAt,
+      );
 
       await this.revokeSessionsAndChallenges(user.tenantCode, user.id);
 
@@ -144,18 +139,14 @@ export class InvitationApplicationService {
         sentAt: new Date(),
       });
 
-      const outbox = new AuthSecurityEventOutbox();
-      outbox.tenantCode = user.tenantCode;
-      outbox.userId = user.id;
-      outbox.eventType = EventType.AUTHENTICATION_INVITATION_RESENT;
-      outbox.sanitizedPayload = {
-        invitationId: savedInvite.id,
-        recipientEmail: user.displayEmail,
-        expiresAt: savedInvite.expiresAt.toISOString(),
-        resentByActorId: currentUserId,
-      };
-      outbox.publishStatus = 'pending';
-      await this.authSecurityEventOutboxRepository.save(outbox);
+      await this.securityEventService.logInvitationResent(
+        user.tenantCode,
+        user.id,
+        savedInvite.id,
+        user.displayEmail,
+        savedInvite.expiresAt,
+        currentUserId,
+      );
 
       return {
         success: true,

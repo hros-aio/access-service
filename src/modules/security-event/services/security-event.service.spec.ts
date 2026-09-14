@@ -226,4 +226,159 @@ describe('SecurityEventService', () => {
       });
     });
   });
+
+  describe('logInvitationAccepted', () => {
+    it('should insert an invitation-accepted event', async () => {
+      const acceptedAt = new Date('2026-09-13T12:00:00.000Z');
+      await service.logInvitationAccepted(
+        'TENANT_123',
+        'user-123',
+        'invite-123',
+        acceptedAt.toISOString(),
+      );
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.invitation-accepted',
+        publishStatus: 'pending',
+        sanitizedPayload: {
+          userId: 'user-123',
+          tenantCode: 'TENANT_123',
+          invitationId: 'invite-123',
+          acceptedAt: acceptedAt.toISOString(),
+        },
+      });
+    });
+
+    it('should include supersededBy when provided', async () => {
+      await service.logInvitationAccepted(
+        'TENANT_123',
+        'user-123',
+        'invite-123',
+        undefined,
+        'SSO_SETUP',
+      );
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.invitation-accepted',
+        publishStatus: 'pending',
+        sanitizedPayload: expect.objectContaining({
+          userId: 'user-123',
+          tenantCode: 'TENANT_123',
+          invitationId: 'invite-123',
+          supersededBy: 'SSO_SETUP',
+        }),
+      });
+    });
+  });
+
+  describe('logInvitationResent', () => {
+    it('should insert an invitation-resent event', async () => {
+      const expiresAt = new Date('2026-09-14T12:00:00.000Z');
+      await service.logInvitationResent(
+        'TENANT_123',
+        'user-123',
+        'invite-123',
+        'user@tenant.com',
+        expiresAt,
+        'actor-123',
+      );
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.invitation-resent',
+        publishStatus: 'pending',
+        sanitizedPayload: {
+          invitationId: 'invite-123',
+          recipientEmail: 'user@tenant.com',
+          expiresAt: expiresAt.toISOString(),
+          resentByActorId: 'actor-123',
+        },
+      });
+    });
+  });
+
+  describe('logPasswordResetRequested', () => {
+    it('should insert a password-reset-requested event', async () => {
+      await service.logPasswordResetRequested(
+        'TENANT_123',
+        'user-123',
+        'user@example.com',
+        'ch-123',
+        false,
+      );
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.password-reset-requested',
+        publishStatus: 'pending',
+        sanitizedPayload: {
+          tenantCode: 'TENANT_123',
+          userId: 'user-123',
+          deliveryEmail: 'user@example.com',
+          challengeId: 'ch-123',
+          initiatedByAdmin: false,
+        },
+      });
+    });
+  });
+
+  describe('logPasswordResetCompleted', () => {
+    it('should insert a password-reset-completed event', async () => {
+      await service.logPasswordResetCompleted('TENANT_123', 'user-123', 'self_service');
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.password-reset-completed',
+        publishStatus: 'pending',
+        sanitizedPayload: {
+          tenantCode: 'TENANT_123',
+          userId: 'user-123',
+          resetMethod: 'self_service',
+        },
+      });
+    });
+  });
+
+  describe('logPasswordChanged', () => {
+    it('should insert a password-changed event with default actor', async () => {
+      await service.logPasswordChanged('TENANT_123', 'user-123', 'SSO_FALLBACK_FIRST_TIME_SETUP');
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.password-changed',
+        publishStatus: 'pending',
+        sanitizedPayload: {
+          userId: 'user-123',
+          changeReason: 'SSO_FALLBACK_FIRST_TIME_SETUP',
+          actor: {
+            userId: 'user-123',
+            type: 'USER',
+          },
+        },
+      });
+    });
+
+    it('should insert a password-changed event with custom actor', async () => {
+      await service.logPasswordChanged('TENANT_123', 'user-123', 'ADMIN_RESET', {
+        userId: 'admin-1',
+        type: 'ADMIN',
+      });
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.password-changed',
+        publishStatus: 'pending',
+        sanitizedPayload: {
+          userId: 'user-123',
+          changeReason: 'ADMIN_RESET',
+          actor: {
+            userId: 'admin-1',
+            type: 'ADMIN',
+          },
+        },
+      });
+    });
+  });
 });
