@@ -1,8 +1,10 @@
 import { BaseEntity } from '@new-hros/libs-sql';
 import { Column, Entity, Unique } from 'typeorm';
 
-@Entity('employee_references')
-@Unique('uq_employee_references_tenant_employee_code', ['tenant_code', 'employee_code'])
+import { TableName } from '@/enums';
+
+@Entity(TableName.EMPLOYEE_REFERENCES)
+@Unique('uq_employee_references_tenant_employee_code', ['tenantCode', 'employeeCode'])
 export class EmployeeReference extends BaseEntity {
   @Column({ name: 'employee_code', type: 'varchar', length: 100 })
   employeeCode: string;

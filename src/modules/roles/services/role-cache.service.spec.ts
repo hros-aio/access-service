@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CACHE_PROVIDER_TOKEN } from '@new-hros/libs-core';
+import { CacheService } from '@new-hros/libs-core';
 
 import { RoleCacheService } from './role-cache.service';
 import { Role } from '../entities/role.entity';
@@ -23,7 +23,7 @@ describe('RoleCacheService', () => {
       providers: [
         RoleCacheService,
         {
-          provide: CACHE_PROVIDER_TOKEN,
+          provide: CacheService,
           useValue: mockCacheService,
         },
       ],

@@ -1,10 +1,11 @@
-import { EmployeeLifecycleConsumer } from './employee-lifecycle.consumer';
-import { EventType } from '../../enums';
-import { ProvisioningApplicationService } from '../../modules/provisioning/services/provisioning.application.service';
-import { EmployeeAttributePropagationService } from '../../modules/user-groups/services/employee-attribute-propagation.service';
+import { EmployeeLifecycleHandler } from './employee-lifecycle.handler';
+
+import { EventType } from '@/enums';
+import { ProvisioningApplicationService } from '@/modules/provisioning/services/provisioning.application.service';
+import { EmployeeAttributePropagationService } from '@/modules/user-groups/services/employee-attribute-propagation.service';
 
 describe('EmployeeLifecycleConsumer', () => {
-  let consumer: EmployeeLifecycleConsumer;
+  let consumer: EmployeeLifecycleHandler;
   let mockProvisioningService: jest.Mocked<ProvisioningApplicationService>;
   let mockPropagationService: jest.Mocked<EmployeeAttributePropagationService>;
 
@@ -17,7 +18,7 @@ describe('EmployeeLifecycleConsumer', () => {
       handleEmployeeUpsert: jest.fn(),
     } as unknown as jest.Mocked<EmployeeAttributePropagationService>;
 
-    consumer = new EmployeeLifecycleConsumer(mockProvisioningService, mockPropagationService);
+    consumer = new EmployeeLifecycleHandler(mockProvisioningService, mockPropagationService);
   });
 
   it('handles terminated event by delegating to provisioning service', async () => {

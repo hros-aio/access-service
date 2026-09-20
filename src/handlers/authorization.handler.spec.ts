@@ -1,12 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RequestContextService } from '@new-hros/libs-core';
 
-import { AuthorizationConsumer } from './authorization.consumer';
-import { EventType } from '../../enums';
-import { AuthorizationReconciliationWorker } from '../../modules/authorization/services/authorization-reconciliation-worker.service';
+import { AuthorizationHandler } from './authorization.handler';
+
+import { EventType } from '@/enums';
+import { AuthorizationReconciliationWorker } from '@/modules/authorization';
 
 describe('AuthorizationConsumer', () => {
-  let consumer: AuthorizationConsumer;
+  let consumer: AuthorizationHandler;
   let mockReconciliationWorker: { processNextJob: jest.Mock };
 
   beforeEach(async () => {
@@ -15,7 +16,7 @@ describe('AuthorizationConsumer', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [AuthorizationConsumer],
+      controllers: [AuthorizationHandler],
       providers: [
         {
           provide: AuthorizationReconciliationWorker,
@@ -24,7 +25,7 @@ describe('AuthorizationConsumer', () => {
       ],
     }).compile();
 
-    consumer = module.get<AuthorizationConsumer>(AuthorizationConsumer);
+    consumer = module.get<AuthorizationHandler>(AuthorizationHandler);
   });
 
   afterEach(() => {

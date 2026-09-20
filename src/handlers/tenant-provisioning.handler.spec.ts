@@ -1,12 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RequestContextService } from '@new-hros/libs-core';
 
-import { TenantProvisioningConsumer } from './tenant-provisioning.consumer';
-import { EventType } from '../../enums';
-import { ProvisioningApplicationService } from '../../modules/provisioning/services/provisioning.application.service';
+import { TenantProvisioningHandler } from './tenant-provisioning.handler';
+
+import { EventType } from '@/enums';
+import { ProvisioningApplicationService } from '@/modules/provisioning/services/provisioning.application.service';
 
 describe('TenantProvisioningConsumer', () => {
-  let consumer: TenantProvisioningConsumer;
+  let consumer: TenantProvisioningHandler;
   let mockProvisioningService: { bootstrapRootAdmin: jest.Mock };
 
   beforeEach(async () => {
@@ -15,11 +16,11 @@ describe('TenantProvisioningConsumer', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [TenantProvisioningConsumer],
+      controllers: [TenantProvisioningHandler],
       providers: [{ provide: ProvisioningApplicationService, useValue: mockProvisioningService }],
     }).compile();
 
-    consumer = module.get<TenantProvisioningConsumer>(TenantProvisioningConsumer);
+    consumer = module.get<TenantProvisioningHandler>(TenantProvisioningHandler);
   });
 
   afterEach(() => {

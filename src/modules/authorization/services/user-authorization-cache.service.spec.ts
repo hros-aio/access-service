@@ -2,8 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CacheService, RedisCacheProvider } from '@new-hros/libs-core';
 
 import { UserAuthorizationCacheService } from './user-authorization-cache.service';
-import { UserEffectiveRoleEntity } from '../entities/user-effective-role.entity';
 import { UserEffectiveRoleRepository } from '../repositories/user-effective-role.repository';
+
+import { UserEffectiveRole } from '@/modules/user-groups';
 
 describe('UserAuthorizationCacheService', () => {
   let service: UserAuthorizationCacheService;
@@ -40,7 +41,7 @@ describe('UserAuthorizationCacheService', () => {
           scopeType: 'SELF',
           scopeEntityId: null,
           createdAt: new Date(),
-        } as UserEffectiveRoleEntity,
+        } as UserEffectiveRole,
       ]),
     };
 

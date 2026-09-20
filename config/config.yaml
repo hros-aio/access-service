@@ -1,23 +1,23 @@
 app:
-  name: "hrms-access-service"
+  name: 'hrms-access-service'
   port: 3000
-  env: "development"
+  env: 'development'
 
 database:
-  host: "localhost"
+  host: 'localhost'
   port: 5432
-  username: "hrms_user"
-  password: "hrms_password"
-  name: "hrms_access_db"
+  username: 'hrms_user'
+  password: 'hrms_password'
+  name: 'access'
 
 redis:
-  host: "localhost"
+  host: 'localhost'
   port: 6379
 
 kafka:
   brokers:
-    - "localhost:9092"
+    - 'localhost:9092'
 
 jwt:
-  publicKey: "test-public-key"
+  publicKey: 'test-public-key'
   # privateKey is intentionally omitted; load via JWT_PRIVATE_KEY environment variable or secrets manager

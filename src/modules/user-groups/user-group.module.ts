@@ -1,6 +1,10 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { EmployeeModule } from '../employee/employee.module';
+import { RoleModule } from '../roles/role.module';
+import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../security-event';
+import { UserModule } from '../user/user.module';
 import { UserGroupAdminController } from './controllers/user-group-admin.controller';
 import { UserGroupPopulationController } from './controllers/user-group-population.controller';
 import { UserGroupRoleController } from './controllers/user-group-role.controller';
@@ -22,9 +26,6 @@ import { UserGroupPopulationQueryService } from './services/user-group-populatio
 import { UserGroupQueryService } from './services/user-group-query.service';
 import { UserGroupRoleAssignmentService } from './services/user-group-role-assignment.service';
 import { UserGroupScopeService } from './services/user-group-scope.service';
-import { EmployeeModule } from '../employee/employee.module';
-import { RoleModule } from '../roles/role.module';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../security-event';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../s
     ]),
     EmployeeModule,
     RoleModule,
+    forwardRef(() => UserModule),
   ],
   controllers: [
     UserGroupAdminController,

@@ -4,7 +4,8 @@ import { BaseRepository, TransactionService } from '@new-hros/libs-sql';
 import { In } from 'typeorm';
 
 import { GenerateUserEffectiveRoleKey } from '../../../constants';
-import { UserEffectiveRoleEntity } from '../entities/user-effective-role.entity';
+
+import { UserEffectiveRole } from '@/modules/user-groups';
 
 export interface PersistUserEffectiveRoleEntry {
   roleId: string;
@@ -13,9 +14,9 @@ export interface PersistUserEffectiveRoleEntry {
 }
 
 @Injectable()
-export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRoleEntity> {
+export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRole> {
   constructor(transactionService: TransactionService) {
-    super(UserEffectiveRoleEntity, transactionService);
+    super(UserEffectiveRole, transactionService);
   }
 
   async deleteByUserId(userId: string): Promise<number> {
@@ -88,7 +89,7 @@ export class UserEffectiveRoleRepository extends BaseRepository<UserEffectiveRol
       await this.repository
         .createQueryBuilder()
         .insert()
-        .into(UserEffectiveRoleEntity)
+        .into(UserEffectiveRole)
         .values(entities)
         .orIgnore()
         .execute();

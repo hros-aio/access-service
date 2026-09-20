@@ -6,7 +6,7 @@ import { EmployeeReference } from '../../employee/entities/employee-reference.en
 import { TableName } from '@/enums';
 
 @Entity(TableName.USER_GROUP_MEMBERSHIPS)
-@Unique('uq_user_group_memberships_tenant_group_employee', ['tenant_code', 'group_id', 'user_id'])
+@Unique('uq_user_group_memberships_tenant_group_employee', ['tenantCode', 'groupId', 'userId'])
 export class UserGroupMembership extends BaseEntity {
   @Column({ name: 'group_id', type: 'uuid' })
   groupId: string;

@@ -6,7 +6,6 @@ export * from './dto/sync-status-response.dto';
 export * from './dto/sync-status-summary-response.dto';
 export * from './dto/trigger-sync-now.dto';
 export * from './entities/authorization-sync-job.entity';
-export * from './entities/user-effective-role.entity';
 export * from './repositories/authorization-sync-job.repository';
 export * from './repositories/user-effective-role.repository';
 export * from './services/authorization-reconciliation-worker.service';
