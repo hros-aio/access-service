@@ -3,15 +3,31 @@ import { EventPattern, Payload } from '@nestjs/microservices';
 import { RequestContext, RequestContextService } from '@new-hros/libs-core';
 import { EventEnvelope, EventPublishException } from '@new-hros/libs-events';
 
-import { EventType } from '../../enums';
-import { ProvisioningApplicationService } from '../../modules/provisioning/services/provisioning.application.service';
-import { EmployeeAttributePropagationService } from '../../modules/user-groups/services/employee-attribute-propagation.service';
-import { EmployeeLifecyclePayload } from '../interfaces/employee-lifecycle.interface';
+import { EventType } from '@/enums';
+import { ProvisioningApplicationService } from '@/modules/provisioning/services/provisioning.application.service';
+import { EmployeeAttributePropagationService } from '@/modules/user-groups/services/employee-attribute-propagation.service';
+
+export interface EmployeeLifecyclePayload {
+  id: string;
+  tenantCode: string;
+  employeeCode: string;
+  companyId?: string | null;
+  locationId?: string | null;
+  departmentId?: string | null;
+  gradeId?: string | null;
+  jobTitleId?: string | null;
+  employmentStatus?: string;
+  status?: string;
+  oldManagerEmployeeId?: string | null;
+  newManagerEmployeeId?: string | null;
+  managerEmployeeId?: string | null;
+  sourceVersion: number;
+}
 
 @Controller()
 @UseFilters(EventPublishException)
-export class EmployeeLifecycleConsumer {
-  private readonly logger = new Logger(EmployeeLifecycleConsumer.name);
+export class EmployeeLifecycleHandler {
+  private readonly logger = new Logger(EmployeeLifecycleHandler.name);
 
   constructor(
     private readonly provisioningService: ProvisioningApplicationService,

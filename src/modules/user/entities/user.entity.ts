@@ -1,8 +1,7 @@
 import { BaseEntity } from '@new-hros/libs-sql';
-import { Column, Entity, JoinColumn, OneToOne, Unique } from 'typeorm';
+import { Column, Entity, Unique } from 'typeorm';
 
 import { CredentialStatus, UserStatus } from '../../../enums';
-import { EmployeeReference } from '../../employee/entities/employee-reference.entity';
 
 @Entity('users')
 @Unique('uq_users_tenant_normalized_email', ['tenantCode', 'normalizedEmail'])
@@ -39,11 +38,4 @@ export class User extends BaseEntity {
 
   @Column({ name: 'external_identity_id', type: 'varchar', length: 100, nullable: true })
   externalIdentityId?: string;
-
-  @OneToOne(() => EmployeeReference, { onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
-  @JoinColumn([
-    { name: 'tenant_code', referencedColumnName: 'tenant_code' },
-    { name: 'employee_ref_id', referencedColumnName: 'id' },
-  ])
-  employee?: EmployeeReference;
 }

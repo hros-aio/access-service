@@ -1,16 +1,16 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { AuthorizationConsumer } from '../../kafka/consumers/authorization.consumer';
 import { AuthModule } from '../auth/auth.module';
 import { EmployeeModule } from '../employee/employee.module';
 import { PermissionsModule } from '../permissions';
 import { RoleModule } from '../roles/role.module';
-import { UserGroupModule } from '../user-groups';
+import { SecurityEventModule } from '../security-event';
+import { UserModule } from '../user/user.module';
+import { UserEffectiveRole, UserGroupModule } from '../user-groups';
 import { AuthorizationSyncController } from './controllers/authorization-sync.controller';
 import { BootstrapAuthorizationController } from './controllers/bootstrap-authorization.controller';
 import { AuthorizationSyncJob } from './entities/authorization-sync-job.entity';
-import { UserEffectiveRoleEntity } from './entities/user-effective-role.entity';
 import { AuthorizationSyncJobRepository } from './repositories/authorization-sync-job.repository';
 import { UserEffectiveRoleRepository } from './repositories/user-effective-role.repository';
 import { AuthorizationReconciliationWorker } from './services/authorization-reconciliation-worker.service';
@@ -24,19 +24,23 @@ import { SyncJobWatchdogService } from './services/sync-job-watchdog.service';
 import { SyncStatusProjectionService } from './services/sync-status-projection.service';
 import { UserAuthorizationCacheService } from './services/user-authorization-cache.service';
 
+import { AuthorizationHandler } from '@/handlers/authorization.handler';
+
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserEffectiveRoleEntity, AuthorizationSyncJob]),
+    TypeOrmModule.forFeature([UserEffectiveRole, AuthorizationSyncJob]),
     RoleModule,
     UserGroupModule,
     EmployeeModule,
     PermissionsModule,
     AuthModule,
+    SecurityEventModule,
+    forwardRef(() => UserModule),
   ],
   controllers: [
     BootstrapAuthorizationController,
     AuthorizationSyncController,
-    AuthorizationConsumer,
+    AuthorizationHandler,
   ],
   providers: [
     UserEffectiveRoleRepository,

@@ -1,5 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { CACHE_KEY_BUILDER, CACHE_PROVIDER_TOKEN, CacheService } from '@new-hros/libs-core';
+import { Injectable } from '@nestjs/common';
+import { CACHE_KEY_BUILDER, CacheService } from '@new-hros/libs-core';
 
 import { Role } from '../entities/role.entity';
 import { CachedRoleData } from '../interfaces/system-role-template.interface';
@@ -8,10 +8,7 @@ import { CachedRoleData } from '../interfaces/system-role-template.interface';
 export class RoleCacheService {
   private readonly TTL_SECONDS = 86400; // 24 hours
 
-  constructor(
-    @Inject(CACHE_PROVIDER_TOKEN)
-    private readonly cacheService: CacheService,
-  ) {}
+  constructor(private readonly cacheService: CacheService) {}
 
   async syncRole(role: Role): Promise<void> {
     const key = CACHE_KEY_BUILDER.buildRoleAuthz(role.tenantCode, role.id);

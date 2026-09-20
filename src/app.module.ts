@@ -1,6 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ApisModule } from '@new-hros/libs-apis';
-import { ConfigurationModule, ConfigurationService, CoreModule } from '@new-hros/libs-core';
+import {
+  CacheModule,
+  CacheModuleOptions,
+  ConfigurationModule,
+  ConfigurationService,
+  CoreModule,
+} from '@new-hros/libs-core';
 import { SqlModule } from '@new-hros/libs-sql';
 
 import { AuthModule } from './modules/auth/auth.module';
@@ -20,16 +26,19 @@ import { TenantModule } from './modules/tenant/tenant.module';
 import { UserModule } from './modules/user/user.module';
 import { UserGroupModule } from './modules/user-groups/user-group.module';
 
-const config = new ConfigurationService({});
-
 @Module({
   imports: [
     ConfigurationModule.register({ configDir: 'config', envPath: '.env' }),
-    CoreModule.forRoot({
-      cache: {
-        store: 'redis',
-        host: config.get<string>('redis.host') ?? 'localhost',
-        port: config.get<number>('redis.port') ?? 6379,
+    CoreModule.forRoot(),
+    CacheModule.registerAsync({
+      inject: [ConfigurationService],
+      useFactory: (config: ConfigurationService): CacheModuleOptions => {
+        return {
+          redis: {
+            host: config.get<string>('redis.host') ?? 'localhost',
+            port: config.get<number>('redis.port') ?? 6379,
+          },
+        };
       },
     }),
     ApisModule.forRootAsync({

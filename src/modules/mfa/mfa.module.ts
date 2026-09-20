@@ -2,6 +2,8 @@ import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuthModule } from '../auth/auth.module';
+import { SecurityEventModule } from '../security-event';
+import { UserModule } from '../user/user.module';
 import { KmsCryptoAdapter } from './adapters/kms-crypto.adapter';
 import { RedisMfaChallengeAdapter } from './adapters/redis_mfa_challenge.adapter';
 import { MfaController } from './controllers/mfa.controller';
@@ -12,7 +14,12 @@ import { MfaAdminApplicationService } from './services/mfa_admin_application.ser
 import { MfaApplicationService } from './services/mfa_application.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MfaMethod]), forwardRef(() => AuthModule)],
+  imports: [
+    TypeOrmModule.forFeature([MfaMethod]),
+    forwardRef(() => AuthModule),
+    forwardRef(() => UserModule),
+    SecurityEventModule,
+  ],
   controllers: [MfaController, MfaAdminController],
   providers: [
     KmsCryptoAdapter,

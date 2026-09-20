@@ -1,7 +1,8 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { CACHE_PROVIDER_TOKEN, CacheService, RedisCacheProvider } from '@new-hros/libs-core';
+import { CacheService, RedisCacheProvider } from '@new-hros/libs-core';
 
+import { EmployeeModule } from '../employee/employee.module';
 import { FirebaseSsoModule } from '../firebase-sso/firebase-sso.module';
 import { IpRestrictionService } from '../ip-restriction/services/ip-restriction.service';
 import { LockoutService } from '../lockout/services/lockout.service';
@@ -22,6 +23,7 @@ import { SessionApplicationService } from './services/session.application.servic
     TenantModule,
     UserModule,
     SecurityEventModule,
+    EmployeeModule,
     forwardRef(() => MfaModule),
     forwardRef(() => FirebaseSsoModule),
   ],
@@ -36,7 +38,7 @@ import { SessionApplicationService } from './services/session.application.servic
     {
       provide: RedisCacheProvider,
       useFactory: (cacheService: CacheService): RedisCacheProvider => cacheService['l2'],
-      inject: [CACHE_PROVIDER_TOKEN],
+      inject: [CacheService],
     },
   ],
   exports: [

@@ -6,7 +6,6 @@ import { isEmail } from 'class-validator';
 
 import { SystemRoleSeederService } from './system-role-seeder.service';
 import { CredentialStatus, EventType, InvitationStatus, UserStatus } from '../../../enums';
-import { TenantCreatedPayload } from '../../../kafka/interfaces/tenant-created.interface';
 import { SessionApplicationService } from '../../auth/services/session.application.service';
 import { EmployeeReferenceRepository } from '../../employee/repositories/employee-reference.repository';
 import { InvitationRepository } from '../../invite/repositories/invitation.repository';
@@ -14,6 +13,7 @@ import { SecurityEventService } from '../../security-event/services/security-eve
 import { UserRepository } from '../../user/repositories/user.repository';
 
 import { EmployeeStatus } from '@/enums/employee-status.enum';
+import { TenantCreatedPayload } from '@/handlers/tenant-provisioning.handler';
 import { EmployeeReference } from '@/modules/employee/entities/employee-reference.entity';
 import { User } from '@/modules/user/entities/user.entity';
 

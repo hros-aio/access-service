@@ -10,6 +10,8 @@ import {
 import { GenerateUserAuthzVersionKey } from '../../../constants';
 import { UserEffectiveRoleRepository } from '../repositories/user-effective-role.repository';
 
+import { ScopeType } from '@/modules/user-groups';
+
 @Injectable()
 export class UserAuthorizationCacheService {
   private readonly logger = new Logger(UserAuthorizationCacheService.name);
@@ -33,7 +35,7 @@ export class UserAuthorizationCacheService {
         roleId: r.roleId,
         sourceGroupId: r.sourceGroupId,
         scope: {
-          type: r.scopeType,
+          type: r.scopeType as ScopeType,
           refId: r.scopeEntityId || null,
         },
       }));

@@ -8,7 +8,7 @@ import { Role } from '../../roles/entities/role.entity';
 @Entity(TableName.USER_EFFECTIVE_ROLES)
 @Unique('uq_user_effective_roles_grant', [
   'tenantCode',
-  'user_id',
+  'userId',
   'roleId',
   'sourceGroupId',
   'scopeType',
