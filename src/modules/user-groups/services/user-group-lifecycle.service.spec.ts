@@ -1,7 +1,7 @@
 import { RequestContextService } from '@new-hros/libs-core';
-import { TransactionService } from '@new-hros/libs-sql';
+import { OutboxEventEntity, TransactionService } from '@new-hros/libs-sql';
 
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository } from '../../security-event';
 import { ScopeType, UserGroupStatus } from '../domain/enums';
 import {
   ConcurrentModificationError,
@@ -21,7 +21,7 @@ describe('UserGroupLifecycleService', () => {
   let userGroupRepository: jest.Mocked<UserGroupRepository>;
   let userGroupRoleRepository: jest.Mocked<UserGroupRoleRepository>;
   let userGroupMembershipRepository: jest.Mocked<UserGroupMembershipRepository>;
-  let outboxRepository: jest.Mocked<AuthSecurityEventOutboxRepository>;
+  let outboxRepository: jest.Mocked<OutboxEventRepository>;
   let transactionService: jest.Mocked<TransactionService>;
   let userGroupImpactService: jest.Mocked<UserGroupImpactService>;
 
@@ -63,8 +63,8 @@ describe('UserGroupLifecycleService', () => {
     } as unknown as jest.Mocked<UserGroupMembershipRepository>;
 
     outboxRepository = {
-      save: jest.fn().mockResolvedValue({} as AuthSecurityEventOutbox),
-    } as unknown as jest.Mocked<AuthSecurityEventOutboxRepository>;
+      save: jest.fn().mockResolvedValue({} as OutboxEventEntity),
+    } as unknown as jest.Mocked<OutboxEventRepository>;
 
     transactionService = {
       runInTransaction: jest.fn().mockImplementation((cb: () => unknown) => cb()),

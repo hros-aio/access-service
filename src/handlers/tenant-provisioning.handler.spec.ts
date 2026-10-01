@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test, TestingModule } from '@nestjs/testing';
 import { RequestContextService } from '@new-hros/libs-core';
 
@@ -48,7 +49,7 @@ describe('TenantProvisioningConsumer', () => {
 
     const runSpy = jest.spyOn(RequestContextService, 'run');
 
-    await consumer.handleTenantLifecycleEvent(envelope);
+    await consumer.handleTenantLifecycleEvent(envelope as any);
 
     expect(runSpy).toHaveBeenCalled();
     expect(mockProvisioningService.bootstrapRootAdmin).toHaveBeenCalledWith(envelope.payload);

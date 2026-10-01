@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test, TestingModule } from '@nestjs/testing';
 import { RequestContextService } from '@new-hros/libs-core';
 
@@ -57,7 +58,7 @@ describe('AuthorizationConsumer', () => {
 
     const runSpy = jest.spyOn(RequestContextService, 'run');
 
-    await consumer.handleAuthorizationSyncRequested(envelope);
+    await consumer.handleAuthorizationSyncRequested(envelope as any);
 
     expect(runSpy).toHaveBeenCalled();
     expect(mockReconciliationWorker.processNextJob).toHaveBeenCalledWith('TEST_TENANT');
@@ -82,7 +83,7 @@ describe('AuthorizationConsumer', () => {
       },
     };
 
-    await consumer.handleAuthorizationSyncRequested(envelope);
+    await consumer.handleAuthorizationSyncRequested(envelope as any);
 
     expect(mockReconciliationWorker.processNextJob).not.toHaveBeenCalled();
   });

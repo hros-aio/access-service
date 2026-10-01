@@ -46,8 +46,8 @@ export class EmployeeLifecycleHandler {
     }
 
     const context = {
-      traceId: envelope.correlationId || envelope.id,
-      requestId: envelope.id,
+      traceId: envelope.traceId || envelope.correlationId || envelope.eventId,
+      requestId: envelope.eventId,
       tenantCode: payload.tenantCode,
       clientMetadata: {
         ip: '127.0.0.1',
@@ -75,8 +75,8 @@ export class EmployeeLifecycleHandler {
     }
 
     const context = {
-      traceId: envelope.correlationId || envelope.id,
-      requestId: envelope.id,
+      traceId: envelope.traceId || envelope.correlationId || envelope.eventId,
+      requestId: envelope.eventId,
       tenantCode: payload.tenantCode,
       clientMetadata: {
         ip: '127.0.0.1',
@@ -104,8 +104,8 @@ export class EmployeeLifecycleHandler {
     }
 
     const context = {
-      traceId: envelope.correlationId || envelope.id,
-      requestId: envelope.id,
+      traceId: envelope.traceId || envelope.correlationId || envelope.eventId,
+      requestId: envelope.eventId,
       tenantCode: payload.tenantCode,
       clientMetadata: {
         ip: '127.0.0.1',
@@ -133,8 +133,8 @@ export class EmployeeLifecycleHandler {
     }
 
     const context = {
-      traceId: envelope.correlationId || envelope.id,
-      requestId: envelope.id,
+      traceId: envelope.traceId || envelope.correlationId || envelope.eventId,
+      requestId: envelope.eventId,
       tenantCode: payload.tenantCode,
       clientMetadata: {
         ip: '127.0.0.1',
@@ -165,8 +165,8 @@ export class EmployeeLifecycleHandler {
     }
 
     const context: RequestContext = {
-      traceId: envelope.correlationId || envelope.id,
-      requestId: envelope.id,
+      traceId: envelope.traceId || envelope.correlationId || envelope.eventId,
+      requestId: envelope.eventId,
       tenantCode: payload.tenantCode,
       clientMetadata: {
         ip: '127.0.0.1',
@@ -191,8 +191,8 @@ export class EmployeeLifecycleHandler {
     }
 
     const context: RequestContext = {
-      traceId: envelope.correlationId || envelope.id,
-      requestId: envelope.id,
+      traceId: envelope.traceId || envelope.correlationId || envelope.eventId,
+      requestId: envelope.eventId,
       tenantCode: payload.tenantCode,
       clientMetadata: {
         ip: '127.0.0.1',

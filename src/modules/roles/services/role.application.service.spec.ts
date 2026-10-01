@@ -5,7 +5,7 @@ import { RoleCacheService } from './role-cache.service';
 import { RoleApplicationService } from './role.application.service';
 import { EventType } from '../../../enums';
 import { PermissionDependencyService } from '../../permissions';
-import { AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository } from '../../security-event';
 import { HighImpactConfirmationRequiredResponseDto } from '../dto/role.dto';
 import { RolePermission } from '../entities/role-permission.entity';
 import { Role } from '../entities/role.entity';
@@ -90,7 +90,7 @@ describe('RoleApplicationService', () => {
         { provide: RolePermissionRepository, useValue: mockRolePermissionRepository },
         { provide: RoleCacheService, useValue: mockRoleCacheService },
         { provide: PermissionDependencyService, useValue: mockPermissionDependencyService },
-        { provide: AuthSecurityEventOutboxRepository, useValue: mockOutboxRepository },
+        { provide: OutboxEventRepository, useValue: mockOutboxRepository },
       ],
     }).compile();
 

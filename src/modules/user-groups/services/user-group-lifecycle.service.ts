@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository, OutboxEventService } from '../../security-event';
 import { UserGroupAggregate } from '../domain/aggregates/user-group.aggregate';
 import {
   ConcurrentModificationError,
@@ -28,7 +28,7 @@ export class UserGroupLifecycleService {
     private readonly userGroupRepository: UserGroupRepository,
     private readonly userGroupRoleRepository: UserGroupRoleRepository,
     private readonly userGroupMembershipRepository: UserGroupMembershipRepository,
-    private readonly outboxRepository: AuthSecurityEventOutboxRepository,
+    private readonly outboxRepository: OutboxEventRepository,
     private readonly userGroupImpactService: UserGroupImpactService,
   ) {}
 
@@ -69,11 +69,11 @@ export class UserGroupLifecycleService {
 
       // Outbox events
       const outboxContext = { tenantCode, userId };
-      const createdOutbox = AuthSecurityEventOutbox.fromUserGroupCreated(outboxContext, {
+      const createdOutbox = OutboxEventService.fromUserGroupCreated(outboxContext, {
         userGroup: savedGroup,
         roleIds,
       });
-      const syncOutbox = AuthSecurityEventOutbox.fromAuthorizationUserGroupUpdated(outboxContext, {
+      const syncOutbox = OutboxEventService.fromAuthorizationUserGroupUpdated(outboxContext, {
         userGroup: savedGroup,
       });
 
@@ -154,12 +154,12 @@ export class UserGroupLifecycleService {
 
       // Outbox events
       const outboxContext = { tenantCode, userId };
-      const updatedOutbox = AuthSecurityEventOutbox.fromUserGroupUpdated(outboxContext, {
+      const updatedOutbox = OutboxEventService.fromUserGroupUpdated(outboxContext, {
         userGroup: savedGroup,
         addedRoleIds,
         removedRoleIds,
       });
-      const syncOutbox = AuthSecurityEventOutbox.fromAuthorizationUserGroupUpdated(outboxContext, {
+      const syncOutbox = OutboxEventService.fromAuthorizationUserGroupUpdated(outboxContext, {
         userGroup: savedGroup,
       });
 
@@ -198,10 +198,10 @@ export class UserGroupLifecycleService {
       const savedGroup = await this.userGroupRepository.save(existing);
 
       const outboxContext = { tenantCode, userId };
-      const deactivatedOutbox = AuthSecurityEventOutbox.fromUserGroupDeactivated(outboxContext, {
+      const deactivatedOutbox = OutboxEventService.fromUserGroupDeactivated(outboxContext, {
         userGroup: savedGroup,
       });
-      const syncOutbox = AuthSecurityEventOutbox.fromAuthorizationUserGroupUpdated(outboxContext, {
+      const syncOutbox = OutboxEventService.fromAuthorizationUserGroupUpdated(outboxContext, {
         userGroup: savedGroup,
       });
 
@@ -232,10 +232,10 @@ export class UserGroupLifecycleService {
       const savedGroup = await this.userGroupRepository.save(existing);
 
       const outboxContext = { tenantCode, userId };
-      const reactivatedOutbox = AuthSecurityEventOutbox.fromUserGroupReactivated(outboxContext, {
+      const reactivatedOutbox = OutboxEventService.fromUserGroupReactivated(outboxContext, {
         userGroup: savedGroup,
       });
-      const syncOutbox = AuthSecurityEventOutbox.fromAuthorizationUserGroupUpdated(outboxContext, {
+      const syncOutbox = OutboxEventService.fromAuthorizationUserGroupUpdated(outboxContext, {
         userGroup: savedGroup,
       });
 

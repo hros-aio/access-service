@@ -3,7 +3,7 @@ import { TransactionService } from '@new-hros/libs-sql';
 import { UserGroupImpactService } from './user-group-impact.service';
 import { UserGroupRoleAssignmentService } from './user-group-role-assignment.service';
 import { RoleRepository } from '../../roles/repositories/role.repository';
-import { AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository } from '../../security-event';
 import {
   HighImpactConfirmationRequiredError,
   InvalidRoleAssignmentError,
@@ -17,7 +17,7 @@ describe('UserGroupRoleAssignmentService', () => {
   let mockUserGroupRepo: jest.Mocked<UserGroupRepository>;
   let mockUserGroupRoleRepo: jest.Mocked<UserGroupRoleRepository>;
   let mockRoleRepo: jest.Mocked<RoleRepository>;
-  let mockOutboxRepo: jest.Mocked<AuthSecurityEventOutboxRepository>;
+  let mockOutboxRepo: jest.Mocked<OutboxEventRepository>;
   let mockImpactService: jest.Mocked<UserGroupImpactService>;
 
   beforeEach(() => {
@@ -50,7 +50,7 @@ describe('UserGroupRoleAssignmentService', () => {
 
     mockOutboxRepo = {
       save: jest.fn(),
-    } as unknown as jest.Mocked<AuthSecurityEventOutboxRepository>;
+    } as unknown as jest.Mocked<OutboxEventRepository>;
 
     mockImpactService = {
       estimateRoleAssignmentImpact: jest.fn(),

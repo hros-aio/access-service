@@ -1,9 +1,9 @@
 import { RequestContextService } from '@new-hros/libs-core';
-import { TransactionService } from '@new-hros/libs-sql';
+import { OutboxEventEntity, TransactionService } from '@new-hros/libs-sql';
 
 import { UserGroupImpactService } from './user-group-impact.service';
 import { UserGroupScopeService } from './user-group-scope.service';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository } from '../../security-event';
 import { ScopeType } from '../domain/enums/scope-type.enum';
 import {
   ConcurrentModificationError,
@@ -16,7 +16,7 @@ describe('UserGroupScopeService', () => {
   let service: UserGroupScopeService;
   let transactionService: jest.Mocked<TransactionService>;
   let userGroupRepo: jest.Mocked<UserGroupRepository>;
-  let outboxRepo: jest.Mocked<AuthSecurityEventOutboxRepository>;
+  let outboxRepo: jest.Mocked<OutboxEventRepository>;
   let impactService: jest.Mocked<UserGroupImpactService>;
 
   const tenantCode = 'tenant-test';
@@ -40,8 +40,8 @@ describe('UserGroupScopeService', () => {
     } as unknown as jest.Mocked<UserGroupRepository>;
 
     outboxRepo = {
-      save: jest.fn().mockResolvedValue({} as unknown as AuthSecurityEventOutbox),
-    } as unknown as jest.Mocked<AuthSecurityEventOutboxRepository>;
+      save: jest.fn().mockResolvedValue({} as unknown as OutboxEventEntity),
+    } as unknown as jest.Mocked<OutboxEventRepository>;
 
     impactService = {
       estimateScopeImpact: jest.fn(),

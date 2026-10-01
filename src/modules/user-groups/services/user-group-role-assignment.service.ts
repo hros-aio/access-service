@@ -4,7 +4,7 @@ import { TransactionService } from '@new-hros/libs-sql';
 
 import { UserGroupImpactService } from './user-group-impact.service';
 import { RoleRepository } from '../../roles/repositories/role.repository';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository, OutboxEventService } from '../../security-event';
 import { UserGroupAggregate } from '../domain/aggregates/user-group.aggregate';
 import {
   ConcurrentModificationError,
@@ -28,7 +28,7 @@ export class UserGroupRoleAssignmentService {
     private readonly userGroupRepository: UserGroupRepository,
     private readonly userGroupRoleRepository: UserGroupRoleRepository,
     private readonly roleRepository: RoleRepository,
-    private readonly outboxRepository: AuthSecurityEventOutboxRepository,
+    private readonly outboxRepository: OutboxEventRepository,
     private readonly impactService: UserGroupImpactService,
   ) {}
 
@@ -111,32 +111,26 @@ export class UserGroupRoleAssignmentService {
       const outboxContext = { tenantCode, userId };
 
       if (addedRoleIds.length > 0) {
-        const rolesAssignedOutbox = AuthSecurityEventOutbox.fromUserGroupRolesAssigned(
-          outboxContext,
-          {
-            userGroup: savedGroup,
-            assignedRoleIds: targetRoleIds,
-            addedRoleIds,
-            previousRoleIds: currentRoleIds,
-          },
-        );
+        const rolesAssignedOutbox = OutboxEventService.fromUserGroupRolesAssigned(outboxContext, {
+          userGroup: savedGroup,
+          assignedRoleIds: targetRoleIds,
+          addedRoleIds,
+          previousRoleIds: currentRoleIds,
+        });
         await this.outboxRepository.save(rolesAssignedOutbox);
       }
 
       if (removedRoleIds.length > 0) {
-        const roleUnassignedOutbox = AuthSecurityEventOutbox.fromUserGroupRoleUnassigned(
-          outboxContext,
-          {
-            userGroup: savedGroup,
-            assignedRoleIds: targetRoleIds,
-            removedRoleIds,
-            previousRoleIds: currentRoleIds,
-          },
-        );
+        const roleUnassignedOutbox = OutboxEventService.fromUserGroupRoleUnassigned(outboxContext, {
+          userGroup: savedGroup,
+          assignedRoleIds: targetRoleIds,
+          removedRoleIds,
+          previousRoleIds: currentRoleIds,
+        });
         await this.outboxRepository.save(roleUnassignedOutbox);
       }
 
-      const syncOutbox = AuthSecurityEventOutbox.fromAuthorizationUserGroupUpdated(outboxContext, {
+      const syncOutbox = OutboxEventService.fromAuthorizationUserGroupUpdated(outboxContext, {
         userGroup: savedGroup,
         isUrgent: removedRoleIds.length > 0,
       });

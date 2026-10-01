@@ -3,7 +3,7 @@ import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { RoleRepository } from '../../roles/repositories/role.repository';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository, OutboxEventService } from '../../security-event';
 import { UserGroupRepository } from '../../user-groups/repositories/user-group.repository';
 import { SyncJobResponseDto } from '../dto/sync-job-response.dto';
 import { TriggerSyncNowDto } from '../dto/trigger-sync-now.dto';
@@ -23,7 +23,7 @@ export class AuthorizationSyncService {
     private readonly syncJobRepo: AuthorizationSyncJobRepository,
     private readonly userGroupRepo: UserGroupRepository,
     private readonly roleRepo: RoleRepository,
-    private readonly outboxRepo: AuthSecurityEventOutboxRepository,
+    private readonly outboxRepo: OutboxEventRepository,
     private readonly transactionService: TransactionService,
   ) {}
 
@@ -134,7 +134,7 @@ export class AuthorizationSyncService {
         createdBy: userId ?? null,
       });
 
-      const outboxEvent = AuthSecurityEventOutbox.fromAuthorizationSyncRequested(
+      const outboxEvent = OutboxEventService.fromAuthorizationSyncRequested(
         { tenantCode, userId: userId ?? undefined },
         {
           jobId: job.id,
