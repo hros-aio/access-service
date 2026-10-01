@@ -3,7 +3,7 @@ import { RequestContextService } from '@new-hros/libs-core';
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { UserGroupImpactService } from './user-group-impact.service';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository, OutboxEventService } from '../../security-event';
 import { UserGroupAggregate } from '../domain/aggregates/user-group.aggregate';
 import {
   ConcurrentModificationError,
@@ -20,7 +20,7 @@ export class UserGroupScopeService {
   constructor(
     private readonly transactionService: TransactionService,
     private readonly userGroupRepository: UserGroupRepository,
-    private readonly outboxRepository: AuthSecurityEventOutboxRepository,
+    private readonly outboxRepository: OutboxEventRepository,
     private readonly impactService: UserGroupImpactService,
   ) {}
 
@@ -69,14 +69,14 @@ export class UserGroupScopeService {
       // Persist Audit and Domain events into Transactional Outbox
       const outboxContext = { tenantCode, userId };
 
-      const scopeUpdatedOutbox = AuthSecurityEventOutbox.fromUserGroupScopeUpdated(outboxContext, {
+      const scopeUpdatedOutbox = OutboxEventService.fromUserGroupScopeUpdated(outboxContext, {
         userGroup: savedGroup,
         previousScope,
         newScope,
       });
       await this.outboxRepository.save(scopeUpdatedOutbox);
 
-      const syncOutbox = AuthSecurityEventOutbox.fromAuthorizationUserGroupUpdated(outboxContext, {
+      const syncOutbox = OutboxEventService.fromAuthorizationUserGroupUpdated(outboxContext, {
         userGroup: savedGroup,
       });
       await this.outboxRepository.save(syncOutbox);

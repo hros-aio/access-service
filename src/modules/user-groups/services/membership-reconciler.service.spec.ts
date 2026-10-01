@@ -1,7 +1,7 @@
 import { TransactionService } from '@new-hros/libs-sql';
 
 import { MembershipReconciler } from './membership-reconciler.service';
-import { AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository } from '../../security-event';
 import { UserGroupRole } from '../entities/user-group-role.entity';
 import { UserGroup } from '../entities/user-group.entity';
 import { UserEffectiveRoleRepository } from '../repositories/user-effective-role.repository';
@@ -16,7 +16,7 @@ describe('MembershipReconciler', () => {
   let mockUserGroupRoleRepo: jest.Mocked<UserGroupRoleRepository>;
   let mockMembershipRepo: jest.Mocked<UserGroupMembershipRepository>;
   let mockEffectiveRoleRepo: jest.Mocked<UserEffectiveRoleRepository>;
-  let mockOutboxRepo: jest.Mocked<AuthSecurityEventOutboxRepository>;
+  let mockOutboxRepo: jest.Mocked<OutboxEventRepository>;
 
   beforeEach(() => {
     mockTransactionService = {
@@ -43,7 +43,7 @@ describe('MembershipReconciler', () => {
     } as unknown as jest.Mocked<UserEffectiveRoleRepository>;
     mockOutboxRepo = {
       create: jest.fn(),
-    } as unknown as jest.Mocked<AuthSecurityEventOutboxRepository>;
+    } as unknown as jest.Mocked<OutboxEventRepository>;
 
     reconciler = new MembershipReconciler(
       mockTransactionService,

@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { RequestContextService } from '@new-hros/libs-core';
 import { PaginatedResult } from '@new-hros/libs-sql';
 
+import { UserGroupMatchingEngine } from './user-group-matching.engine';
 import { MatchingRuleValidator } from '../domain/validators/matching-rule.validator';
 import { MatchingRule } from '../domain/value-objects/matching-rule.vo';
 import { CriteriaImpactResponseDto, MatchedMemberDto, PreviewMatchingResponseDto } from '../dto';
-import { UserGroupMatchingEngine } from './user-group-matching.engine';
 import { UserGroupMembershipRepository } from '../repositories/user-group-membership.repository';
 import { UserGroupRepository } from '../repositories/user-group.repository';
 

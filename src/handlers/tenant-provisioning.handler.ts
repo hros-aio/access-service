@@ -23,8 +23,8 @@ export class TenantProvisioningHandler {
     const payload = envelope.payload;
 
     const context: RequestContext = {
-      traceId: envelope.correlationId || envelope.id,
-      requestId: envelope.id,
+      traceId: envelope.traceId || envelope.correlationId || envelope.eventId,
+      requestId: envelope.eventId,
       tenantCode: payload.tenantCode,
       clientMetadata: {
         ip: '127.0.0.1',

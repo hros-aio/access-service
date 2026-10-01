@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionService } from '@new-hros/libs-sql';
+import { OutboxEventEntity, OutboxStatus, TransactionService } from '@new-hros/libs-sql';
 
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository } from '../../security-event';
 import { UserGroupStatus } from '../domain/enums';
 import {
   UserEffectiveRoleEntry,
@@ -33,7 +33,7 @@ export class MembershipReconciler {
     private readonly userGroupRoleRepo: UserGroupRoleRepository,
     private readonly membershipRepo: UserGroupMembershipRepository,
     private readonly effectiveRoleRepo: UserEffectiveRoleRepository,
-    private readonly outboxRepo: AuthSecurityEventOutboxRepository,
+    private readonly outboxRepo: OutboxEventRepository,
   ) {}
 
   /**
@@ -101,10 +101,13 @@ export class MembershipReconciler {
     const roleDiff = await this.effectiveRoleRepo.syncEffectiveRolesForUser(userId, targetRoles);
 
     // Record outbox audit event
-    const outbox = new AuthSecurityEventOutbox();
+    const outbox = new OutboxEventEntity();
     outbox.tenantCode = tenantCode;
+    outbox.aggregateType = 'USER';
+    outbox.aggregateId = userId;
     outbox.eventType = 'AUTHORIZATION_MEMBERSHIP_RECONCILED';
-    outbox.sanitizedPayload = {
+    outbox.eventVersion = 1;
+    outbox.payload = {
       userId,
       addedGroupIds,
       removedGroupIds,
@@ -112,7 +115,7 @@ export class MembershipReconciler {
       effectiveRolesDeleted: roleDiff.deleted,
       timestamp: new Date().toISOString(),
     };
-    outbox.publishStatus = 'pending';
+    outbox.status = OutboxStatus.PENDING;
     await this.outboxRepo.create(outbox);
 
     return {

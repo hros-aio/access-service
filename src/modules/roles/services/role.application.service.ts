@@ -4,7 +4,7 @@ import { PaginatedResult, TransactionService } from '@new-hros/libs-sql';
 
 import { RoleCacheService } from './role-cache.service';
 import { PermissionDependencyService } from '../../permissions';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository, OutboxEventService } from '../../security-event';
 import { SYSTEM_ROLE_TEMPLATES } from '../constants/system-role-templates.constant';
 import {
   CopyRoleDto,
@@ -41,7 +41,7 @@ export class RoleApplicationService {
     private readonly rolePermissionRepository: RolePermissionRepository,
     private readonly roleCacheService: RoleCacheService,
     private readonly permissionDependencyService: PermissionDependencyService,
-    private readonly outboxRepository: AuthSecurityEventOutboxRepository,
+    private readonly outboxRepository: OutboxEventRepository,
   ) {}
 
   async list(filters: FilterRoleDto): Promise<PaginatedResult<Role>> {
@@ -111,7 +111,7 @@ export class RoleApplicationService {
       await this.rolePermissionRepository.bulkSave(rolePermissions);
 
       // Record outbox event
-      const outbox = AuthSecurityEventOutbox.fromRoleCreated(
+      const outbox = OutboxEventService.fromRoleCreated(
         { tenantCode, userId },
         { role: savedRole, permissionCodes: dto.permissionCodes },
       );
@@ -158,7 +158,7 @@ export class RoleApplicationService {
       await this.rolePermissionRepository.bulkSave(rolePermissions);
 
       // Record outbox event
-      const outbox = AuthSecurityEventOutbox.fromRoleCopied(
+      const outbox = OutboxEventService.fromRoleCopied(
         { tenantCode, userId },
         { role: savedRole, sourceRoleId, permissionCodes },
       );
@@ -258,7 +258,7 @@ export class RoleApplicationService {
       await this.rolePermissionRepository.bulkSave(newRolePermissions);
 
       const savedRole = await this.roleRepository.save(lockedRole);
-      const outbox = AuthSecurityEventOutbox.fromPermissionsUpdated(
+      const outbox = OutboxEventService.fromPermissionsUpdated(
         { tenantCode, userId },
         { role: savedRole, permissionCodes: dto.permissionCodes },
       );
@@ -327,7 +327,7 @@ export class RoleApplicationService {
       lockedRole.updatedBy = userId;
 
       const saved = await this.roleRepository.save(lockedRole);
-      const outbox = AuthSecurityEventOutbox.fromRoleDeactivated(
+      const outbox = OutboxEventService.fromRoleDeactivated(
         { tenantCode, userId },
         {
           role: saved,
@@ -370,7 +370,7 @@ export class RoleApplicationService {
 
       const saved = await this.roleRepository.save(lockedRole);
 
-      const outbox = AuthSecurityEventOutbox.fromRoleReactivated(
+      const outbox = OutboxEventService.fromRoleReactivated(
         { tenantCode, userId },
         { role: saved },
       );
@@ -416,7 +416,7 @@ export class RoleApplicationService {
 
       const saved = await this.roleRepository.save(role);
 
-      const outbox = AuthSecurityEventOutbox.fromRenameRole(
+      const outbox = OutboxEventService.fromRenameRole(
         { tenantCode, userId },
         { role: saved, oldName, newName: saved.name },
       );
@@ -519,7 +519,7 @@ export class RoleApplicationService {
       await this.rolePermissionRepository.bulkSave(newRolePermissions);
 
       const savedRole = await this.roleRepository.save(lockedRole);
-      const outbox = AuthSecurityEventOutbox.fromPermissionsUpdated(
+      const outbox = OutboxEventService.fromPermissionsUpdated(
         { tenantCode, userId },
         { role: savedRole, permissionCodes: dto.permissionCodes },
       );

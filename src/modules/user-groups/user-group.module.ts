@@ -1,9 +1,10 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { OutboxEventEntity } from '@new-hros/libs-sql';
 
 import { EmployeeModule } from '../employee/employee.module';
 import { RoleModule } from '../roles/role.module';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../security-event';
+import { AuthSecurityEventOutboxRepository, OutboxEventRepository } from '../security-event';
 import { UserModule } from '../user/user.module';
 import { UserGroupAdminController } from './controllers/user-group-admin.controller';
 import { UserGroupPopulationController } from './controllers/user-group-population.controller';
@@ -34,7 +35,7 @@ import { UserGroupScopeService } from './services/user-group-scope.service';
       UserGroupRole,
       UserGroupMembership,
       UserEffectiveRole,
-      AuthSecurityEventOutbox,
+      OutboxEventEntity,
     ]),
     EmployeeModule,
     RoleModule,
@@ -51,7 +52,11 @@ import { UserGroupScopeService } from './services/user-group-scope.service';
     UserGroupRoleRepository,
     UserGroupMembershipRepository,
     UserEffectiveRoleRepository,
-    AuthSecurityEventOutboxRepository,
+    OutboxEventRepository,
+    {
+      provide: AuthSecurityEventOutboxRepository,
+      useExisting: OutboxEventRepository,
+    },
     UserGroupLifecycleService,
     UserGroupQueryService,
     UserGroupMatchingEngine,

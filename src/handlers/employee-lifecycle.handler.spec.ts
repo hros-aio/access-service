@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { EmployeeLifecycleHandler } from './employee-lifecycle.handler';
 
 import { EventType } from '@/enums';
@@ -38,7 +39,7 @@ describe('EmployeeLifecycleConsumer', () => {
       },
     };
 
-    await consumer.handleEmployeeTerminated(envelope);
+    await consumer.handleEmployeeTerminated(envelope as any);
 
     expect(mockProvisioningService.synchronizeEmployeeStatus).toHaveBeenCalledWith(
       EventType.EMPLOYEE_TERMINATED,
@@ -65,7 +66,7 @@ describe('EmployeeLifecycleConsumer', () => {
       },
     };
 
-    await consumer.handleEmployeeReportingLineChanged(envelope);
+    await consumer.handleEmployeeReportingLineChanged(envelope as any);
 
     expect(mockPropagationService.handleEmployeeReportingLineChanged).toHaveBeenCalledWith(
       'DEFAULT',
@@ -92,7 +93,7 @@ describe('EmployeeLifecycleConsumer', () => {
       },
     };
 
-    await consumer.handleEmployeeUpdated(envelope);
+    await consumer.handleEmployeeUpdated(envelope as any);
 
     expect(mockPropagationService.handleEmployeeUpsert).toHaveBeenCalledWith(envelope.payload);
   });

@@ -1,9 +1,10 @@
 import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { OutboxEventEntity } from '@new-hros/libs-sql';
 
 import { AuthModule } from '../auth/auth.module';
 import { PermissionsModule } from '../permissions';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../security-event';
+import { AuthSecurityEventOutboxRepository, OutboxEventRepository } from '../security-event';
 import { RoleController } from './controllers/role.controller';
 import { RolePermission } from './entities/role-permission.entity';
 import { Role } from './entities/role.entity';
@@ -14,7 +15,7 @@ import { RoleApplicationService } from './services/role.application.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Role, RolePermission, AuthSecurityEventOutbox]),
+    TypeOrmModule.forFeature([Role, RolePermission, OutboxEventEntity]),
     PermissionsModule,
     forwardRef(() => AuthModule),
   ],
@@ -24,7 +25,11 @@ import { RoleApplicationService } from './services/role.application.service';
     RolePermissionRepository,
     RoleCacheService,
     RoleApplicationService,
-    AuthSecurityEventOutboxRepository,
+    OutboxEventRepository,
+    {
+      provide: AuthSecurityEventOutboxRepository,
+      useExisting: OutboxEventRepository,
+    },
   ],
   exports: [RoleRepository, RolePermissionRepository, RoleCacheService, RoleApplicationService],
 })

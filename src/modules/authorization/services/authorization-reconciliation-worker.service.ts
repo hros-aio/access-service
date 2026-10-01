@@ -6,7 +6,7 @@ import { EffectiveRoleProjectionService } from './effective-role-projection.serv
 import { GenerateAuthzWorkerLockKey } from '../../../constants';
 import { EmployeeReferenceRepository } from '../../employee/repositories/employee-reference.repository';
 import { RoleRepository } from '../../roles/repositories/role.repository';
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository, OutboxEventService } from '../../security-event';
 import { UserGroupRepository } from '../../user-groups/repositories/user-group.repository';
 import { MembershipReconciler } from '../../user-groups/services/membership-reconciler.service';
 import { UserGroupMatchingEngine } from '../../user-groups/services/user-group-matching.engine';
@@ -32,7 +32,7 @@ export class AuthorizationReconciliationWorker {
     private readonly userGroupMatchingEngine: UserGroupMatchingEngine,
     private readonly membershipReconciler: MembershipReconciler,
     private readonly effectiveRoleProjectionService: EffectiveRoleProjectionService,
-    private readonly outboxRepo: AuthSecurityEventOutboxRepository,
+    private readonly outboxRepo: OutboxEventRepository,
     private readonly transactionService: TransactionService,
     private readonly lockAdapter: DistributedLockAdapter,
     private readonly userRepository: UserRepository,
@@ -134,7 +134,7 @@ export class AuthorizationReconciliationWorker {
       const isLongRunning = durationMs >= LONG_RUNNING_SYNC_THRESHOLD_MS;
 
       // Append outbox event for sync completion
-      const outboxEvent = AuthSecurityEventOutbox.fromAuthorizationSyncCompleted(
+      const outboxEvent = OutboxEventService.fromAuthorizationSyncCompleted(
         { tenantCode: job.tenantCode, userId: job.createdBy ?? undefined },
         {
           jobId: job.id,
@@ -174,7 +174,7 @@ export class AuthorizationReconciliationWorker {
     await this.transactionService.runInTransaction(async () => {
       await this.syncJobRepo.markFailed(job.id, errorDetails);
 
-      const outboxEvent = AuthSecurityEventOutbox.fromAuthorizationSyncFailed(
+      const outboxEvent = OutboxEventService.fromAuthorizationSyncFailed(
         { tenantCode: job.tenantCode, userId: job.createdBy ?? undefined },
         {
           jobId: job.id,

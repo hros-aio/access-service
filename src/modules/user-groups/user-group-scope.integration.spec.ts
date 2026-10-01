@@ -1,7 +1,7 @@
 import { RequestContextService } from '@new-hros/libs-core';
-import { TransactionService } from '@new-hros/libs-sql';
+import { OutboxEventEntity, TransactionService } from '@new-hros/libs-sql';
 
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../security-event';
+import { OutboxEventRepository } from '../security-event';
 import { UserGroupScopeController } from './controllers/user-group-scope.controller';
 import { ScopeType } from './domain/enums/scope-type.enum';
 import {
@@ -24,7 +24,7 @@ describe('UserGroupScope Integration / Security Isolation', () => {
   let userGroupRepo: jest.Mocked<UserGroupRepository>;
   let userGroupRoleRepo: jest.Mocked<UserGroupRoleRepository>;
   let membershipRepo: jest.Mocked<UserGroupMembershipRepository>;
-  let outboxRepo: jest.Mocked<AuthSecurityEventOutboxRepository>;
+  let outboxRepo: jest.Mocked<OutboxEventRepository>;
   let transactionService: jest.Mocked<TransactionService>;
 
   const tenantA = 'tenant-a';
@@ -56,8 +56,8 @@ describe('UserGroupScope Integration / Security Isolation', () => {
     } as unknown as jest.Mocked<UserGroupMembershipRepository>;
 
     outboxRepo = {
-      save: jest.fn().mockResolvedValue({} as unknown as AuthSecurityEventOutbox),
-    } as unknown as jest.Mocked<AuthSecurityEventOutboxRepository>;
+      save: jest.fn().mockResolvedValue({} as unknown as OutboxEventEntity),
+    } as unknown as jest.Mocked<OutboxEventRepository>;
 
     transactionService = {
       runInTransaction: jest.fn((cb) => cb()),

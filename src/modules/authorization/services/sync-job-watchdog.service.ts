@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TransactionService } from '@new-hros/libs-sql';
 
-import { AuthSecurityEventOutbox, AuthSecurityEventOutboxRepository } from '../../security-event';
+import { OutboxEventRepository, OutboxEventService } from '../../security-event';
 import { AuthorizationSyncJobRepository } from '../repositories/authorization-sync-job.repository';
 
 @Injectable()
@@ -12,7 +12,7 @@ export class SyncJobWatchdogService {
 
   constructor(
     private readonly syncJobRepo: AuthorizationSyncJobRepository,
-    private readonly outboxRepo: AuthSecurityEventOutboxRepository,
+    private readonly outboxRepo: OutboxEventRepository,
     private readonly transactionService: TransactionService,
   ) {}
 
@@ -46,7 +46,7 @@ export class SyncJobWatchdogService {
         await this.transactionService.runInTransaction(async () => {
           await this.syncJobRepo.markFailed(job.id, errorDetails);
 
-          const outboxEvent = AuthSecurityEventOutbox.fromAuthorizationSyncFailed(
+          const outboxEvent = OutboxEventService.fromAuthorizationSyncFailed(
             { tenantCode: job.tenantCode, userId: job.createdBy ?? undefined },
             {
               jobId: job.id,
