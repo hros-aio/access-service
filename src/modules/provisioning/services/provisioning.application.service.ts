@@ -11,6 +11,7 @@ import { EmployeeReferenceRepository } from '../../employee/repositories/employe
 import { InvitationRepository } from '../../invite/repositories/invitation.repository';
 import { SecurityEventService } from '../../security-event/services/security-event.service';
 import { UserRepository } from '../../user/repositories/user.repository';
+import { CognitoUserProvisioningService } from '../../user/services/cognito-user-provisioning.service';
 
 import { EmployeeStatus } from '@/enums/employee-status.enum';
 import { TenantCreatedPayload } from '@/handlers/tenant-provisioning.handler';
@@ -28,6 +29,7 @@ export class ProvisioningApplicationService {
     private readonly sessionService: SessionApplicationService,
     private readonly systemRoleSeederService: SystemRoleSeederService,
     private readonly securityEventService: SecurityEventService,
+    private readonly cognitoUserProvisioningService: CognitoUserProvisioningService,
   ) {}
 
   async bootstrapRootAdmin(
@@ -57,6 +59,15 @@ export class ProvisioningApplicationService {
         credentialStatus: CredentialStatus.PENDING,
         protectedRootAdmin: true,
         securityVersion: 1,
+      });
+
+      // 4. Provision in AWS Cognito
+      await this.cognitoUserProvisioningService.provisionCognitoUser({
+        userId: savedUser.id,
+        email: savedUser.normalizedEmail,
+        tenantCode,
+        userType: 'admin',
+        suppressNotification: true,
       });
 
       // 5. Seed default baseline System Roles for the newly provisioned tenant

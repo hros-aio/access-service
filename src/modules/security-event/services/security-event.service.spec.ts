@@ -381,4 +381,79 @@ describe('SecurityEventService', () => {
       });
     });
   });
+
+  describe('logCognitoUserProvisioned', () => {
+    it('should insert a cognito-user-provisioned event with CREATED action', async () => {
+      await service.logCognitoUserProvisioned(
+        'TENANT_123',
+        'user-123',
+        'test@example.com',
+        'cognito-sub-uuid',
+        'CREATED',
+      );
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.cognito-user-provisioned',
+        publishStatus: 'pending',
+        sanitizedPayload: {
+          userId: 'user-123',
+          tenantCode: 'TENANT_123',
+          normalizedEmail: 'test@example.com',
+          externalIdentityId: 'cognito-sub-uuid',
+          action: 'CREATED',
+        },
+      });
+    });
+
+    it('should insert a cognito-user-provisioned event with LINKED_EXISTING action', async () => {
+      await service.logCognitoUserProvisioned(
+        'TENANT_123',
+        'user-123',
+        'test@example.com',
+        'cognito-sub-uuid',
+        'LINKED_EXISTING',
+      );
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.cognito-user-provisioned',
+        publishStatus: 'pending',
+        sanitizedPayload: {
+          userId: 'user-123',
+          tenantCode: 'TENANT_123',
+          normalizedEmail: 'test@example.com',
+          externalIdentityId: 'cognito-sub-uuid',
+          action: 'LINKED_EXISTING',
+        },
+      });
+    });
+  });
+
+  describe('logCognitoProvisioningFailed', () => {
+    it('should insert a cognito-provisioning-failed event with error details', async () => {
+      await service.logCognitoProvisioningFailed(
+        'TENANT_123',
+        'user-123',
+        'test@example.com',
+        'NETWORK_TIMEOUT',
+        'Cognito connection timed out',
+        3,
+      );
+      expect(mockOutboxRepository.create).toHaveBeenCalledWith({
+        tenantCode: 'TENANT_123',
+        userId: 'user-123',
+        eventType: 'authentication.cognito-provisioning-failed',
+        publishStatus: 'pending',
+        sanitizedPayload: {
+          userId: 'user-123',
+          tenantCode: 'TENANT_123',
+          normalizedEmail: 'test@example.com',
+          errorCode: 'NETWORK_TIMEOUT',
+          reason: 'Cognito connection timed out',
+          retryCount: 3,
+        },
+      });
+    });
+  });
 });

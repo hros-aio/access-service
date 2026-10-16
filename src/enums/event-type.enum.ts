@@ -33,4 +33,6 @@ export enum EventType {
   AUTHORIZATION_SYNC_REQUESTED = 'authorization.sync-requested',
   AUTHORIZATION_SYNC_COMPLETED = 'authorization.sync-completed',
   AUTHORIZATION_SYNC_FAILED = 'authorization.sync-failed',
+  AUTHENTICATION_COGNITO_USER_PROVISIONED = 'authentication.cognito-user-provisioned',
+  AUTHENTICATION_COGNITO_PROVISIONING_FAILED = 'authentication.cognito-provisioning-failed',
 }

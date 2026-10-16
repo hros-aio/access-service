@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ApisModule } from '@new-hros/libs-apis';
+import { CognitoModule } from '@new-hros/libs-aws';
 import {
   CacheModule,
   CacheModuleOptions,
@@ -9,22 +11,9 @@ import {
 } from '@new-hros/libs-core';
 import { SqlModule } from '@new-hros/libs-sql';
 
-import { AuthModule } from './modules/auth/auth.module';
-import { AuthorizationModule } from './modules/authorization/authorization.module';
-import { EmployeeModule } from './modules/employee/employee.module';
+import { modules } from './modules';
 import { HealthModule } from './modules/health/health.module';
-import { ImpactAnalysisModule } from './modules/impact-analysis/impact-analysis.module';
-import { InviteModule } from './modules/invite/invite.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
-import { MfaModule } from './modules/mfa/mfa.module';
-import { PasswordModule } from './modules/password/password.module';
-import { PermissionsModule } from './modules/permissions';
-import { ProvisioningModule } from './modules/provisioning/provisioning.module';
-import { RoleModule } from './modules/roles/role.module';
-import { SecurityEventModule } from './modules/security-event/security-event.module';
-import { TenantModule } from './modules/tenant/tenant.module';
-import { UserModule } from './modules/user/user.module';
-import { UserGroupModule } from './modules/user-groups/user-group.module';
 
 @Module({
   imports: [
@@ -65,20 +54,20 @@ import { UserGroupModule } from './modules/user-groups/user-group.module';
         autoLoadEntities: true,
       }),
     }),
-    TenantModule,
-    EmployeeModule,
-    UserModule,
-    InviteModule,
-    AuthModule,
-    MfaModule,
-    PasswordModule,
-    PermissionsModule,
-    RoleModule,
-    UserGroupModule,
-    ImpactAnalysisModule,
-    AuthorizationModule,
-    ProvisioningModule,
-    SecurityEventModule,
+    {
+      ...CognitoModule.forRootAsync({
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          region: config.get<string>('AWS_REGION', 'us-east-1'),
+          userPoolId: config.getOrThrow<string>('AWS_COGNITO_USER_POOL_ID'),
+          clientId: config.get<string>('AWS_COGNITO_CLIENT_ID'),
+          clientSecret: config.get<string>('AWS_COGNITO_CLIENT_SECRET'),
+        }),
+      }),
+      global: true,
+    },
+    ...modules,
   ],
 })
 export class AppModule {}
