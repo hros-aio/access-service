@@ -338,4 +338,52 @@ export class SecurityEventService {
       publishStatus: 'pending',
     });
   }
+
+  async logCognitoUserProvisioned(
+    tenantCode: string,
+    userId: string,
+    normalizedEmail: string,
+    externalIdentityId: string,
+    action: 'CREATED' | 'LINKED_EXISTING',
+  ): Promise<void> {
+    const payload = {
+      userId,
+      normalizedEmail,
+      externalIdentityId,
+      action,
+    };
+
+    await this.outboxRepository.create({
+      tenantCode,
+      userId,
+      eventType: EventType.AUTHENTICATION_COGNITO_USER_PROVISIONED,
+      sanitizedPayload: payload,
+      publishStatus: 'pending',
+    });
+  }
+
+  async logCognitoProvisioningFailed(
+    tenantCode: string,
+    userId: string,
+    normalizedEmail: string,
+    errorCode: string,
+    reason: string,
+    retryCount = 0,
+  ): Promise<void> {
+    const payload = {
+      userId,
+      normalizedEmail,
+      errorCode,
+      reason,
+      retryCount,
+    };
+
+    await this.outboxRepository.create({
+      tenantCode,
+      userId,
+      eventType: EventType.AUTHENTICATION_COGNITO_PROVISIONING_FAILED,
+      sanitizedPayload: payload,
+      publishStatus: 'pending',
+    });
+  }
 }

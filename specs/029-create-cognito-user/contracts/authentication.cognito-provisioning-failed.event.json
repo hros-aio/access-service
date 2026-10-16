@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CognitoProvisioningFailedSecurityEvent",
+  "type": "object",
+  "required": ["eventId", "tenantCode", "eventType", "timestamp", "payload"],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantCode": {
+      "type": "string"
+    },
+    "eventType": {
+      "type": "string",
+      "enum": ["authentication.cognito-provisioning-failed"]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object",
+      "required": ["userId", "normalizedEmail", "errorCode", "reason"],
+      "properties": {
+        "userId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "normalizedEmail": {
+          "type": "string",
+          "format": "email"
+        },
+        "errorCode": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "retryCount": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

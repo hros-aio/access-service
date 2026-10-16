@@ -13,6 +13,7 @@ import { InvitationRepository } from '../../invite/repositories/invitation.repos
 import { SecurityEventService } from '../../security-event/services/security-event.service';
 import { User } from '../../user/entities/user.entity';
 import { UserRepository } from '../../user/repositories/user.repository';
+import { CognitoUserProvisioningService } from '../../user/services/cognito-user-provisioning.service';
 
 import { EmployeeStatus } from '@/enums/employee-status.enum';
 
@@ -29,6 +30,7 @@ describe('ProvisioningApplicationService', () => {
   };
   let mockSessionService: { revokeAllSessions: jest.Mock };
   let mockSystemRoleSeederService: { seedBaselineSystemRoles: jest.Mock };
+  let mockCognitoUserProvisioningService: { provisionCognitoUser: jest.Mock };
 
   beforeEach(async () => {
     mockTransactionService = {
@@ -66,6 +68,15 @@ describe('ProvisioningApplicationService', () => {
       seedBaselineSystemRoles: jest.fn().mockResolvedValue([]),
     };
 
+    mockCognitoUserProvisioningService = {
+      provisionCognitoUser: jest.fn().mockResolvedValue({
+        userId: 'new-user-uuid',
+        externalIdentityId: 'cognito-sub-12345',
+        username: 'root@tenant-a.com',
+        action: 'CREATED',
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProvisioningApplicationService,
@@ -76,6 +87,7 @@ describe('ProvisioningApplicationService', () => {
         { provide: InvitationRepository, useValue: mockInvitationRepository },
         { provide: SessionApplicationService, useValue: mockSessionService },
         { provide: SystemRoleSeederService, useValue: mockSystemRoleSeederService },
+        { provide: CognitoUserProvisioningService, useValue: mockCognitoUserProvisioningService },
       ],
     }).compile();
 
@@ -135,6 +147,14 @@ describe('ProvisioningApplicationService', () => {
 
       expect(result).toEqual({ success: true });
       expect(mockUserRepository.create).toHaveBeenCalled();
+      expect(mockCognitoUserProvisioningService.provisionCognitoUser).toHaveBeenCalledWith({
+        userId: 'new-user-uuid',
+        email: 'root@tenant-a.com',
+        tenantCode: 'TENANT_A',
+        userType: 'admin',
+        suppressNotification: false,
+        isEmailVerified: false,
+      });
       expect(mockSystemRoleSeederService.seedBaselineSystemRoles).toHaveBeenCalledWith('TENANT_A');
       expect(mockSecurityEventService.logUserProvisioned).toHaveBeenCalledWith(
         'TENANT_A',

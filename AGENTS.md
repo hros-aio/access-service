@@ -1,5 +1,5 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/028-prompt-sensitive-access-revocation/plan.md
+at specs/029-create-cognito-user/plan.md
 <!-- SPECKIT END -->
