@@ -50,10 +50,10 @@ In-memory representation returned by `@new-hros/libs-aws` `CognitoService`.
 
 Outbox record published to downstream Kafka consumers for security auditing.
 
-| Event Type | Payload Attributes | Trigger Condition |
-|---|---|---|
-| `authentication.cognito-user-provisioned` | `tenantCode`, `userId`, `email`, `externalIdentityId`, `action: 'CREATED' \| 'LINKED_EXISTING'` | Dispatched upon successful creation or linking of Cognito user |
-| `authentication.cognito-provisioning-failed` | `tenantCode`, `userId`, `email`, `errorCode`, `reason` | Dispatched when external Cognito provisioning exhausts retries and fails |
+| Event Type | Envelope Attributes | Payload Attributes | Trigger Condition |
+|---|---|---|---|
+| `authentication.cognito-user-provisioned` | `eventId`, `tenantCode`, `eventType`, `timestamp` | `userId`, `normalizedEmail`, `externalIdentityId`, `action: 'CREATED' \| 'LINKED_EXISTING'` | Dispatched upon successful creation or linking of Cognito user |
+| `authentication.cognito-provisioning-failed` | `eventId`, `tenantCode`, `eventType`, `timestamp` | `userId`, `normalizedEmail`, `errorCode`, `reason`, `retryCount` | Dispatched when external Cognito provisioning exhausts retries and fails |
 
 ---
 

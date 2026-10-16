@@ -152,7 +152,8 @@ describe('ProvisioningApplicationService', () => {
         email: 'root@tenant-a.com',
         tenantCode: 'TENANT_A',
         userType: 'admin',
-        suppressNotification: true,
+        suppressNotification: false,
+        isEmailVerified: false,
       });
       expect(mockSystemRoleSeederService.seedBaselineSystemRoles).toHaveBeenCalledWith('TENANT_A');
       expect(mockSecurityEventService.logUserProvisioned).toHaveBeenCalledWith(

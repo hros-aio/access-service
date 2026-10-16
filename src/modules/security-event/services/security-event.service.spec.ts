@@ -398,7 +398,6 @@ describe('SecurityEventService', () => {
         publishStatus: 'pending',
         sanitizedPayload: {
           userId: 'user-123',
-          tenantCode: 'TENANT_123',
           normalizedEmail: 'test@example.com',
           externalIdentityId: 'cognito-sub-uuid',
           action: 'CREATED',
@@ -421,7 +420,6 @@ describe('SecurityEventService', () => {
         publishStatus: 'pending',
         sanitizedPayload: {
           userId: 'user-123',
-          tenantCode: 'TENANT_123',
           normalizedEmail: 'test@example.com',
           externalIdentityId: 'cognito-sub-uuid',
           action: 'LINKED_EXISTING',
@@ -447,7 +445,6 @@ describe('SecurityEventService', () => {
         publishStatus: 'pending',
         sanitizedPayload: {
           userId: 'user-123',
-          tenantCode: 'TENANT_123',
           normalizedEmail: 'test@example.com',
           errorCode: 'NETWORK_TIMEOUT',
           reason: 'Cognito connection timed out',

@@ -61,13 +61,14 @@ export class ProvisioningApplicationService {
         securityVersion: 1,
       });
 
-      // 4. Provision in AWS Cognito
+      // 4. Provision in AWS Cognito with temporary-password onboarding
       await this.cognitoUserProvisioningService.provisionCognitoUser({
         userId: savedUser.id,
         email: savedUser.normalizedEmail,
         tenantCode,
         userType: 'admin',
-        suppressNotification: true,
+        suppressNotification: false,
+        isEmailVerified: false,
       });
 
       // 5. Seed default baseline System Roles for the newly provisioned tenant

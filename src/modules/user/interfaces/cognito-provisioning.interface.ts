@@ -4,6 +4,7 @@ export interface ProvisionCognitoUserInput {
   readonly tenantCode: string;
   readonly userType?: string;
   readonly suppressNotification?: boolean;
+  readonly isEmailVerified?: boolean;
 }
 
 export type CognitoProvisioningAction = 'CREATED' | 'LINKED_EXISTING';

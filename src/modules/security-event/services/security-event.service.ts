@@ -348,7 +348,6 @@ export class SecurityEventService {
   ): Promise<void> {
     const payload = {
       userId,
-      tenantCode,
       normalizedEmail,
       externalIdentityId,
       action,
@@ -373,7 +372,6 @@ export class SecurityEventService {
   ): Promise<void> {
     const payload = {
       userId,
-      tenantCode,
       normalizedEmail,
       errorCode,
       reason,

@@ -33,14 +33,15 @@ export class CognitoUserProvisioningService {
     let retryCount = 0;
 
     try {
+      const isVerified = input.isEmailVerified === true;
       const createInput: CreateUserInput = {
         username: normalizedEmail,
         userAttributes: {
           email: normalizedEmail,
-          email_verified: 'true',
+          email_verified: isVerified ? 'true' : 'false',
           'custom:tenant_code': input.tenantCode,
         },
-        messageAction: input.suppressNotification !== false ? 'SUPPRESS' : undefined,
+        messageAction: input.suppressNotification ? 'SUPPRESS' : undefined,
       };
 
       const cognitoRecord = await this.executeWithRetry(
@@ -48,7 +49,13 @@ export class CognitoUserProvisioningService {
         (attempts) => (retryCount = attempts),
       );
 
-      const sub = cognitoRecord.attributes?.sub ?? cognitoRecord.username ?? normalizedEmail;
+      const sub = cognitoRecord.attributes?.sub;
+      if (!sub) {
+        throw new CognitoProvisioningException(
+          'Cognito user record is missing required sub attribute',
+          'MISSING_COGNITO_SUB',
+        );
+      }
 
       await this.userRepository.update(input.userId, {
         externalIdentityId: sub,
@@ -79,9 +86,11 @@ export class CognitoUserProvisioningService {
       }
 
       const errorCode =
-        error instanceof CognitoException
-          ? error.code
-          : ((error as { name?: string })?.name ?? 'UNKNOWN_ERROR');
+        error instanceof CognitoProvisioningException
+          ? (error.errorCode ?? 'COGNITO_PROVISIONING_ERROR')
+          : error instanceof CognitoException
+            ? error.code
+            : ((error as { name?: string })?.name ?? 'UNKNOWN_ERROR');
       const errorMessage = (error as Error)?.message ?? 'Failed to provision Cognito user';
 
       await this.securityEventService.logCognitoProvisioningFailed(
@@ -98,6 +107,10 @@ export class CognitoUserProvisioningService {
         (error as Error)?.stack,
       );
 
+      if (error instanceof CognitoProvisioningException) {
+        throw error;
+      }
+
       throw new CognitoProvisioningException(errorMessage, errorCode, error);
     }
   }
@@ -111,7 +124,29 @@ export class CognitoUserProvisioningService {
         this.cognitoService.getUser(normalizedEmail),
       );
 
-      const sub = existingUser.attributes?.sub ?? existingUser.username ?? normalizedEmail;
+      const sub = existingUser.attributes?.sub;
+      if (!sub) {
+        throw new CognitoProvisioningException(
+          'Existing Cognito user record is missing required sub attribute',
+          'MISSING_COGNITO_SUB',
+        );
+      }
+
+      const cognitoTenant = existingUser.attributes?.['custom:tenant_code'];
+      if (cognitoTenant && cognitoTenant !== input.tenantCode) {
+        throw new CognitoProvisioningException(
+          `Cognito user exists but belongs to a different tenant: ${cognitoTenant}`,
+          'TENANT_MISMATCH',
+        );
+      }
+
+      const existingInternalUser = await this.userRepository.findByTenantAndExternalIdentity(sub);
+      if (existingInternalUser && existingInternalUser.id !== input.userId) {
+        throw new CognitoProvisioningException(
+          `Cognito sub ${sub} is already linked to another internal user ${existingInternalUser.id}`,
+          'IDENTITY_CONFLICT',
+        );
+      }
 
       await this.userRepository.update(input.userId, {
         externalIdentityId: sub,
@@ -133,9 +168,11 @@ export class CognitoUserProvisioningService {
       };
     } catch (linkError) {
       const errorCode =
-        linkError instanceof CognitoException
-          ? linkError.code
-          : ((linkError as { name?: string })?.name ?? 'FETCH_EXISTING_FAILED');
+        linkError instanceof CognitoProvisioningException
+          ? (linkError.errorCode ?? 'LINK_CONFLICT')
+          : linkError instanceof CognitoException
+            ? linkError.code
+            : ((linkError as { name?: string })?.name ?? 'FETCH_EXISTING_FAILED');
       const errorMessage =
         (linkError as Error)?.message ??
         `Failed to fetch existing Cognito user for linking: ${normalizedEmail}`;
@@ -148,6 +185,10 @@ export class CognitoUserProvisioningService {
         errorMessage,
         1,
       );
+
+      if (linkError instanceof CognitoProvisioningException) {
+        throw linkError;
+      }
 
       throw new CognitoProvisioningException(errorMessage, errorCode, linkError);
     }

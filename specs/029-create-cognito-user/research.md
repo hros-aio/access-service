@@ -27,16 +27,17 @@
 - **Context**: When creating a user in AWS Cognito (`AdminCreateUserCommand`), if a user with that username or email already exists, Cognito throws a `UsernameExistsException` (mapped to `CognitoUserAlreadyExistsException` by `@new-hros/libs-aws`).
 - **Decision**: When `CognitoUserAlreadyExistsException` is caught:
   1. Retrieve the existing user profile using `CognitoService.getUser(normalizedEmail)`.
-  2. Extract the `sub` attribute (or unique Cognito username) from the returned `attributes`.
-  3. Associate `user.externalIdentityId = sub` and persist this update to PostgreSQL.
-  4. Optionally update Cognito user attributes (e.g. `custom:tenant_code`) using `CognitoService.updateUser` to ensure directory consistency.
-  5. Log an audit event indicating that an existing Cognito user was linked rather than created anew.
+  2. Extract the `sub` attribute from the returned `attributes`. If `sub` is absent, reject with `CognitoProvisioningException` (`MISSING_COGNITO_SUB`).
+  3. Validate tenant ownership: Ensure `custom:tenant_code` matches `input.tenantCode`. If mismatched, treat as a cross-tenant ownership conflict (`TENANT_MISMATCH`) and reject rather than retrying.
+  4. Validate internal user uniqueness: Check that the Cognito `sub` is not already associated with another internal user in the database (`userRepository.findByTenantAndExternalIdentity`). If associated with a different user, treat as an identity conflict (`IDENTITY_CONFLICT`) and reject.
+  5. Associate `user.externalIdentityId = sub` and persist this update to PostgreSQL.
+  6. Log an audit event indicating that an existing Cognito user was linked rather than created anew (`action: 'LINKED_EXISTING'`).
 - **Rationale**:
-  - Guarantees idempotency during tenant re-provisioning, system recovery, or re-onboarding of previously existing users.
-  - Prevents fatal crashes on duplicate events while preserving data integrity.
+  - Guarantees idempotency during tenant re-provisioning or re-onboarding while preventing cross-tenant identity hijacking and conflicting user links.
+  - Prevents fatal crashes on legitimate duplicate events while strictly enforcing ownership boundaries.
 - **Alternatives Considered**:
-  - *Failing the operation with HTTP 409 Conflict*: Rejected because in enterprise HRMS provisioning, external directory state might precede internal DB bootstrap. Failing halts onboarding and requires manual cloud console cleanup.
-  - *Deleting the existing Cognito user and recreating*: Strongly rejected due to security risks, breaking existing sessions, or invalidating historical audit logs in AWS.
+  - *Failing the operation with HTTP 409 Conflict without checking*: Rejected because legitimate re-onboarding or idempotent retries within the same tenant should succeed.
+  - *Blindly linking without tenant and user validation*: Strongly rejected due to high security and tenant isolation risks.
 
 ---
 
@@ -47,15 +48,11 @@
   - **Username**: Use `user.normalizedEmail` (lowercased, trimmed).
   - **Attributes**:
     - `email`: `user.normalizedEmail`
-    - `email_verified`: `'true'`
+    - `email_verified`: Set to `'true'` only when the user's email reflects a trusted, pre-verified state (e.g. corporate SSO or verified invitation); otherwise, set to `'false'` until user verification is completed.
     - `custom:tenant_code`: `user.tenantCode`
-  - **Message Action**: Pass `messageAction: 'SUPPRESS'` by default in `CreateUserInput`.
-- **Rationale**:
-  - The HROS Access Service has its own branded invitation workflow (`InviteModule` with secure single-use tokens and transactional outbox email dispatch).
-  - Suppressing Cognito's default unbranded email avoids confusing users with duplicate or conflicting emails.
-  - If a tenant configuration explicitly opts in to Cognito-managed passwords/emails in the future, `messageAction` can be parameterized.
-- **Alternatives Considered**:
-  - *Using internal UUID as Cognito username*: Rejected because Cognito usernames cannot easily be used by employees at standard login prompts, whereas email is human-readable and standard across the platform.
+  - **Message Action / Onboarding**:
+    - For root admin bootstrap provisioning (`bootstrapRootAdmin`), allow Cognito-managed temporary-password onboarding (leave `suppressNotification` unset or `false`), so the root administrator receives their initial temporary password email from Cognito to access the tenant.
+    - For users onboarded through internal invitation workflows, pass `messageAction: 'SUPPRESS'` (`suppressNotification: true`) to allow the platform's branded invitation emails to manage credentials.
 
 ---
 
